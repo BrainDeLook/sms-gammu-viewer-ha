@@ -1,0 +1,10 @@
+{
+  "domain": "sms_gammu_viewer",
+  "name": "SMS Gammu Viewer",
+  "version": "1.0.0",
+  "documentation": "https://github.com/PavelVe/home-assistant-addons/tree/main/sms-gammu-gateway",
+  "requirements": [],
+  "dependencies": ["http", "frontend"],
+  "codeowners": [],
+  "iot_class": "local_polling"
+}
