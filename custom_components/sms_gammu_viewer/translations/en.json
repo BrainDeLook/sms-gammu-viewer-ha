@@ -1,0 +1,23 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to SMS Gateway",
+        "description": "Enter the connection details for your sms-gammu-gateway addon",
+        "data": {
+          "host": "Host (IP or hostname)",
+          "port": "Port",
+          "username": "Username",
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot connect to SMS Gateway. Check host and port.",
+      "invalid_auth": "Invalid username or password."
+    },
+    "abort": {
+      "already_configured": "This SMS Gateway is already configured."
+    }
+  }
+}
