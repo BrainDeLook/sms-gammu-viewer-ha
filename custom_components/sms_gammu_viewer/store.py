@@ -40,7 +40,7 @@ class SmsStore:
             with self._conn() as conn:
                 cur = conn.execute(
                     "INSERT INTO messages (number, text, date, received, is_read) VALUES (?,?,?,?,0)",
-                    (number, text, date),
+                    (number, text, date, received),
                 )
                 return cur.lastrowid
         except Exception as e:
