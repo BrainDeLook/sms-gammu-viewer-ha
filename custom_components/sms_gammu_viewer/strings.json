@@ -1,0 +1,23 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Подключение к SMS Gateway",
+        "description": "Введите параметры подключения к аддону sms-gammu-gateway",
+        "data": {
+          "host": "Хост (IP или hostname)",
+          "port": "Порт",
+          "username": "Логин",
+          "password": "Пароль"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Не удалось подключиться к SMS Gateway. Проверь хост и порт.",
+      "invalid_auth": "Неверный логин или пароль."
+    },
+    "abort": {
+      "already_configured": "Этот SMS Gateway уже добавлен."
+    }
+  }
+}
