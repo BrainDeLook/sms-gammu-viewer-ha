@@ -2,8 +2,11 @@
 from __future__ import annotations
 
 import logging
+import shutil
+import os
 import aiohttp
 from aiohttp import web
+from pathlib import Path
 
 from homeassistant.components.http import HomeAssistantView
 from homeassistant.core import HomeAssistant
@@ -28,6 +31,21 @@ DEFAULT_USERNAME = "admin"
 DEFAULT_PASSWORD = "password"
 
 
+def _copy_panel_js(hass: HomeAssistant) -> None:
+    src_dir = Path(__file__).parent / "www"
+    dst_dir = Path(hass.config.config_dir) / "www" / "sms_gammu_viewer"
+    dst_dir.mkdir(parents=True, exist_ok=True)
+
+    src = src_dir / "panel.js"
+    dst = dst_dir / "panel.js"
+
+    if src.exists():
+        shutil.copy2(src, dst)
+        _LOGGER.info("SMS Gammu Viewer: panel.js скопирован в %s", dst)
+    else:
+        _LOGGER.error("SMS Gammu Viewer: panel.js не найден в %s", src)
+
+
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     cfg = config.get(DOMAIN, {})
     host = cfg.get(CONF_HOST, DEFAULT_HOST)
@@ -41,6 +59,8 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         "username": username,
         "password": password,
     }
+
+    await hass.async_add_executor_job(_copy_panel_js, hass)
 
     hass.http.register_view(SmsProxyView(hass))
 
