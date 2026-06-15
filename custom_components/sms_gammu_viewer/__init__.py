@@ -189,16 +189,19 @@ class SmsCoordinator:
             if key not in self._buffer:
                 self._buffer[key] = {"parts": [], "last_seen": now, "sim_ids": []}
 
-            # Добавляем только если такого текста ещё нет в буфере
             existing_texts = [p["text"] for p in self._buffer[key]["parts"]]
             if text not in existing_texts:
                 self._buffer[key]["parts"].append({"text": text, "sim_id": sim_id})
                 self._buffer[key]["last_seen"] = now
-                _LOGGER.debug("Buffered part from %s (key=%s, parts=%d)", number, key, len(self._buffer[key]["parts"]))
-
-            # Удаляем с симки сразу
-            if sim_id is not None:
-                await self.client.delete_sms(int(sim_id))
+                _LOGGER.debug(
+                    "Buffered part from %s (parts=%d)", number, len(self._buffer[key]["parts"])
+                )
+                if sim_id is not None:
+                    await self.client.delete_sms(int(sim_id))
+            else:
+                _LOGGER.debug("Skipped duplicate part from %s", number)
+                if sim_id is not None:
+                    await self.client.delete_sms(int(sim_id))
 
     async def _flush_ready(self) -> None:
         """Собираем SMS из буфера которые не менялись MULTIPART_WAIT секунд."""
