@@ -173,23 +173,32 @@ class SmsCoordinator:
             await asyncio.sleep(self._interval)
 
     async def _poll(self) -> None:
-        while True:
-            msg = await self.client.pop_sms()
-            if msg is None:
-                break
+        messages = await self.client.get_all_sms()
+        if not messages:
+            return
 
+        for msg in messages:
             number = msg.get("Number", "Unknown")
             text = msg.get("Text", "")
             date = msg.get("Date", "")
+            sim_id = msg.get("id") or msg.get("Id") or msg.get("ID")
+
+            if not text:
+                continue
 
             msg_id = await self.hass.async_add_executor_job(
                 self.store.add, number, text, date
             )
 
-            _LOGGER.info("New SMS from %s (id=%s)", number, msg_id)
+            _LOGGER.info("New SMS from %s (store_id=%s)", number, msg_id)
             await self._notify(number, text)
 
-            await asyncio.sleep(0.5)
+            if sim_id is not None:
+                await asyncio.sleep(2)
+                await self.client.delete_sms(int(sim_id))
+                _LOGGER.debug("Deleted SMS %s from modem", sim_id)
+
+        await asyncio.sleep(1)
 
     async def _notify(self, number: str, text: str) -> None:
         targets = self._notify_targets
