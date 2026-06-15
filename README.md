@@ -30,6 +30,8 @@
 - Запущенный аддон [sms-gammu-gateway](https://github.com/PavelVe/home-assistant-addons/tree/main/sms-gammu-gateway) с REST API на порту 5000
 - Для push-уведомлений: приложение [Home Assistant Companion](https://companion.home-assistant.io/) на телефоне
 
+> ⚠️ **Важно:** В настройках аддона sms-gammu-gateway необходимо **отключить автоматическую проверку сообщений** (параметр `SMS_CHECK_INTERVAL` или аналогичный). Иначе аддон и эта интеграция будут одновременно читать и удалять SMS с симки, что приведёт к потере сообщений. Всю логику опроса берёт на себя SMS Gammu Viewer.
+
 ---
 
 ## Установка
