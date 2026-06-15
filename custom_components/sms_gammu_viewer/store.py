@@ -23,11 +23,18 @@ class SmsStore:
                     text      TEXT NOT NULL,
                     date      TEXT NOT NULL,
                     received  TEXT NOT NULL,
-                    is_read   INTEGER NOT NULL DEFAULT 0
+                    is_read   INTEGER NOT NULL DEFAULT 0,
+                    UNIQUE(number, date, text)
                 )
             """)
             conn.execute("CREATE INDEX IF NOT EXISTS idx_number ON messages(number)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_date   ON messages(date)")
+            try:
+                conn.execute(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS idx_dedup ON messages(number, date, text)"
+                )
+            except Exception:
+                pass
 
     def _conn(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self._path)
@@ -39,10 +46,16 @@ class SmsStore:
         try:
             with self._conn() as conn:
                 cur = conn.execute(
-                    "INSERT INTO messages (number, text, date, received, is_read) VALUES (?,?,?,?,0)",
+                    "INSERT OR IGNORE INTO messages (number, text, date, received, is_read) VALUES (?,?,?,?,0)",
                     (number, text, date, received),
                 )
-                return cur.lastrowid
+                if cur.lastrowid and cur.rowcount > 0:
+                    return cur.lastrowid
+                row = conn.execute(
+                    "SELECT id FROM messages WHERE number=? AND date=? AND text=?",
+                    (number, date, text),
+                ).fetchone()
+                return row[0] if row else None
         except Exception as e:
             _LOGGER.error("SmsStore.add error: %s", e)
             return None
