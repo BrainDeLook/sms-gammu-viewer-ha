@@ -57,6 +57,15 @@ class GatewayClient:
             _LOGGER.warning("delete_sms(%s) error: %s", sms_id, e)
             return False
 
+    async def delete_all_sms(self) -> bool:
+        """DELETE /sms/deleteall — удаляет все SMS с симки."""
+        try:
+            await self._request("DELETE", "/sms/deleteall")
+            return True
+        except Exception as e:
+            _LOGGER.warning("delete_all_sms error: %s", e)
+            return False
+
     async def get_signal(self) -> dict | None:
         try:
             return await self._request("GET", "/status/signal")
