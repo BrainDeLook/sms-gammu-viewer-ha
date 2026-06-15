@@ -46,12 +46,31 @@ class SmsStore:
         received = datetime.now().isoformat(timespec="seconds")
         try:
             with self._conn() as conn:
+                # Точный дубликат
                 cur = conn.execute(
                     "INSERT OR IGNORE INTO messages (number, text, date, received, is_read) VALUES (?,?,?,?,0)",
                     (number, text, date, received),
                 )
                 if cur.rowcount > 0:
                     return cur.lastrowid
+
+                # Частичный дубликат: новый текст является началом или концом уже сохранённого
+                # (промежуточная версия multipart SMS которая уже обновилась до полной)
+                existing = conn.execute(
+                    "SELECT id, text FROM messages WHERE number=? AND date=?",
+                    (number, date),
+                ).fetchall()
+                for row in existing:
+                    saved_text = row[1]
+                    if saved_text.startswith(text) or text.startswith(saved_text):
+                        # Если новый текст длиннее — обновляем
+                        if len(text) > len(saved_text):
+                            conn.execute(
+                                "UPDATE messages SET text=? WHERE id=?",
+                                (text, row[0]),
+                            )
+                            return row[0]
+                        return None
                 return None
         except Exception as e:
             _LOGGER.error("SmsStore.add error: %s", e)
