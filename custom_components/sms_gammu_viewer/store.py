@@ -42,6 +42,7 @@ class SmsStore:
         return conn
 
     def add(self, number: str, text: str, date: str) -> int | None:
+        """Возвращает id только если SMS реально новый, None если дубликат."""
         received = datetime.now().isoformat(timespec="seconds")
         try:
             with self._conn() as conn:
@@ -49,13 +50,9 @@ class SmsStore:
                     "INSERT OR IGNORE INTO messages (number, text, date, received, is_read) VALUES (?,?,?,?,0)",
                     (number, text, date, received),
                 )
-                if cur.lastrowid and cur.rowcount > 0:
+                if cur.rowcount > 0:
                     return cur.lastrowid
-                row = conn.execute(
-                    "SELECT id FROM messages WHERE number=? AND date=? AND text=?",
-                    (number, date, text),
-                ).fetchone()
-                return row[0] if row else None
+                return None
         except Exception as e:
             _LOGGER.error("SmsStore.add error: %s", e)
             return None
