@@ -41,6 +41,8 @@ _LOGGER = logging.getLogger(__name__)
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
+MULTIPART_WAIT = 10
+
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     hass.data.setdefault(DOMAIN, {})
@@ -55,7 +57,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await hass.async_add_executor_job(store.init)
 
     client = GatewayClient(entry.data)
-
     coordinator = SmsCoordinator(hass, entry, store, client)
     hass.data[DOMAIN][entry.entry_id] = coordinator
 
@@ -64,9 +65,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await _register_panel(hass)
 
     hass.http.register_view(SmsApiView(hass))
-
     await coordinator.start()
-
     entry.async_on_unload(entry.add_update_listener(_options_updated))
 
     _LOGGER.info("SMS Gammu Viewer started: %s", entry.title)
@@ -121,20 +120,16 @@ async def _register_panel(hass: HomeAssistant) -> None:
 
 
 class SmsCoordinator:
-    """Фоновый опросчик: забирает SMS с симки и сохраняет в БД."""
+    """Фоновый опросчик с буферизацией multipart SMS."""
 
-    def __init__(
-        self,
-        hass: HomeAssistant,
-        entry: ConfigEntry,
-        store: SmsStore,
-        client: GatewayClient,
-    ) -> None:
+    def __init__(self, hass, entry, store, client):
         self.hass = hass
         self.entry = entry
         self.store = store
         self.client = client
         self._task: asyncio.Task | None = None
+        # Буфер: ключ = (number, date), значение = {"parts": [...], "last_seen": float}
+        self._buffer: dict[tuple, dict] = {}
 
     @property
     def _interval(self) -> int:
@@ -168,14 +163,18 @@ class SmsCoordinator:
         while True:
             try:
                 await self._poll()
+                await self._flush_ready()
             except Exception as e:
                 _LOGGER.error("Poll error: %s", e)
             await asyncio.sleep(self._interval)
 
     async def _poll(self) -> None:
+        """Читаем все SMS с симки, кладём в буфер, удаляем с симки."""
         messages = await self.client.get_all_sms()
         if not messages:
             return
+
+        now = asyncio.get_event_loop().time()
 
         for msg in messages:
             number = msg.get("Number", "Unknown")
@@ -186,38 +185,62 @@ class SmsCoordinator:
             if not text:
                 continue
 
-            msg_id = await self.hass.async_add_executor_job(
-                self.store.add, number, text, date
+            key = (number, date)
+            if key not in self._buffer:
+                self._buffer[key] = {"parts": [], "last_seen": now, "sim_ids": []}
+
+            # Добавляем только если такого текста ещё нет в буфере
+            existing_texts = [p["text"] for p in self._buffer[key]["parts"]]
+            if text not in existing_texts:
+                self._buffer[key]["parts"].append({"text": text, "sim_id": sim_id})
+                self._buffer[key]["last_seen"] = now
+                _LOGGER.debug("Buffered part from %s (key=%s, parts=%d)", number, key, len(self._buffer[key]["parts"]))
+
+            # Удаляем с симки сразу
+            if sim_id is not None:
+                await self.client.delete_sms(int(sim_id))
+
+    async def _flush_ready(self) -> None:
+        """Собираем SMS из буфера которые не менялись MULTIPART_WAIT секунд."""
+        now = asyncio.get_event_loop().time()
+        ready_keys = [
+            key for key, buf in self._buffer.items()
+            if now - buf["last_seen"] >= MULTIPART_WAIT
+        ]
+
+        for key in ready_keys:
+            buf = self._buffer.pop(key)
+            number, date = key
+            parts = buf["parts"]
+
+            # Склеиваем все части в порядке поступления
+            full_text = "".join(p["text"] for p in parts)
+
+            _LOGGER.info(
+                "SMS assembled from %s: %d parts, %d chars",
+                number, len(parts), len(full_text)
             )
 
-            _LOGGER.info("New SMS from %s (store_id=%s)", number, msg_id)
-            await self._notify(number, text)
+            msg_id = await self.hass.async_add_executor_job(
+                self.store.add, number, full_text, date
+            )
 
-            if sim_id is not None:
-                await asyncio.sleep(2)
-                await self.client.delete_sms(int(sim_id))
-                _LOGGER.debug("Deleted SMS %s from modem", sim_id)
-
-        await asyncio.sleep(1)
+            if msg_id:
+                await self._notify(number, full_text)
 
     async def _notify(self, number: str, text: str) -> None:
         targets = self._notify_targets
         if not targets:
             return
-
         message = f"От: {number}\nТекст: {text}"
-        title = "Новое SMS"
-
         for target in targets:
             parts = target.split(".", 1)
             if len(parts) != 2:
                 continue
-            domain, service = parts[0], parts[1]
             try:
                 await self.hass.services.async_call(
-                    domain,
-                    service,
-                    {"title": title, "message": message},
+                    parts[0], parts[1],
+                    {"title": "Новое SMS", "message": message},
                     blocking=False,
                 )
             except Exception as e:
@@ -225,8 +248,6 @@ class SmsCoordinator:
 
 
 class SmsApiView(HomeAssistantView):
-    """REST API для фронтенда панели."""
-
     url = "/api/sms_gammu_viewer/{action:.*}"
     name = "api:sms_gammu_viewer"
     requires_auth = True
@@ -253,9 +274,7 @@ class SmsApiView(HomeAssistantView):
 
         if action.startswith("messages/"):
             number = action[len("messages/"):]
-            data = await self.hass.async_add_executor_job(
-                store.get_by_number, number
-            )
+            data = await self.hass.async_add_executor_job(store.get_by_number, number)
             return self._json(data)
 
         if action == "messages":
@@ -268,11 +287,13 @@ class SmsApiView(HomeAssistantView):
             network = await client.get_network()
             modem = await client.get_modem()
             unread = await self.hass.async_add_executor_job(store.unread_count)
+            buffered = len(coord._buffer)
             return self._json({
                 "signal": signal,
                 "network": network,
                 "modem": modem,
                 "unread": unread,
+                "buffered_conversations": buffered,
             })
 
         if action == "poll_interval":
