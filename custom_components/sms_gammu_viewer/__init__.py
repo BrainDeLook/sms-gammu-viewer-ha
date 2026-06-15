@@ -261,7 +261,8 @@ class SmsCoordinator:
         targets = self._notify_targets
         if not targets:
             return
-        message = f"От: {number}\nТекст: {text}"
+        preview = text if len(text) <= 150 else text[:150] + "…"
+        message = f"От: {number}\nТекст: {preview}"
         for target in targets:
             parts = target.split(".", 1)
             if len(parts) != 2:
