@@ -222,12 +222,12 @@ class SmsCoordinator:
             else:
                 _LOGGER.debug("Duplicate part skipped for %s", number)
 
-            # Удаляем с симки в любом случае
-            if sim_id is not None:
-                try:
-                    await self.client.delete_sms(int(sim_id))
-                except Exception as e:
-                    _LOGGER.warning("delete_sms(%s) failed: %s", sim_id, e)
+        # Удаляем все SMS с симки после того как забрали их в буфер
+        deleted = await self.client.delete_all_sms()
+        if deleted:
+            _LOGGER.debug("Cleared all SMS from modem after buffering %d messages", len(messages))
+        else:
+            _LOGGER.warning("Failed to delete SMS from modem")
 
     async def _flush_ready(self) -> None:
         """Сохраняем сессии которые не получали новых частей ASSEMBLY_TIMEOUT секунд."""
