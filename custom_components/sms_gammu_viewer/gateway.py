@@ -23,61 +23,69 @@ class GatewayClient:
             "Content-Type": "application/json",
         }
 
-    async def _get(self, path: str, timeout: int = 10) -> Any:
+    async def _request(self, method: str, path: str, timeout: int = 10, **kwargs) -> Any:
         t = aiohttp.ClientTimeout(total=timeout)
         async with aiohttp.ClientSession(timeout=t) as s:
-            async with s.get(f"{self._base}{path}", headers=self._headers) as r:
+            async with s.request(
+                method, f"{self._base}{path}", headers=self._headers, **kwargs
+            ) as r:
                 r.raise_for_status()
+                if r.content_length == 0 or r.status == 204:
+                    return None
                 return await r.json()
 
-    async def pop_sms(self) -> dict | None:
-        """GET /sms/getsms — забирает первое SMS и удаляет его с симки."""
+    async def get_all_sms(self) -> list[dict]:
+        """GET /sms — возвращает все SMS целиком (multipart уже склеены)."""
         try:
-            data = await self._get("/sms/getsms")
-            if isinstance(data, dict) and data.get("Text"):
+            data = await self._request("GET", "/sms")
+            if isinstance(data, list):
                 return data
-            return None
+            return []
         except aiohttp.ClientResponseError as e:
-            if e.status == 404:
-                return None
-            _LOGGER.debug("pop_sms HTTP %s", e.status)
-            return None
+            _LOGGER.debug("get_all_sms HTTP %s", e.status)
+            return []
         except Exception as e:
-            _LOGGER.debug("pop_sms error: %s", e)
-            return None
+            _LOGGER.debug("get_all_sms error: %s", e)
+            return []
+
+    async def delete_sms(self, sms_id: int) -> bool:
+        """DELETE /sms/{id} — удаляет конкретное SMS с симки."""
+        try:
+            await self._request("DELETE", f"/sms/{sms_id}")
+            return True
+        except Exception as e:
+            _LOGGER.warning("delete_sms(%s) error: %s", sms_id, e)
+            return False
 
     async def get_signal(self) -> dict | None:
         try:
-            return await self._get("/status/signal")
+            return await self._request("GET", "/status/signal")
         except Exception:
             return None
 
     async def get_network(self) -> dict | None:
         try:
-            return await self._get("/status/network")
+            return await self._request("GET", "/status/network")
         except Exception:
             return None
 
     async def get_modem(self) -> dict | None:
         try:
-            return await self._get("/status/modem")
+            return await self._request("GET", "/status/modem")
         except Exception:
             return None
 
     async def send_sms(self, number: str, text: str) -> bool:
-        t = aiohttp.ClientTimeout(total=15)
-        async with aiohttp.ClientSession(timeout=t) as s:
-            async with s.post(
-                f"{self._base}/sms",
-                headers=self._headers,
-                json={"number": number, "text": text},
-            ) as r:
-                return r.status == 200
+        try:
+            await self._request("POST", "/sms", json={"number": number, "text": text}, timeout=15)
+            return True
+        except Exception as e:
+            _LOGGER.error("send_sms error: %s", e)
+            return False
 
     async def test_connection(self) -> str | None:
-        """Возвращает None если OK, иначе строку с ошибкой."""
         try:
-            await self._get("/status/signal", timeout=10)
+            await self._request("GET", "/status/signal", timeout=10)
             return None
         except aiohttp.ClientResponseError as e:
             if e.status == 401:
