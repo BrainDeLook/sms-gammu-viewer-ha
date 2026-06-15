@@ -270,7 +270,14 @@ class SmsCoordinator:
             try:
                 await self.hass.services.async_call(
                     parts[0], parts[1],
-                    {"title": "Новое SMS", "message": message},
+                    {
+                        "title": "Новое SMS",
+                        "message": message,
+                        "data": {
+                            "url": "/sms-viewer",
+                            "clickAction": "/sms-viewer",
+                        },
+                    },
                     blocking=False,
                 )
             except Exception as e:
