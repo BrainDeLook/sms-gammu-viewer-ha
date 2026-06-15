@@ -1,7 +1,7 @@
 # SMS Gammu Viewer for Home Assistant
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg?style=for-the-badge)](https://github.com/hacs/integration)
-[![GitHub Release](https://img.shields.io/github/release/BrainDeLook/sms-gammu-viewer-ha.svg?style=for-the-badge)](https://github.com/BrainDeLook/sms-gammu-viewer-ha/releases)
+[![GitHub Release](https://img.shields.io/github/v/release/BrainDeLook/sms-gammu-viewer-ha?style=for-the-badge)](https://github.com/BrainDeLook/sms-gammu-viewer-ha/releases)
 [![License](https://img.shields.io/github/license/BrainDeLook/sms-gammu-viewer-ha.svg?style=for-the-badge)](LICENSE)
 
 > 🇷🇺 [Русская версия](README_RU.md)
