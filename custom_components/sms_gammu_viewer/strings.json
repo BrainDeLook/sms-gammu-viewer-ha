@@ -2,32 +2,32 @@
   "config": {
     "step": {
       "user": {
-        "title": "Настройка SMS Gammu Viewer",
-        "description": "Укажи адрес и данные доступа к аддону sms-gammu-gateway.",
+        "title": "SMS Gammu Viewer Setup",
+        "description": "Enter the address and credentials for the sms-gammu-gateway add-on.",
         "data": {
-          "host": "Хост (IP или hostname)",
-          "port": "Порт REST API",
-          "username": "Логин",
-          "password": "Пароль"
+          "host": "Host (IP or hostname)",
+          "port": "REST API port",
+          "username": "Username",
+          "password": "Password"
         }
       }
     },
     "error": {
-      "cannot_connect": "Не удалось подключиться к шлюзу. Проверь адрес.",
-      "invalid_auth": "Неверный логин или пароль."
+      "cannot_connect": "Cannot connect to the gateway. Check the address and port.",
+      "invalid_auth": "Invalid username or password."
     },
     "abort": {
-      "already_configured": "Этот шлюз уже настроен."
+      "already_configured": "This gateway is already configured."
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "Настройки SMS Gammu Viewer",
-        "description": "Интервал опроса (секунды) и устройства для уведомлений.\nДоступные notify-сервисы: {notify_hint}",
+        "title": "SMS Gammu Viewer Settings",
+        "description": "Configure polling interval and notification targets.\n\nFound {notify_count} notify service(s) available.",
         "data": {
-          "poll_interval": "Интервал опроса (сек, минимум 5)",
-          "notify_targets": "Устройства для уведомлений (каждое с новой строки)"
+          "poll_interval": "Polling interval (seconds, min 5)",
+          "notify_targets": "Devices to notify on new SMS"
         }
       }
     }
