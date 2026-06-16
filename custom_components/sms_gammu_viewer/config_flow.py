@@ -5,7 +5,17 @@ import voluptuous as vol
 
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
 from homeassistant.core import callback
-from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.selector import (
+    NumberSelector,
+    NumberSelectorConfig,
+    NumberSelectorMode,
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
+    TextSelector,
+    TextSelectorConfig,
+    TextSelectorType,
+)
 
 from .const import (
     CONF_HOST,
@@ -56,7 +66,9 @@ class SmsGammuConfigFlow(ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_HOST, default="localhost"): str,
                 vol.Required(CONF_PORT, default=DEFAULT_PORT): int,
                 vol.Required(CONF_USERNAME, default=DEFAULT_USERNAME): str,
-                vol.Required(CONF_PASSWORD, default=DEFAULT_PASSWORD): str,
+                vol.Required(CONF_PASSWORD, default=DEFAULT_PASSWORD): TextSelector(
+                    TextSelectorConfig(type=TextSelectorType.PASSWORD)
+                ),
             }),
             errors=errors,
         )
@@ -75,45 +87,81 @@ class SmsGammuOptionsFlow(OptionsFlow):
         self, user_input: dict | None = None
     ) -> ConfigFlowResult:
         if user_input is not None:
-            targets_raw = user_input.get(CONF_NOTIFY_TARGETS, "")
-            targets = [
-                t.strip()
-                for t in targets_raw.replace(",", "\n").splitlines()
-                if t.strip()
-            ]
+            targets = user_input.get(CONF_NOTIFY_TARGETS, [])
             self.hass.config_entries.async_update_entry(
                 self._entry,
                 data={
                     **self._entry.data,
-                    CONF_POLL_INTERVAL: user_input[CONF_POLL_INTERVAL],
+                    CONF_POLL_INTERVAL: int(user_input[CONF_POLL_INTERVAL]),
                     CONF_NOTIFY_TARGETS: targets,
                 },
             )
             return self.async_create_entry(title="", data={})
 
+        notify_options = self._get_notify_options()
         current_targets = self._entry.data.get(CONF_NOTIFY_TARGETS, [])
-        targets_str = "\n".join(current_targets)
 
-        notify_services = self._get_notify_services()
-        hint = "Например:\n" + "\n".join(notify_services[:5]) if notify_services else ""
+        # Фильтруем current_targets — убираем те что больше не существуют
+        valid_values = {o["value"] for o in notify_options}
+        current_targets = [t for t in current_targets if t in valid_values]
+
+        schema_fields: dict = {
+            vol.Required(
+                CONF_POLL_INTERVAL,
+                default=self._entry.data.get(CONF_POLL_INTERVAL, DEFAULT_POLL_INTERVAL),
+            ): NumberSelector(
+                NumberSelectorConfig(
+                    min=5,
+                    max=3600,
+                    step=1,
+                    mode=NumberSelectorMode.BOX,
+                    unit_of_measurement="сек",
+                )
+            ),
+        }
+
+        if notify_options:
+            schema_fields[vol.Optional(
+                CONF_NOTIFY_TARGETS,
+                default=current_targets,
+            )] = SelectSelector(
+                SelectSelectorConfig(
+                    options=notify_options,
+                    multiple=True,
+                    mode=SelectSelectorMode.LIST,
+                    sort=True,
+                )
+            )
+        else:
+            schema_fields[vol.Optional(
+                CONF_NOTIFY_TARGETS,
+                default=", ".join(current_targets),
+            )] = str
 
         return self.async_show_form(
             step_id="init",
-            data_schema=vol.Schema({
-                vol.Required(
-                    CONF_POLL_INTERVAL,
-                    default=self._entry.data.get(CONF_POLL_INTERVAL, DEFAULT_POLL_INTERVAL),
-                ): vol.All(int, vol.Range(min=5, max=3600)),
-                vol.Optional(CONF_NOTIFY_TARGETS, default=targets_str): str,
-            }),
+            data_schema=vol.Schema(schema_fields),
             description_placeholders={
-                "notify_hint": hint or "notify.mobile_app_ваш_телефон",
+                "notify_count": str(len(notify_options)),
             },
         )
 
-    def _get_notify_services(self) -> list[str]:
+    def _get_notify_options(self) -> list[dict]:
+        """Список notify сервисов в формате [{value, label}] для SelectSelector."""
         try:
             services = self.hass.services.async_services().get("notify", {})
-            return [f"notify.{k}" for k in sorted(services.keys())]
+            result = []
+            for key in sorted(services.keys()):
+                full = f"notify.{key}"
+                # Делаем читаемый лейбл: mobile_app_iphone_daniil → iPhone Daniil
+                label = key
+                if key.startswith("mobile_app_"):
+                    label = key[len("mobile_app_"):].replace("_", " ").title()
+                elif key == "persistent_notification":
+                    label = "Persistent Notification (HA)"
+                else:
+                    label = key.replace("_", " ").title()
+                result.append({"value": full, "label": f"{label} ({full})"})
+            return result
         except Exception:
             return []
