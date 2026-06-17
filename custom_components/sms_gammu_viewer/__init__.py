@@ -302,12 +302,33 @@ class SmsCoordinator:
             await self._save_one(number, text, date)
 
     async def _save_one(self, number: str, text: str, date: str) -> None:
-        msg_id = await self.hass.async_add_executor_job(
-            self.store.add, number, text, date
+        # Проверяем есть ли недавнее сообщение от этого номера (в рамках 2 минут)
+        # Если да — это продолжение того же SMS, дописываем к нему
+        recent = await self.hass.async_add_executor_job(
+            self.store.find_recent, number, 120
         )
-        if msg_id:
-            self.push_event("new_message", {"id": msg_id, "number": number, "text": text, "date": date, "is_read": 0})
-            await self._notify(number, text)
+        if recent:
+            _LOGGER.info(
+                "Appending to recent SMS id=%s from %s (%d chars + %d chars)",
+                recent["id"], number, len(recent["text"]), len(text)
+            )
+            await self.hass.async_add_executor_job(
+                self.store.append_text, recent["id"], text
+            )
+            # Обновляем полный текст для уведомления
+            full_text = recent["text"] + text
+            self.push_event("new_message", {
+                "id": recent["id"], "number": number,
+                "text": full_text, "date": date, "is_read": 0
+            })
+            await self._notify(number, full_text)
+        else:
+            msg_id = await self.hass.async_add_executor_job(
+                self.store.add, number, text, date
+            )
+            if msg_id:
+                self.push_event("new_message", {"id": msg_id, "number": number, "text": text, "date": date, "is_read": 0})
+                await self._notify(number, text)
 
     def _add_to_buffers(self, buffers: dict[str, NumberBuffer], messages: list[dict]) -> bool:
         got_new = False
