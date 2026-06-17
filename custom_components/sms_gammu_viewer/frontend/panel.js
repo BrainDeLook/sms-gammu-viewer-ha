@@ -315,22 +315,6 @@ const CSS = `
     align-items: flex-start;
   }
 
-  /* ─── Tabs ─── */
-  .sidebar-tabs {
-    display: flex;
-    border-bottom: 1px solid var(--line);
-    flex-shrink: 0;
-  }
-  .tab-btn {
-    flex: 1; padding: 8px 4px;
-    border: none; background: none;
-    font-size: 12px; color: var(--sub);
-    cursor: pointer;
-    border-bottom: 2px solid transparent;
-    transition: all .2s;
-  }
-  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
-
   /* ─── Status page (main area) ─── */
   .status-main {
     flex: 1; overflow-y: auto; padding: 24px;
@@ -758,6 +742,12 @@ class SmsGammuPanel extends HTMLElement {
               </button>
               <h2>SMS</h2>
               <span class="unread-badge" id="unread-badge"></span>
+              <button class="icon-btn" id="modem-btn" title="Статус модема">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
+                  <line x1="12" y1="18" x2="12.01" y2="18"/>
+                </svg>
+              </button>
               <button class="icon-btn" id="refresh-btn" title="Обновить">
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                   <polyline points="23 4 23 10 17 10"/>
@@ -769,10 +759,6 @@ class SmsGammuPanel extends HTMLElement {
             <input class="search" id="search" type="text" placeholder="Поиск…" />
           </div>
           <div class="status-bar" id="status-bar">Загрузка статуса…</div>
-          <div class="sidebar-tabs">
-            <button class="tab-btn active" data-tab="chats">💬 Чаты</button>
-            <button class="tab-btn" data-tab="status">📶 Модем</button>
-          </div>
           <div class="contact-list" id="contact-list"></div>
         </div>
 
@@ -813,6 +799,13 @@ class SmsGammuPanel extends HTMLElement {
       this._pollNow();
     });
 
+    this.shadowRoot.getElementById("modem-btn").addEventListener("click", () => {
+      this._activeTab = this._activeTab === "status" ? "chats" : "status";
+      const btn = this.shadowRoot.getElementById("modem-btn");
+      btn.style.color = this._activeTab === "status" ? "var(--accent)" : "";
+      this._switchTab();
+    });
+
     this.shadowRoot.getElementById("menu-btn").addEventListener("click", () => {
       this.dispatchEvent(new Event("hass-toggle-menu", { bubbles: true, composed: true }));
     });
@@ -822,14 +815,6 @@ class SmsGammuPanel extends HTMLElement {
       this._renderContacts();
     });
 
-    this.shadowRoot.querySelectorAll(".tab-btn").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        this.shadowRoot.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
-        btn.classList.add("active");
-        this._activeTab = btn.dataset.tab;
-        this._switchTab();
-      });
-    });
 
     this.shadowRoot.getElementById("back-btn").addEventListener("click", () => {
       this._activeNumber = null;
@@ -975,6 +960,7 @@ class SmsGammuPanel extends HTMLElement {
 }
 
 customElements.define("sms-gammu-panel", SmsGammuPanel);
+
 
 
 
