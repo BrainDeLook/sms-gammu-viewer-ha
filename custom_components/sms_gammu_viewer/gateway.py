@@ -84,6 +84,24 @@ class GatewayClient:
         except Exception:
             return None
 
+    async def get_sim(self) -> dict | None:
+        try:
+            return await self._request("GET", "/status/sim")
+        except Exception:
+            return None
+
+    async def get_sms_capacity(self) -> dict | None:
+        try:
+            return await self._request("GET", "/status/sms_capacity")
+        except Exception:
+            return None
+
+    async def reset_modem(self) -> dict | None:
+        try:
+            return await self._request("GET", "/status/reset", timeout=30)
+        except Exception as e:
+            raise
+
     async def send_sms(self, number: str, text: str) -> bool:
         try:
             await self._request("POST", "/sms", json={"number": number, "text": text}, timeout=15)
@@ -102,3 +120,4 @@ class GatewayClient:
             return "cannot_connect"
         except Exception:
             return "cannot_connect"
+
