@@ -620,6 +620,7 @@ class SmsGammuPanel extends HTMLElement {
 
   _switchTab() {
     const isStatus = this._activeTab === "status";
+    const root         = this.shadowRoot.getElementById("root");
     const contactList  = this.shadowRoot.getElementById("contact-list");
     const messagesArea = this.shadowRoot.getElementById("messages-area");
     const statusMain   = this.shadowRoot.getElementById("status-main");
@@ -632,6 +633,8 @@ class SmsGammuPanel extends HTMLElement {
       if (messagesArea) messagesArea.style.display = "none";
       if (chatHeader)   chatHeader.style.display = "none";
       if (statusMain)   statusMain.style.display = "";
+      // На мобилке показываем правую область (как при открытии чата)
+      root?.classList.add("chat-open");
       this._renderStatusPage();
     } else {
       if (contactList)  contactList.style.display = "";
@@ -639,6 +642,10 @@ class SmsGammuPanel extends HTMLElement {
       if (messagesArea) messagesArea.style.display = "";
       if (chatHeader)   chatHeader.style.display = "";
       if (statusMain)   statusMain.style.display = "none";
+      // На мобилке возвращаемся к списку чатов только если нет активного чата
+      if (!this._activeNumber) {
+        root?.classList.remove("chat-open");
+      }
     }
   }
 
@@ -817,10 +824,18 @@ class SmsGammuPanel extends HTMLElement {
 
 
     this.shadowRoot.getElementById("back-btn").addEventListener("click", () => {
-      this._activeNumber = null;
-      this.shadowRoot.getElementById("root").classList.remove("chat-open");
-      this._renderContacts();
-      this._renderMessages();
+      if (this._activeTab === "status") {
+        // Закрываем страницу модема — возврат к списку
+        this._activeTab = "chats";
+        const btn = this.shadowRoot.getElementById("modem-btn");
+        if (btn) btn.style.color = "";
+        this._switchTab();
+      } else {
+        this._activeNumber = null;
+        this.shadowRoot.getElementById("root").classList.remove("chat-open");
+        this._renderContacts();
+        this._renderMessages();
+      }
     });
 
     this.shadowRoot.getElementById("delete-contact-btn").addEventListener("click", () => {
@@ -960,6 +975,7 @@ class SmsGammuPanel extends HTMLElement {
 }
 
 customElements.define("sms-gammu-panel", SmsGammuPanel);
+
 
 
 
