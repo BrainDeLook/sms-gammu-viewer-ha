@@ -467,3 +467,4 @@ class SmsApiView(HomeAssistantView):
             status=status,
             content_type="application/json",
         )
+
