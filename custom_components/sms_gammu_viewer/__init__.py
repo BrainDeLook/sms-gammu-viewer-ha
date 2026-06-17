@@ -36,8 +36,9 @@ _LOGGER = logging.getLogger(__name__)
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
-COLLECT_INTERVAL  = 3   # секунды между опросами в режиме сбора
-COLLECT_EMPTY_MAX = 10  # сколько пустых опросов подряд = SMS полностью получен
+COLLECT_INTERVAL  = 3
+COLLECT_EMPTY_MAX = 10
+MODEM_ERROR_RESET_THRESHOLD = 5
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
@@ -61,6 +62,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     hass.http.register_view(SmsApiView(hass))
     await coordinator.start()
+    await hass.config_entries.async_forward_entry_setups(entry, ["sensor"])
     entry.async_on_unload(entry.add_update_listener(_options_updated))
 
     _LOGGER.info("SMS Gammu Viewer started: %s", entry.title)
@@ -74,6 +76,7 @@ async def _options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    await hass.config_entries.async_unload_platforms(entry, ["sensor"])
     coord = hass.data[DOMAIN].pop(entry.entry_id, None)
     if coord:
         await coord.stop()
@@ -111,22 +114,19 @@ async def _register_panel(hass: HomeAssistant) -> None:
             }
         },
         require_admin=False,
+        update_events=True,
     )
 
 
 class NumberBuffer:
-    """Буфер частей SMS от одного номера."""
-
     def __init__(self, number: str) -> None:
         self.number = number
-        self.parts: list[str] = []       # тексты частей в порядке получения
-        self.first_date: str = ""        # дата первой части
+        self.parts: list[str] = []
+        self.first_date: str = ""
 
     def add(self, text: str, date: str) -> bool:
-        """Добавляет часть. Возвращает True если текст новый."""
         if text in self.parts:
             return False
-        # Проверяем что новая часть не является подстрокой уже накопленного
         assembled = "".join(self.parts)
         if text in assembled:
             return False
@@ -141,27 +141,16 @@ class NumberBuffer:
 
 
 class SmsCoordinator:
-    """
-    Два режима работы:
-
-    ОБЫЧНЫЙ: ждём poll_interval секунд, делаем GET /sms.
-    - Если пусто — снова ждём.
-    - Если есть SMS — переходим в РЕЖИМ СБОРА.
-
-    СБОР: опрашиваем каждые COLLECT_INTERVAL секунд.
-    - Пришли новые части — добавляем в буфер, сбрасываем счётчик пустых.
-    - Пусто — увеличиваем счётчик.
-    - Достигли COLLECT_EMPTY_MAX пустых подряд — SMS собран, сохраняем.
-    - Обычный таймер на паузе всё это время.
-    """
-
     def __init__(self, hass, entry, store, client):
         self.hass = hass
         self.entry = entry
-        self.store = store
+        self.store: SmsStore = store
         self.client: GatewayClient = client
         self._task: asyncio.Task | None = None
         self.collecting = False
+        self._error_streak = 0
+        self._last_event_id = 0
+        self._events: list[dict] = []  # SSE события для фронтенда
 
     @property
     def _interval(self) -> int:
@@ -190,7 +179,18 @@ class SmsCoordinator:
         self.client = GatewayClient(self.entry.data)
         await self.start()
 
-    # ─── Главный цикл ───────────────────────────────────────────────
+    def push_event(self, event_type: str, data: dict) -> None:
+        self._last_event_id += 1
+        self._events.append({
+            "id": self._last_event_id,
+            "type": event_type,
+            "data": data,
+        })
+        if len(self._events) > 100:
+            self._events = self._events[-100:]
+
+    def get_events_since(self, last_id: int) -> list[dict]:
+        return [e for e in self._events if e["id"] > last_id]
 
     async def _loop(self) -> None:
         _LOGGER.debug("Poll loop started, interval=%ss", self._interval)
@@ -199,37 +199,32 @@ class SmsCoordinator:
                 await asyncio.sleep(self._interval)
                 messages = await self._safe_get_all()
                 if messages:
+                    self._error_streak = 0
                     await self._collect(messages)
+                else:
+                    if messages is not None:
+                        self._error_streak = 0
             except asyncio.CancelledError:
                 raise
             except Exception as e:
                 _LOGGER.error("Poll loop error: %s", e)
 
-    # ─── Режим сбора ────────────────────────────────────────────────
-
     async def _collect(self, first_batch: list[dict]) -> None:
         self.collecting = True
         _LOGGER.info("Collect mode: %d parts on SIM", len(first_batch))
 
-        # Буферы по номеру
         buffers: dict[str, NumberBuffer] = {}
         self._add_to_buffers(buffers, first_batch)
-
-        # Сразу удаляем с симки
         await self._safe_delete_all()
 
         empty_streak = 0
-
         while empty_streak < COLLECT_EMPTY_MAX:
             await asyncio.sleep(COLLECT_INTERVAL)
-
             messages = await self._safe_get_all()
 
             if not messages:
                 empty_streak += 1
-                _LOGGER.debug(
-                    "Collect: empty %d/%d", empty_streak, COLLECT_EMPTY_MAX
-                )
+                _LOGGER.debug("Collect: empty %d/%d", empty_streak, COLLECT_EMPTY_MAX)
                 continue
 
             got_new = self._add_to_buffers(buffers, messages)
@@ -237,33 +232,23 @@ class SmsCoordinator:
 
             if got_new:
                 empty_streak = 0
-                _LOGGER.debug("Collect: new parts arrived, reset counter")
             else:
                 empty_streak += 1
-                _LOGGER.debug(
-                    "Collect: no new parts, empty %d/%d",
-                    empty_streak, COLLECT_EMPTY_MAX,
-                )
 
-        # Сохраняем в БД и уведомляем
         for number, buf in buffers.items():
             full_text = buf.full_text
-            _LOGGER.info(
-                "SMS assembled from %s: %d parts, %d chars",
-                number, len(buf.parts), len(full_text),
-            )
+            _LOGGER.info("SMS assembled from %s: %d parts, %d chars", number, len(buf.parts), len(full_text))
             msg_id = await self.hass.async_add_executor_job(
                 self.store.add, number, full_text, buf.first_date
             )
             if msg_id:
+                msg = {"id": msg_id, "number": number, "text": full_text, "date": buf.first_date, "is_read": 0}
+                self.push_event("new_message", msg)
                 await self._notify(number, full_text)
 
         self.collecting = False
-        _LOGGER.debug("Collect mode done")
 
-    def _add_to_buffers(
-        self, buffers: dict[str, NumberBuffer], messages: list[dict]
-    ) -> bool:
+    def _add_to_buffers(self, buffers: dict[str, NumberBuffer], messages: list[dict]) -> bool:
         got_new = False
         for msg in messages:
             number = msg.get("Number", "Unknown")
@@ -277,14 +262,22 @@ class SmsCoordinator:
                 got_new = True
         return got_new
 
-    # ─── Вспомогательные методы ────────────────────────────────────
-
-    async def _safe_get_all(self) -> list[dict]:
+    async def _safe_get_all(self) -> list[dict] | None:
         try:
-            return await self.client.get_all_sms()
+            result = await self.client.get_all_sms()
+            self._error_streak = 0
+            return result
         except Exception as e:
-            _LOGGER.warning("get_all_sms failed: %s", e)
-            return []
+            self._error_streak += 1
+            _LOGGER.warning("get_all_sms failed (%d): %s", self._error_streak, e)
+            if self._error_streak >= MODEM_ERROR_RESET_THRESHOLD:
+                _LOGGER.warning("Too many errors, attempting modem reset")
+                try:
+                    await self.client.reset_modem()
+                    self._error_streak = 0
+                except Exception as re:
+                    _LOGGER.error("Modem reset failed: %s", re)
+            return None
 
     async def _safe_delete_all(self) -> None:
         try:
@@ -327,17 +320,14 @@ class SmsApiView(HomeAssistantView):
     def __init__(self, hass: HomeAssistant) -> None:
         self.hass = hass
 
-    def _coordinator(self) -> SmsCoordinator | None:
+    def _coord(self) -> SmsCoordinator | None:
         entries = self.hass.data.get(DOMAIN, {})
-        if not entries:
-            return None
-        return next(iter(entries.values()))
+        return next(iter(entries.values())) if entries else None
 
     async def get(self, request: web.Request, action: str) -> web.Response:
-        coord = self._coordinator()
+        coord = self._coord()
         if not coord:
             return self._error("Not configured", 503)
-
         store = coord.store
 
         if action == "contacts":
@@ -357,52 +347,114 @@ class SmsApiView(HomeAssistantView):
             signal  = await coord.client.get_signal()
             network = await coord.client.get_network()
             modem   = await coord.client.get_modem()
+            sim     = await coord.client.get_sim()
+            capacity = await coord.client.get_sms_capacity()
             unread  = await self.hass.async_add_executor_job(store.unread_count)
             return self._json({
                 "signal": signal,
                 "network": network,
                 "modem": modem,
+                "sim": sim,
+                "capacity": capacity,
                 "unread": unread,
                 "collecting": coord.collecting,
+                "error_streak": coord._error_streak,
             })
 
         if action == "poll_interval":
             return self._json({"interval": coord._interval})
 
+        if action.startswith("events"):
+            last_id = int(request.rel_url.query.get("since", "0"))
+            events = coord.get_events_since(last_id)
+            return self._json({"events": events, "last_id": coord._last_event_id})
+
+        if action.startswith("export/"):
+            fmt = action[len("export/"):]
+            return await self._export(store, fmt)
+
         return self._error("Unknown action", 404)
 
     async def post(self, request: web.Request, action: str) -> web.Response:
-        coord = self._coordinator()
+        coord = self._coord()
         if not coord:
             return self._error("Not configured", 503)
-
         store = coord.store
 
         if action.startswith("read/"):
             msg_id = int(action[len("read/"):])
             await self.hass.async_add_executor_job(store.mark_read, msg_id)
+            coord.push_event("message_read", {"id": msg_id})
             return self._json({"ok": True})
 
         if action.startswith("delete/"):
             msg_id = int(action[len("delete/"):])
             await self.hass.async_add_executor_job(store.delete, msg_id)
+            coord.push_event("message_deleted", {"id": msg_id})
             return self._json({"ok": True})
 
         if action.startswith("delete_contact/"):
             number = action[len("delete_contact/"):]
             await self.hass.async_add_executor_job(store.delete_by_number, number)
+            coord.push_event("contact_deleted", {"number": number})
             return self._json({"ok": True})
+
+        if action == "send":
+            try:
+                body = await request.json()
+            except Exception:
+                return self._error("Invalid JSON", 400)
+            number = body.get("number", "").strip()
+            text   = body.get("text", "").strip()
+            if not number or not text:
+                return self._error("number and text required", 400)
+            ok = await coord.client.send_sms(number, text)
+            return self._json({"ok": ok})
 
         if action == "poll_now":
             if not coord.collecting:
-                async def _manual_poll():
+                async def _manual():
                     msgs = await coord._safe_get_all()
                     if msgs:
                         await coord._collect(msgs)
-                self.hass.async_create_task(_manual_poll())
+                self.hass.async_create_task(_manual())
             return self._json({"ok": True, "collecting": coord.collecting})
 
+        if action == "reset_modem":
+            try:
+                result = await coord.client.reset_modem()
+                return self._json({"ok": True, "result": result})
+            except Exception as e:
+                return self._error(str(e), 500)
+
         return self._error("Unknown action", 404)
+
+    async def _export(self, store: SmsStore, fmt: str) -> web.Response:
+        all_msgs = await self.hass.async_add_executor_job(store.get_all)
+
+        if fmt == "json":
+            text = json.dumps(all_msgs, ensure_ascii=False, indent=2, default=str)
+            return web.Response(
+                body=text.encode("utf-8"),
+                content_type="application/json",
+                headers={"Content-Disposition": "attachment; filename=sms_export.json"},
+            )
+
+        if fmt == "csv":
+            import csv, io
+            buf = io.StringIO()
+            writer = csv.writer(buf)
+            writer.writerow(["id", "number", "date", "received", "is_read", "text"])
+            for m in all_msgs:
+                writer.writerow([m.get("id"), m.get("number"), m.get("date"),
+                                  m.get("received"), m.get("is_read"), m.get("text")])
+            return web.Response(
+                body=buf.getvalue().encode("utf-8-sig"),
+                content_type="text/csv",
+                headers={"Content-Disposition": "attachment; filename=sms_export.csv"},
+            )
+
+        return self._error("Unknown format, use json or csv", 400)
 
     def _json(self, data) -> web.Response:
         return web.Response(
