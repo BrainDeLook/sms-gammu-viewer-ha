@@ -397,6 +397,8 @@ class SmsGammuPanel extends HTMLElement {
     this._status = null;
     this._pollInterval = 30;
     this._timer = null;
+    this._eventTimer = null;
+    this._lastEventId = 0;
     this._activeTab = 'chats';
     this._narrow = false;
   }
@@ -487,10 +489,45 @@ class SmsGammuPanel extends HTMLElement {
   _startTimer() {
     this._stopTimer();
     this._timer = setInterval(() => this._load(), this._pollInterval * 1000);
+    this._eventTimer = setInterval(() => this._pollEvents(), 4000);
   }
 
   _stopTimer() {
     if (this._timer) { clearInterval(this._timer); this._timer = null; }
+    if (this._eventTimer) { clearInterval(this._eventTimer); this._eventTimer = null; }
+  }
+
+  async _pollEvents() {
+    try {
+      const data = await this._api(`events?since=${this._lastEventId}`);
+      if (!data.events?.length) return;
+      this._lastEventId = data.last_id;
+
+      let needContacts = false;
+      let needMessages = false;
+
+      for (const ev of data.events) {
+        if (ev.type === "new_message") {
+          needContacts = true;
+          if (ev.data.number === this._activeNumber) {
+            needMessages = true;
+          }
+        } else if (ev.type === "message_deleted" || ev.type === "contact_deleted") {
+          needContacts = true;
+          needMessages = true;
+        }
+      }
+
+      if (needContacts) {
+        this._contacts = await this._api("contacts");
+        this._renderContacts();
+        this._updateBadge();
+      }
+      if (needMessages && this._activeNumber && this._activeTab !== "status") {
+        this._messages = await this._api(`messages/${encodeURIComponent(this._activeNumber)}`);
+        this._renderMessages();
+      }
+    } catch (_) {}
   }
 
   async _selectContact(number) {
@@ -983,6 +1020,7 @@ class SmsGammuPanel extends HTMLElement {
 }
 
 customElements.define("sms-gammu-panel", SmsGammuPanel);
+
 
 
 
