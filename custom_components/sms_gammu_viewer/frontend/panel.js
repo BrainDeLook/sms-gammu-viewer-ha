@@ -358,15 +358,15 @@ const CSS = `
   .status-loading { padding: 60px; text-align: center; color: var(--sub); font-size: 14px; }
 
   /* ─── Mobile ─── */
+  .back-btn { display: none; }
   @media (max-width: 580px) {
     .contacts { width: 100%; border-right: none; }
-    .chat { display: none; position: absolute; inset: 0; z-index: 10; }
+    .chat { display: none; position: absolute; inset: 0; z-index: 10; background: var(--bg); }
     .root.chat-open .contacts { display: none; }
     .root.chat-open .chat { display: flex; }
-    .back-btn { display: flex !important; }
+    .root.chat-open .back-btn { display: flex !important; }
     .status-grid { grid-template-columns: 1fr; }
   }
-  .back-btn { display: none; }
 
   .menu-btn {
     display: none;
