@@ -37,7 +37,7 @@ _LOGGER = logging.getLogger(__name__)
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 COLLECT_INTERVAL  = 3
-COLLECT_EMPTY_MAX = 10
+COLLECT_EMPTY_MAX = 5
 MODEM_ERROR_RESET_THRESHOLD = 5
 
 
@@ -529,5 +529,6 @@ class SmsApiView(HomeAssistantView):
             status=status,
             content_type="application/json",
         )
+
 
 
