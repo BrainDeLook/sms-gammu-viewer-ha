@@ -88,6 +88,25 @@ class SmsStore:
         with self._conn() as conn:
             conn.execute("DELETE FROM messages WHERE number=?", (number,))
 
+    def find_recent(self, number: str, within_seconds: int = 120) -> dict | None:
+        """Ищет последнее сообщение от номера за последние N секунд."""
+        from datetime import datetime, timedelta
+        cutoff = (datetime.now() - timedelta(seconds=within_seconds)).isoformat(timespec="seconds")
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM messages WHERE number=? AND received >= ? ORDER BY id DESC LIMIT 1",
+                (number, cutoff),
+            ).fetchone()
+        return dict(row) if row else None
+
+    def append_text(self, msg_id: int, extra_text: str) -> None:
+        """Дописывает текст к существующему сообщению."""
+        with self._conn() as conn:
+            conn.execute(
+                "UPDATE messages SET text = text || ? WHERE id = ?",
+                (extra_text, msg_id),
+            )
+
     def get_all(self) -> list[dict[str, Any]]:
         with self._conn() as conn:
             rows = conn.execute(
