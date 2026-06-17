@@ -209,9 +209,64 @@ class SmsCoordinator:
                 _LOGGER.error("Poll loop error: %s", e)
 
     async def _collect(self, first_batch: list[dict]) -> None:
-        self.collecting = True
-        _LOGGER.info("Collect mode: %d parts on SIM", len(first_batch))
+        """
+        Два режима сборки multipart SMS:
 
+        1. Аддон v1.7.1+: поле Complete=false означает что SMS ещё не полный.
+           Ждём пока все SMS станут Complete=true, потом сохраняем и удаляем.
+
+        2. Старый аддон (нет поля Complete): наш таймер — ждём COLLECT_EMPTY_MAX
+           пустых опросов подряд.
+        """
+        self.collecting = True
+        _LOGGER.info("Collect mode: %d messages on SIM", len(first_batch))
+
+        has_complete_field = any("Complete" in m for m in first_batch)
+
+        if has_complete_field:
+            await self._collect_with_complete_flag(first_batch)
+        else:
+            await self._collect_with_timer(first_batch)
+
+        self.collecting = False
+
+    async def _collect_with_complete_flag(self, first_batch: list[dict]) -> None:
+        """Режим v1.7.1+: используем поле Complete из API."""
+        _LOGGER.debug("Collect mode: using Complete field (addon v1.7.1+)")
+
+        for attempt in range(20):
+            messages = await self._safe_get_all() if attempt > 0 else first_batch
+
+            if not messages:
+                await asyncio.sleep(COLLECT_INTERVAL)
+                continue
+
+            incomplete = [m for m in messages if not m.get("Complete", True)]
+            complete   = [m for m in messages if m.get("Complete", True) and m.get("Text")]
+
+            if incomplete:
+                _LOGGER.info(
+                    "Waiting for %d incomplete multipart SMS (attempt %d/20)",
+                    len(incomplete), attempt + 1
+                )
+                await asyncio.sleep(COLLECT_INTERVAL)
+                continue
+
+            # Все SMS полные — сохраняем и удаляем
+            await self._save_messages(complete)
+            await self._safe_delete_all()
+            return
+
+        # Таймаут — сохраняем что есть
+        _LOGGER.warning("Collect timeout, saving whatever is complete")
+        messages = await self._safe_get_all() or []
+        complete = [m for m in messages if m.get("Text")]
+        await self._save_messages(complete)
+        await self._safe_delete_all()
+
+    async def _collect_with_timer(self, first_batch: list[dict]) -> None:
+        """Режим совместимости: таймер ожидания новых частей."""
+        _LOGGER.debug("Collect mode: using timer fallback (old addon)")
         buffers: dict[str, NumberBuffer] = {}
         self._add_to_buffers(buffers, first_batch)
         await self._safe_delete_all()
@@ -228,24 +283,31 @@ class SmsCoordinator:
 
             got_new = self._add_to_buffers(buffers, messages)
             await self._safe_delete_all()
-
-            if got_new:
-                empty_streak = 0
-            else:
-                empty_streak += 1
+            empty_streak = 0 if got_new else empty_streak + 1
 
         for number, buf in buffers.items():
             full_text = buf.full_text
             _LOGGER.info("SMS assembled from %s: %d parts, %d chars", number, len(buf.parts), len(full_text))
-            msg_id = await self.hass.async_add_executor_job(
-                self.store.add, number, full_text, buf.first_date
-            )
-            if msg_id:
-                msg = {"id": msg_id, "number": number, "text": full_text, "date": buf.first_date, "is_read": 0}
-                self.push_event("new_message", msg)
-                await self._notify(number, full_text)
+            await self._save_one(number, full_text, buf.first_date)
 
-        self.collecting = False
+    async def _save_messages(self, messages: list[dict]) -> None:
+        """Сохраняет список готовых SMS в БД."""
+        for msg in messages:
+            number = msg.get("Number", "Unknown")
+            text   = msg.get("Text", "")
+            date   = msg.get("Date", "")
+            parts  = msg.get("PartsReceived", 1)
+            expected = msg.get("PartsExpected", 1)
+            _LOGGER.info("Saving SMS from %s (%d/%d parts, %d chars)", number, parts, expected, len(text))
+            await self._save_one(number, text, date)
+
+    async def _save_one(self, number: str, text: str, date: str) -> None:
+        msg_id = await self.hass.async_add_executor_job(
+            self.store.add, number, text, date
+        )
+        if msg_id:
+            self.push_event("new_message", {"id": msg_id, "number": number, "text": text, "date": date, "is_read": 0})
+            await self._notify(number, text)
 
     def _add_to_buffers(self, buffers: dict[str, NumberBuffer], messages: list[dict]) -> bool:
         got_new = False
@@ -467,4 +529,5 @@ class SmsApiView(HomeAssistantView):
             status=status,
             content_type="application/json",
         )
+
 
