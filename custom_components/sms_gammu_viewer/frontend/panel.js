@@ -631,18 +631,26 @@ class SmsGammuPanel extends HTMLElement {
       if (contactList)  contactList.style.display = "none";
       if (searchBox)    searchBox.style.display = "none";
       if (messagesArea) messagesArea.style.display = "none";
-      if (chatHeader)   chatHeader.style.display = "none";
       if (statusMain)   statusMain.style.display = "";
-      // На мобилке показываем правую область (как при открытии чата)
+      // Показываем хедер с заголовком "Модем" и кнопкой назад
+      if (chatHeader)   chatHeader.style.display = "";
+      const titleEl = this.shadowRoot.getElementById("chat-title");
+      const subEl   = this.shadowRoot.getElementById("chat-subtitle");
+      if (titleEl) titleEl.textContent = "Статус модема";
+      if (subEl)   subEl.textContent = "";
+      const delBtn = this.shadowRoot.getElementById("del-contact-btn");
+      if (delBtn) delBtn.style.display = "none";
+      // На мобилке показываем правую область
       root?.classList.add("chat-open");
       this._renderStatusPage();
     } else {
       if (contactList)  contactList.style.display = "";
       if (searchBox)    searchBox.style.display = "";
       if (messagesArea) messagesArea.style.display = "";
-      if (chatHeader)   chatHeader.style.display = "";
       if (statusMain)   statusMain.style.display = "none";
-      // На мобилке возвращаемся к списку чатов только если нет активного чата
+      if (chatHeader)   chatHeader.style.display = "";
+      // Восстанавливаем заголовок чата
+      this._renderMessages();
       if (!this._activeNumber) {
         root?.classList.remove("chat-open");
       }
@@ -975,6 +983,7 @@ class SmsGammuPanel extends HTMLElement {
 }
 
 customElements.define("sms-gammu-panel", SmsGammuPanel);
+
 
 
 
