@@ -315,6 +315,57 @@ const CSS = `
     align-items: flex-start;
   }
 
+  /* ─── Tabs ─── */
+  .sidebar-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--line);
+    flex-shrink: 0;
+  }
+  .tab-btn {
+    flex: 1; padding: 8px 4px;
+    border: none; background: none;
+    font-size: 12px; color: var(--sub);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all .2s;
+  }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* ─── Status page ─── */
+  .status-page { padding: 16px; overflow-y: auto; flex: 1; }
+  .status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .stat-card {
+    background: var(--card); border-radius: 12px;
+    padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,.07);
+  }
+  .stat-card h3 {
+    font-size: 11px; color: var(--sub);
+    text-transform: uppercase; letter-spacing: .5px;
+    margin-bottom: 10px; font-weight: 600;
+  }
+  .stat-row {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    padding: 5px 0; font-size: 13px;
+    border-bottom: 1px solid var(--line);
+    gap: 8px;
+  }
+  .stat-row:last-child { border-bottom: none; }
+  .stat-key { color: var(--sub); white-space: nowrap; flex-shrink: 0; }
+  .stat-val { color: var(--text); font-weight: 500; text-align: right; word-break: break-all; }
+  .signal-bar-wrap { margin-top: 10px; }
+  .signal-label { font-size: 11px; color: var(--sub); margin-bottom: 4px; }
+  .signal-bar-bg { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; }
+  .signal-bar-fill { height: 100%; border-radius: 4px; transition: width .6s; }
+  .reset-btn {
+    margin-top: 14px; width: 100%; padding: 10px;
+    border: none; border-radius: 8px;
+    background: rgba(229,57,53,.1); color: #c62828;
+    cursor: pointer; font-size: 13px; font-weight: 500;
+    transition: background .2s; grid-column: 1/-1;
+  }
+  .reset-btn:hover { background: rgba(229,57,53,.2); }
+  .status-loading { padding: 40px; text-align: center; color: var(--sub); font-size: 14px; }
+
   /* ─── Mobile ─── */
   @media (max-width: 580px) {
     .contacts { width: 100%; border-right: none; }
@@ -322,6 +373,7 @@ const CSS = `
     .root.chat-open .contacts { display: none; }
     .root.chat-open .chat { display: flex; }
     .back-btn { display: flex !important; }
+    .status-grid { grid-template-columns: 1fr; }
   }
   .back-btn { display: none; }
 `;
@@ -339,6 +391,7 @@ class SmsGammuPanel extends HTMLElement {
     this._status = null;
     this._pollInterval = 30;
     this._timer = null;
+    this._activeTab = 'chats';
   }
 
   set hass(hass) {
@@ -414,6 +467,9 @@ class SmsGammuPanel extends HTMLElement {
     } catch (_) {}
 
     this._renderStatusBar();
+    if (this._activeTab === "status") {
+      this._renderStatusPage();
+    }
   }
 
   _startTimer() {
@@ -538,6 +594,110 @@ class SmsGammuPanel extends HTMLElement {
     );
   }
 
+  // ─── Tab switching ───
+
+  _switchTab() {
+    const chatList = this.shadowRoot.getElementById("contact-list");
+    const statusPage = this.shadowRoot.getElementById("status-page");
+    const searchBox = this.shadowRoot.querySelector(".search");
+    if (!chatList || !statusPage) return;
+
+    if (this._activeTab === "status") {
+      chatList.style.display = "none";
+      statusPage.style.display = "flex";
+      statusPage.style.flexDirection = "column";
+      if (searchBox) searchBox.style.display = "none";
+      this._loadStatus();
+    } else {
+      chatList.style.display = "";
+      statusPage.style.display = "none";
+      if (searchBox) searchBox.style.display = "";
+    }
+  }
+
+  _renderStatusPage() {
+    const page = this.shadowRoot.getElementById("status-page");
+    if (!page || this._activeTab !== "status") return;
+
+    const s = this._status;
+    if (!s) {
+      page.innerHTML = `<div class="status-loading">Загрузка данных модема…</div>`;
+      return;
+    }
+
+    const pct = s.signal?.SignalPercent ?? 0;
+    const barColor = pct >= 50 ? "#4caf50" : pct >= 20 ? "#ff9800" : "#f44336";
+
+    const row = (label, val) => val != null
+      ? `<div class="stat-row"><span class="stat-key">${label}</span><span class="stat-val">${this._esc(String(val))}</span></div>`
+      : "";
+
+    const card = (title, rows) => `
+      <div class="stat-card">
+        <h3>${title}</h3>
+        ${rows}
+      </div>`;
+
+    const signalCard = card("📶 Сигнал", `
+      ${row("Уровень", pct != null ? pct + "%" : null)}
+      ${row("dBm", s.signal?.SignalStrength)}
+      ${row("BER", s.signal?.BitErrorRate)}
+      <div class="signal-bar-wrap">
+        <div class="signal-label">${pct}%</div>
+        <div class="signal-bar-bg">
+          <div class="signal-bar-fill" style="width:${pct}%;background:${barColor}"></div>
+        </div>
+      </div>
+    `);
+
+    const networkCard = card("🌐 Сеть", `
+      ${row("Оператор", s.network?.NetworkName)}
+      ${row("Статус", s.network?.State)}
+      ${row("Код сети", s.network?.NetworkCode)}
+      ${row("Cell ID", s.network?.CID)}
+      ${row("LAC", s.network?.LAC)}
+    `);
+
+    const modemCard = card("📟 Модем", `
+      ${row("Производитель", s.modem?.Manufacturer)}
+      ${row("Модель", s.modem?.Model)}
+      ${row("Прошивка", s.modem?.Firmware)}
+      ${row("IMEI", s.modem?.IMEI)}
+    `);
+
+    const simCapacity = s.capacity;
+    const simUsed = simCapacity ? `${simCapacity.SIMUsed}/${simCapacity.SIMSize}` : null;
+    const phoneUsed = simCapacity ? `${simCapacity.PhoneUsed}/${simCapacity.PhoneSize}` : null;
+    const memCard = card("💾 Память", `
+      ${row("SIM (занято/всего)", simUsed)}
+      ${row("Телефон (занято/всего)", phoneUsed)}
+      ${row("IMSI", s.sim?.IMSI)}
+    `);
+
+    page.innerHTML = `
+      <div style="padding:14px;overflow-y:auto;flex:1">
+        <div class="status-grid">
+          ${signalCard}
+          ${networkCard}
+          ${modemCard}
+          ${memCard}
+        </div>
+        <button class="reset-btn" id="reset-modem-btn">🔄 Перезагрузить модем</button>
+      </div>`;
+
+    page.querySelector("#reset-modem-btn")?.addEventListener("click", async () => {
+      if (!confirm("Перезагрузить модем?")) return;
+      try {
+        await this._api("reset_modem", "POST");
+        const btn = page.querySelector("#reset-modem-btn");
+        if (btn) { btn.textContent = "⏳ Перезагружается…"; btn.disabled = true; }
+        setTimeout(() => this._loadStatus(), 6000);
+      } catch (e) {
+        alert("Ошибка: " + e.message);
+      }
+    });
+  }
+
   // ─── Render ───
 
   _render() {
@@ -561,7 +721,12 @@ class SmsGammuPanel extends HTMLElement {
             <input class="search" id="search" type="text" placeholder="Поиск…" />
           </div>
           <div class="status-bar" id="status-bar">Загрузка статуса…</div>
+          <div class="sidebar-tabs">
+            <button class="tab-btn active" data-tab="chats">💬 Чаты</button>
+            <button class="tab-btn" data-tab="status">📶 Модем</button>
+          </div>
           <div class="contact-list" id="contact-list"></div>
+          <div class="status-page" id="status-page" style="display:none"></div>
         </div>
 
         <div class="chat" id="chat">
@@ -603,6 +768,15 @@ class SmsGammuPanel extends HTMLElement {
     this.shadowRoot.getElementById("search").addEventListener("input", (e) => {
       this._search = e.target.value;
       this._renderContacts();
+    });
+
+    this.shadowRoot.querySelectorAll(".tab-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        this.shadowRoot.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        this._activeTab = btn.dataset.tab;
+        this._switchTab();
+      });
     });
 
     this.shadowRoot.getElementById("back-btn").addEventListener("click", () => {
@@ -749,3 +923,4 @@ class SmsGammuPanel extends HTMLElement {
 }
 
 customElements.define("sms-gammu-panel", SmsGammuPanel);
+
