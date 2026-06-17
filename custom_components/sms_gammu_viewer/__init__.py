@@ -114,7 +114,6 @@ async def _register_panel(hass: HomeAssistant) -> None:
             }
         },
         require_admin=False,
-        update_events=True,
     )
 
 
