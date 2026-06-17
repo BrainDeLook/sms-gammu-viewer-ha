@@ -331,40 +331,47 @@ const CSS = `
   }
   .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
 
-  /* ─── Status page ─── */
-  .status-page { padding: 16px; overflow-y: auto; flex: 1; }
-  .status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  /* ─── Status page (main area) ─── */
+  .status-main {
+    flex: 1; overflow-y: auto; padding: 24px;
+    background: var(--bg);
+  }
+  .status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+    max-width: 900px;
+  }
   .stat-card {
-    background: var(--card); border-radius: 12px;
-    padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,.07);
+    background: var(--card); border-radius: 14px;
+    padding: 18px; box-shadow: 0 1px 4px rgba(0,0,0,.07);
   }
   .stat-card h3 {
     font-size: 11px; color: var(--sub);
-    text-transform: uppercase; letter-spacing: .5px;
-    margin-bottom: 10px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: .6px;
+    margin-bottom: 12px; font-weight: 600;
   }
   .stat-row {
-    display: flex; justify-content: space-between; align-items: flex-start;
-    padding: 5px 0; font-size: 13px;
-    border-bottom: 1px solid var(--line);
-    gap: 8px;
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 6px 0; font-size: 13px;
+    border-bottom: 1px solid var(--line); gap: 12px;
   }
   .stat-row:last-child { border-bottom: none; }
   .stat-key { color: var(--sub); white-space: nowrap; flex-shrink: 0; }
-  .stat-val { color: var(--text); font-weight: 500; text-align: right; word-break: break-all; }
-  .signal-bar-wrap { margin-top: 10px; }
-  .signal-label { font-size: 11px; color: var(--sub); margin-bottom: 4px; }
+  .stat-val { color: var(--text); font-weight: 500; text-align: right; word-break: break-word; max-width: 65%; }
+  .signal-bar-wrap { margin-top: 12px; }
+  .signal-label { font-size: 11px; color: var(--sub); margin-bottom: 5px; }
   .signal-bar-bg { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; }
   .signal-bar-fill { height: 100%; border-radius: 4px; transition: width .6s; }
   .reset-btn {
-    margin-top: 14px; width: 100%; padding: 10px;
+    margin-top: 20px; padding: 10px 24px;
     border: none; border-radius: 8px;
     background: rgba(229,57,53,.1); color: #c62828;
     cursor: pointer; font-size: 13px; font-weight: 500;
-    transition: background .2s; grid-column: 1/-1;
+    transition: background .2s;
   }
   .reset-btn:hover { background: rgba(229,57,53,.2); }
-  .status-loading { padding: 40px; text-align: center; color: var(--sub); font-size: 14px; }
+  .status-loading { padding: 60px; text-align: center; color: var(--sub); font-size: 14px; }
 
   /* ─── Mobile ─── */
   @media (max-width: 580px) {
@@ -628,26 +635,31 @@ class SmsGammuPanel extends HTMLElement {
   // ─── Tab switching ───
 
   _switchTab() {
-    const chatList = this.shadowRoot.getElementById("contact-list");
-    const statusPage = this.shadowRoot.getElementById("status-page");
-    const searchBox = this.shadowRoot.querySelector(".search");
-    if (!chatList || !statusPage) return;
+    const isStatus = this._activeTab === "status";
+    const contactList  = this.shadowRoot.getElementById("contact-list");
+    const messagesArea = this.shadowRoot.getElementById("messages-area");
+    const statusMain   = this.shadowRoot.getElementById("status-main");
+    const chatHeader   = this.shadowRoot.getElementById("chat-header");
+    const searchBox    = this.shadowRoot.querySelector(".search");
 
-    if (this._activeTab === "status") {
-      chatList.style.display = "none";
-      statusPage.style.display = "flex";
-      statusPage.style.flexDirection = "column";
-      if (searchBox) searchBox.style.display = "none";
-      this._loadStatus();
+    if (isStatus) {
+      if (contactList)  contactList.style.display = "none";
+      if (searchBox)    searchBox.style.display = "none";
+      if (messagesArea) messagesArea.style.display = "none";
+      if (chatHeader)   chatHeader.style.display = "none";
+      if (statusMain)   statusMain.style.display = "";
+      this._renderStatusPage();
     } else {
-      chatList.style.display = "";
-      statusPage.style.display = "none";
-      if (searchBox) searchBox.style.display = "";
+      if (contactList)  contactList.style.display = "";
+      if (searchBox)    searchBox.style.display = "";
+      if (messagesArea) messagesArea.style.display = "";
+      if (chatHeader)   chatHeader.style.display = "";
+      if (statusMain)   statusMain.style.display = "none";
     }
   }
 
   _renderStatusPage() {
-    const page = this.shadowRoot.getElementById("status-page");
+    const page = this.shadowRoot.getElementById("status-main");
     if (!page || this._activeTab !== "status") return;
 
     const s = this._status;
@@ -706,15 +718,13 @@ class SmsGammuPanel extends HTMLElement {
     `);
 
     page.innerHTML = `
-      <div style="padding:14px;overflow-y:auto;flex:1">
-        <div class="status-grid">
-          ${signalCard}
-          ${networkCard}
-          ${modemCard}
-          ${memCard}
-        </div>
-        <button class="reset-btn" id="reset-modem-btn">🔄 Перезагрузить модем</button>
-      </div>`;
+      <div class="status-grid">
+        ${signalCard}
+        ${networkCard}
+        ${modemCard}
+        ${memCard}
+      </div>
+      <button class="reset-btn" id="reset-modem-btn">🔄 Перезагрузить модем</button>`;
 
     page.querySelector("#reset-modem-btn")?.addEventListener("click", async () => {
       if (!confirm("Перезагрузить модем?")) return;
@@ -764,7 +774,6 @@ class SmsGammuPanel extends HTMLElement {
             <button class="tab-btn" data-tab="status">📶 Модем</button>
           </div>
           <div class="contact-list" id="contact-list"></div>
-          <div class="status-page" id="status-page" style="display:none"></div>
         </div>
 
         <div class="chat" id="chat">
@@ -795,6 +804,7 @@ class SmsGammuPanel extends HTMLElement {
               <p>Выберите диалог слева</p>
             </div>
           </div>
+          <div class="status-main" id="status-main" style="display:none"></div>
         </div>
       </div>
     `;
@@ -965,5 +975,6 @@ class SmsGammuPanel extends HTMLElement {
 }
 
 customElements.define("sms-gammu-panel", SmsGammuPanel);
+
 
 
