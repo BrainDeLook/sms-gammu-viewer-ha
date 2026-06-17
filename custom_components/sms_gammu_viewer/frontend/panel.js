@@ -285,6 +285,22 @@ const CSS = `
     margin-left: auto;
   }
   .msg-bubble:hover .msg-delete { color: var(--sub); }
+
+  /* ─── Date divider ─── */
+  .date-divider {
+    display: flex; align-items: center; gap: 10px;
+    margin: 10px 0 4px; user-select: none;
+  }
+  .date-divider::before,
+  .date-divider::after {
+    content: ''; flex: 1; height: 1px; background: var(--line);
+  }
+  .date-divider span {
+    font-size: 11px; color: var(--sub);
+    background: var(--bg); padding: 2px 8px;
+    border-radius: 10px; white-space: nowrap;
+    border: 1px solid var(--line);
+  }
   .msg-delete:hover { color: var(--danger) !important; }
 
   /* ─── Empty / loading states ─── */
@@ -609,6 +625,20 @@ class SmsGammuPanel extends HTMLElement {
       if (now - d < 604800000)
         return d.toLocaleDateString([], { weekday: "short" });
       return d.toLocaleDateString([], { day: "2-digit", month: "short" });
+    } catch { return str; }
+  }
+
+  _fmtDateLabel(str) {
+    if (!str) return "";
+    try {
+      const d   = new Date(str);
+      const now = new Date();
+      const today     = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const yesterday = new Date(today - 86400000);
+      const msgDay    = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      if (msgDay.getTime() === today.getTime())     return "Сегодня";
+      if (msgDay.getTime() === yesterday.getTime()) return "Вчера";
+      return d.toLocaleDateString("ru-RU", { day: "2-digit", month: "long", year: "numeric" });
     } catch { return str; }
   }
 
@@ -997,16 +1027,25 @@ class SmsGammuPanel extends HTMLElement {
       return;
     }
 
-    area.innerHTML = this._messages.map((m) => `
-      <div class="msg-bubble ${!m.is_read ? "unread" : ""}">
-        <div class="msg-text">${this._esc(m.text)}</div>
-        <div class="msg-meta">
-          ${!m.is_read ? '<span class="msg-unread-dot"></span>' : ""}
-          <span class="msg-date">${this._formatFull(m.date)}</span>
-          <button class="msg-delete" data-id="${m.id}" title="Удалить">🗑</button>
-        </div>
-      </div>
-    `).join("");
+    let html = "";
+    let lastLabel = "";
+    for (const m of this._messages) {
+      const label = this._fmtDateLabel(m.date);
+      if (label !== lastLabel) {
+        html += `<div class="date-divider"><span>${this._esc(label)}</span></div>`;
+        lastLabel = label;
+      }
+      html += `
+        <div class="msg-bubble ${!m.is_read ? "unread" : ""}">
+          <div class="msg-text">${this._esc(m.text)}</div>
+          <div class="msg-meta">
+            ${!m.is_read ? '<span class="msg-unread-dot"></span>' : ""}
+            <span class="msg-date">${this._formatFull(m.date)}</span>
+            <button class="msg-delete" data-id="${m.id}" title="Удалить">🗑</button>
+          </div>
+        </div>`;
+    }
+    area.innerHTML = html;
 
     area.querySelectorAll(".msg-delete").forEach((btn) => {
       btn.addEventListener("click", (e) => {
@@ -1020,6 +1059,7 @@ class SmsGammuPanel extends HTMLElement {
 }
 
 customElements.define("sms-gammu-panel", SmsGammuPanel);
+
 
 
 
