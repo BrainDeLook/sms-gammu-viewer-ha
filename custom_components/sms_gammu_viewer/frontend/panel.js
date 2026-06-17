@@ -376,6 +376,21 @@ const CSS = `
     .status-grid { grid-template-columns: 1fr; }
   }
   .back-btn { display: none; }
+
+  .menu-btn {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 40px; height: 40px;
+    background: none; border: none;
+    cursor: pointer;
+    color: var(--text);
+    border-radius: 50%;
+    flex-shrink: 0;
+    transition: background .15s;
+  }
+  .menu-btn:hover { background: rgba(0,0,0,.06); }
+  .menu-btn.visible { display: inline-flex; }
 `;
 
 class SmsGammuPanel extends HTMLElement {
@@ -392,6 +407,12 @@ class SmsGammuPanel extends HTMLElement {
     this._pollInterval = 30;
     this._timer = null;
     this._activeTab = 'chats';
+    this._narrow = false;
+  }
+
+  set narrow(val) {
+    this._narrow = val;
+    this._updateMenuBtn();
   }
 
   set hass(hass) {
@@ -594,6 +615,16 @@ class SmsGammuPanel extends HTMLElement {
     );
   }
 
+  _updateMenuBtn() {
+    const btn = this.shadowRoot.getElementById("menu-btn");
+    if (!btn) return;
+    if (this._narrow) {
+      btn.classList.add("visible");
+    } else {
+      btn.classList.remove("visible");
+    }
+  }
+
   // ─── Tab switching ───
 
   _switchTab() {
@@ -708,6 +739,13 @@ class SmsGammuPanel extends HTMLElement {
         <div class="contacts">
           <div class="contacts-header">
             <div class="contacts-header-row">
+              <button class="menu-btn" id="menu-btn" title="Меню">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                  <line x1="3" y1="6" x2="21" y2="6"/>
+                  <line x1="3" y1="12" x2="21" y2="12"/>
+                  <line x1="3" y1="18" x2="21" y2="18"/>
+                </svg>
+              </button>
               <h2>SMS</h2>
               <span class="unread-badge" id="unread-badge"></span>
               <button class="icon-btn" id="refresh-btn" title="Обновить">
@@ -763,6 +801,10 @@ class SmsGammuPanel extends HTMLElement {
 
     this.shadowRoot.getElementById("refresh-btn").addEventListener("click", () => {
       this._pollNow();
+    });
+
+    this.shadowRoot.getElementById("menu-btn").addEventListener("click", () => {
+      this.dispatchEvent(new Event("hass-toggle-menu", { bubbles: true, composed: true }));
     });
 
     this.shadowRoot.getElementById("search").addEventListener("input", (e) => {
@@ -923,4 +965,5 @@ class SmsGammuPanel extends HTMLElement {
 }
 
 customElements.define("sms-gammu-panel", SmsGammuPanel);
+
 
