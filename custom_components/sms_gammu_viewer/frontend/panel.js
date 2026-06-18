@@ -488,11 +488,31 @@ class SmsGammuPanel extends HTMLElement {
     return this._hass?.auth?.data?.access_token || "";
   }
 
-  async _api(path, method = "GET") {
-    const r = await fetch(`/api/sms_gammu_viewer/${path}`, {
+  async _refreshToken() {
+    try {
+      await this._hass.auth.refreshAccessToken();
+    } catch (_) {}
+  }
+
+  async _api(path, method = "GET", body = null) {
+    const opts = {
       method,
       headers: { Authorization: `Bearer ${this._token()}` },
-    });
+    };
+    if (body) {
+      opts.headers["Content-Type"] = "application/json";
+      opts.body = JSON.stringify(body);
+    }
+
+    let r = await fetch(`/api/sms_gammu_viewer/${path}`, opts);
+
+    // Токен истёк — обновляем и повторяем один раз
+    if (r.status === 401) {
+      await this._refreshToken();
+      opts.headers["Authorization"] = `Bearer ${this._token()}`;
+      r = await fetch(`/api/sms_gammu_viewer/${path}`, opts);
+    }
+
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     return r.json();
   }
@@ -1180,6 +1200,7 @@ class SmsGammuPanel extends HTMLElement {
 }
 
 customElements.define("sms-gammu-panel", SmsGammuPanel);
+
 
 
 
