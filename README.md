@@ -8,21 +8,24 @@
 
 A native panel for viewing incoming SMS messages directly in Home Assistant. Works with the [sms-gammu-gateway](https://github.com/PavelVe/home-assistant-addons/tree/main/sms-gammu-gateway) add-on and any compatible gateway based on [pajikos/sms-gammu-gateway](https://github.com/pajikos/sms-gammu-gateway).
 
-After installation, an **SMS** tab appears in the sidebar with all your conversations. Messages are stored inside Home Assistant and are independent of SIM card memory — they are automatically deleted from the modem after being received.
+After installation, an **SMS** tab appears in the sidebar. Messages are stored in an internal SQLite database and are automatically deleted from the modem after being received.
 
 ---
 
 ## Features
 
-- 💬 Conversations by number — all SMS from one sender in one chat thread
-- 🔵 Unread message highlighting and counters
+- 💬 Chat-style view — all SMS from one sender in one thread
+- 🔢 Unread SMS counter badge on the sidebar icon (`sensor.sms_unread_count`)
+- 🔔 Push notifications on new SMS with tap-to-open (iOS & Android)
+- 🔄 Auto-refresh — chat updates automatically when new messages arrive
+- 📶 Modem status page — signal, operator, IMEI, SIM capacity, modem reset
+- 🗄 Internal SQLite storage — messages persist independently of SIM card memory
+- 🧩 Smart multipart SMS assembly — long messages collected in full before saving
 - 🔍 Search by phone number or message text
-- 🗄 Internal HA storage (SQLite) — messages are never lost due to SIM overflow
-- 🔄 Smart multipart SMS assembly — long messages are collected in full before display
-- 📲 Push notifications to your phone on new SMS
 - 🗑 Delete individual messages or entire conversations
-- ⚙️ Configurable polling interval from the HA UI
-- 📶 Signal strength and carrier status in the panel
+- ⚙️ Configurable polling interval and notification targets from the HA UI
+- 📱 Mobile-friendly with hamburger menu button and back navigation
+- 🗓 Date dividers in chat (Today, Yesterday, full date)
 
 ---
 
@@ -32,7 +35,7 @@ After installation, an **SMS** tab appears in the sidebar with all your conversa
 - Running [sms-gammu-gateway](https://github.com/PavelVe/home-assistant-addons/tree/main/sms-gammu-gateway) add-on with REST API on port 5000
 - For push notifications: [Home Assistant Companion](https://companion.home-assistant.io/) app on your phone
 
-> ⚠️ **Important:** In the sms-gammu-gateway add-on configuration, **disable automatic SMS polling** (the `SMS_CHECK_INTERVAL` parameter or equivalent). Otherwise the add-on and this integration will simultaneously read and delete messages from the SIM card, causing message loss. SMS Gammu Viewer takes over all polling logic.
+> ⚠️ **Important:** In the sms-gammu-gateway add-on configuration, **disable automatic SMS polling** (`SMS_CHECK_INTERVAL` or equivalent). Otherwise the add-on and this integration will simultaneously read and delete messages from the SIM, causing message loss. SMS Gammu Viewer takes over all polling logic.
 
 ---
 
@@ -45,87 +48,68 @@ After installation, an **SMS** tab appears in the sidebar with all your conversa
 Or manually:
 
 1. Open **HACS** in Home Assistant
-2. Click the three dots (⋮) in the top right → **Custom repositories**
-3. Paste the URL: `https://github.com/BrainDeLook/sms-gammu-viewer-ha`
-4. Category: **Integration** → click **Add**
-5. Find **SMS Gammu Viewer** → click **Download**
-6. Restart Home Assistant
+2. Click ⋮ → **Custom repositories**
+3. Paste: `https://github.com/BrainDeLook/sms-gammu-viewer-ha` — Category: **Integration**
+4. Find **SMS Gammu Viewer** → **Download**
+5. Restart Home Assistant
 
 ### Manual installation
 
 1. Download the [latest release](https://github.com/BrainDeLook/sms-gammu-viewer-ha/releases)
-2. Copy the `custom_components/sms_gammu_viewer/` folder to `<config>/custom_components/`
+2. Copy `custom_components/sms_gammu_viewer/` to `<config>/custom_components/`
 3. Restart Home Assistant
 
 ---
 
 ## Initial Setup
 
-After restarting HA:
-
-1. Go to **Settings → Devices & Services**
-2. Click **+ Add Integration**
-3. Search for **SMS Gammu Viewer**
-4. Fill in the form:
+1. Go to **Settings → Devices & Services → + Add Integration**
+2. Search for **SMS Gammu Viewer**
+3. Fill in the form:
 
 | Field | Description | Example |
 |---|---|---|
-| **Host** | IP address or hostname where the add-on is running | `localhost` or `192.168.1.100` |
-| **Port** | REST API port of the add-on | `5000` |
+| **Host** | IP or hostname where the add-on runs | `localhost` or `192.168.1.100` |
+| **Port** | REST API port | `5000` |
 | **Username** | Add-on login | `admin` |
 | **Password** | Add-on password | `password` |
 
-> If the add-on runs on the same machine as HA — use `localhost`. Otherwise enter its IP address.
-
-5. Click **Submit** — the integration will verify the connection
-6. The **SMS** icon (💬) will appear in the sidebar
+4. Click **Submit** — the integration will verify the connection
+5. The **SMS** icon (💬) will appear in the sidebar
 
 ---
 
 ## Settings (polling interval & notifications)
 
-To change the polling interval or add devices for push notifications:
-
-1. Go to **Settings → Devices & Services**
-2. Find the **SMS Gammu Viewer** card
-3. Click **Configure** (⚙️ gear icon)
+Go to **Settings → Devices & Services → SMS Gammu Viewer → Configure** (⚙️):
 
 ### Polling Interval
 
-How often the integration checks for new SMS on the modem. Minimum is 5 seconds, recommended is 20–30 seconds.
+How often the integration checks for new SMS. Minimum 5 seconds, recommended 20–30 seconds.
 
-> When an SMS arrives, the integration automatically switches to active collection mode: it polls the modem every 3 seconds until it confirms that all parts of a long message have been received. The regular timer is paused during this time.
+> When an SMS arrives, the integration automatically enters **active collection mode**: polls every 3 seconds until the SIM is empty for 5 consecutive polls (~15 seconds of silence). The regular timer is paused during this time.
 
 ### Push Notifications
 
-The **"Notification targets"** field — enter notify services one per line.
+Select devices from the dropdown list of all available `notify.*` services. Multiple devices supported.
 
-**How to find your device name:**
+Tapping the notification opens the SMS panel directly.
 
-1. Install the [Home Assistant](https://companion.home-assistant.io/) app on your phone and log in to your HA instance
-2. Go to **Settings → Devices & Services → Integrations**
-3. Find the **Mobile App** integration and open it
-4. You will see your device listed, e.g. `iPhone Daniil`
-5. The service name is generated automatically: spaces → underscores, all lowercase
+**How to find your device name** if it's not in the list:
+- Go to **Developer Tools → Services** and start typing `notify.mobile_app_`
+- Or check **Settings → Devices & Services → Mobile App**
 
-For example, if your device is `iPhone Daniil` → the service will be `notify.mobile_app_iphone_daniil`
+---
 
-You can also find the exact name via **Developer Tools → Services**: start typing `notify.mobile_app_` and all available devices will appear.
+## Modem Status Page
 
-**Example with multiple devices:**
-```
-notify.mobile_app_iphone_daniil
-notify.mobile_app_samsung_galaxy_s24
-```
+Click the 📱 button in the SMS panel header to open the modem status page:
 
-After saving, every new SMS will send a notification to all listed devices:
-```
-New SMS
-From: +79001234567
-Text: Message text...
-```
-
-Tapping the notification will open the SMS panel in Home Assistant.
+- 📶 Signal strength with visual bar
+- 🌐 Network operator and registration state
+- 📟 Modem manufacturer, model, firmware, IMEI
+- 💾 SIM and phone memory usage + IMSI
+- 🔄 Modem reset button
 
 ---
 
@@ -139,30 +123,48 @@ USB GSM modem
 sms-gammu-gateway (REST API :5000)
        ↓ GET /sms  (every N sec, or every 3 sec in collect mode)
 SMS Gammu Viewer (custom component)
-       ↓ DELETE /sms/deleteall  (removes from SIM)
-SQLite database inside HA (/config/sms_gammu_viewer.db)
+       ↓ DELETE /sms/deleteall
+SQLite database (/config/sms_gammu_viewer.db)
        ↓
-SMS panel in sidebar  +  Push notification to phone
+SMS panel in sidebar  +  Push notification  +  sensor.sms_unread_count
 ```
 
 ### Long SMS Assembly
 
-Long messages (>160 Latin chars or >70 Cyrillic chars) are split into parts by the carrier and delivered one by one. The integration handles this automatically:
+Messages over 160 Latin / 70 Cyrillic characters are split by the carrier. The integration:
 
-1. Detects the first part → enters active collection mode
-2. Polls the modem every **3 seconds**
-3. Each received part is added to a buffer and immediately deleted from the SIM
-4. When 10 consecutive polls return empty (≈30 seconds of silence) — the SMS is considered complete
-5. All parts are joined and saved as a single message
+1. Detects first part → enters active collection mode
+2. Polls modem every **3 seconds**, deletes each part from SIM immediately
+3. After **5 empty polls (~15 sec)** — considers SMS complete
+4. If parts arrive in multiple waves within 2 minutes — automatically merges them
+5. Saves as one message, sends notification with full text
 
 ---
 
-## Compatible Add-ons / Gateways
+## Compatible Add-ons
 
 | Project | Compatibility |
 |---|---|
 | [PavelVe/home-assistant-addons sms-gammu-gateway](https://github.com/PavelVe/home-assistant-addons) | ✅ |
 | [pajikos/sms-gammu-gateway](https://github.com/pajikos/sms-gammu-gateway) | ✅ |
+
+---
+
+## Changelog
+
+### v2.2.0
+- 🔄 Auto-refresh chat via event polling every 4 seconds
+- 📶 Modem status page with signal, network, IMEI, SIM capacity and reset button
+- 📱 Hamburger menu button on mobile for HA sidebar navigation
+- 🗓 Date dividers in chat (Today, Yesterday, full date)
+- 🧩 Improved multipart SMS: merge waves from same number within 2-minute window
+- 🔔 Fixed iOS push notification tap — opens SMS panel directly
+
+### v2.1.0
+- 🔢 Unread SMS counter sensor (`sensor.sms_unread_count`) with sidebar badge
+
+### v2.0.0
+- Initial release: chat view, SQLite storage, config flow, smart SMS assembly, push notifications
 
 ---
 
