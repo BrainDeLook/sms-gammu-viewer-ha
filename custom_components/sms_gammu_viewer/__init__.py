@@ -385,14 +385,6 @@ class SmsCoordinator:
                         "message": message,
                         "data": {
                             "url": "/sms-viewer",
-                            "clickAction": "/sms-viewer",
-                            "actions": [
-                                {
-                                    "action": "URI",
-                                    "title": "Открыть SMS",
-                                    "uri": "/sms-viewer",
-                                }
-                            ],
                         },
                     },
                     blocking=False,
@@ -557,6 +549,7 @@ class SmsApiView(HomeAssistantView):
             status=status,
             content_type="application/json",
         )
+
 
 
 
