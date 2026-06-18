@@ -386,6 +386,13 @@ class SmsCoordinator:
                         "data": {
                             "url": "/sms-viewer",
                             "clickAction": "/sms-viewer",
+                            "actions": [
+                                {
+                                    "action": "URI",
+                                    "title": "Открыть SMS",
+                                    "uri": "/sms-viewer",
+                                }
+                            ],
                         },
                     },
                     blocking=False,
