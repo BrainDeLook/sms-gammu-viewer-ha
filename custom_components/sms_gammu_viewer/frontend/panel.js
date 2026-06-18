@@ -440,6 +440,112 @@ const CSS = `
   .menu-btn.visible { display: inline-flex; }
 `;
 
+
+const TRANSLATIONS = {
+  ru: {
+    sms: "SMS",
+    search: "Поиск…",
+    chats: "Чаты",
+    modem: "Модем",
+    select_dialog: "Выберите диалог",
+    select_dialog_left: "Выберите диалог слева",
+    no_messages: this._t("no_messages"),
+    nothing_found: this._t("nothing_found"),
+    messages_count: (n) => `${n} сообщ.`,
+    collecting: this._t("collecting"),
+    modem_unavailable: "Модем недоступен",
+    modem_unavailable_streak: (n) => `⚠ Модем недоступен · ${n} ошибок — перезагрузка…`,
+    no_modem: "Нет связи с модемом",
+    poll_every: (n) => `опрос каждые ${n}с`,
+    today: "Сегодня",
+    yesterday: "Вчера",
+    delete_confirm: (n) => `Удалить всю переписку с ${n}?`,
+    copied: "Скопировано",
+    copy_failed: "Не удалось скопировать",
+    send_error: "Ошибка отправки",
+    send_placeholder: "Написать сообщение…",
+    modem_status: "Статус модема",
+    signal: "📶 Сигнал",
+    network: "🌐 Сеть",
+    modem_card: "📟 Модем",
+    memory: "💾 Память",
+    signal_pct: this._t("signal_pct"),
+    signal_dbm: this._t("signal_dbm"),
+    ber: this._t("ber"),
+    operator: this._t("operator"),
+    status: this._t("status"),
+    network_code: this._t("network_code"),
+    cell_id: this._t("cell_id"),
+    manufacturer: this._t("manufacturer"),
+    model: this._t("model"),
+    firmware: this._t("firmware"),
+    sim_used: this._t("sim_used"),
+    phone_used: this._t("phone_used"),
+    imsi: this._t("imsi"),
+    imei: this._t("imei"),
+    reset_modem: this._t("reset_modem"),
+    reset_confirm: this._t("reset_confirm"),
+    resetting: this._t("resetting"),
+    reset_error: "Ошибка: ",
+    loading_modem: this._t("loading_modem"),
+    back: "Назад",
+    refresh: "Обновить",
+    delete_chat: "Удалить переписку",
+    delete_msg: "Удалить",
+  },
+  en: {
+    sms: "SMS",
+    search: "Search…",
+    chats: "Chats",
+    modem: "Modem",
+    select_dialog: "Select a conversation",
+    select_dialog_left: "Select a conversation on the left",
+    no_messages: "No messages",
+    nothing_found: "Nothing found",
+    messages_count: (n) => `${n} msg`,
+    collecting: "Receiving SMS…",
+    modem_unavailable: "Modem unavailable",
+    modem_unavailable_streak: (n) => `⚠ Modem unavailable · ${n} errors — restarting…`,
+    no_modem: "No modem connection",
+    poll_every: (n) => `poll every ${n}s`,
+    today: "Today",
+    yesterday: "Yesterday",
+    delete_confirm: (n) => `Delete all messages with ${n}?`,
+    copied: "Copied",
+    copy_failed: "Could not copy",
+    send_error: "Send failed",
+    send_placeholder: "Write a message…",
+    modem_status: "Modem status",
+    signal: "📶 Signal",
+    network: "🌐 Network",
+    modem_card: "📟 Modem",
+    memory: "💾 Memory",
+    signal_pct: "Level, %",
+    signal_dbm: "Level, dBm",
+    ber: this._t("ber"),
+    operator: "Operator",
+    status: "Status",
+    network_code: "Network code",
+    cell_id: this._t("cell_id"),
+    manufacturer: "Manufacturer",
+    model: "Model",
+    firmware: "Firmware",
+    sim_used: "SIM (used/total)",
+    phone_used: "Phone (used/total)",
+    imsi: this._t("imsi"),
+    imei: this._t("imei"),
+    reset_modem: "🔄 Reset modem",
+    reset_confirm: "Reset modem?",
+    resetting: "⏳ Restarting…",
+    reset_error: "Error: ",
+    loading_modem: "Loading modem data…",
+    back: "Back",
+    refresh: "Refresh",
+    delete_chat: "Delete conversation",
+    delete_msg: "Delete",
+  },
+};
+
 class SmsGammuPanel extends HTMLElement {
   constructor() {
     super();
@@ -460,6 +566,18 @@ class SmsGammuPanel extends HTMLElement {
     this._sending = false;
     this._modemError = null;
     this._narrow = false;
+  }
+
+  _lang() {
+    const l = this._hass?.language || "en";
+    return l.startsWith("ru") ? "ru" : "en";
+  }
+
+  _t(key, ...args) {
+    const dict = TRANSLATIONS[this._lang()] || TRANSLATIONS.en;
+    const val = dict[key];
+    if (typeof val === "function") return val(...args);
+    return val || key;
   }
 
   set narrow(val) {
@@ -657,7 +775,7 @@ class SmsGammuPanel extends HTMLElement {
   }
 
   async _deleteContact(number) {
-    if (!confirm(`Удалить всю переписку с ${number}?`)) return;
+    if (!confirm(this._t("delete_confirm", number))) return;
     try {
       await this._api(`delete_contact/${encodeURIComponent(number)}`, "POST");
       this._contacts = this._contacts.filter((c) => c.number !== number);
@@ -706,8 +824,8 @@ class SmsGammuPanel extends HTMLElement {
       const today     = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const yesterday = new Date(today - 86400000);
       const msgDay    = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-      if (msgDay.getTime() === today.getTime())     return "Сегодня";
-      if (msgDay.getTime() === yesterday.getTime()) return "Вчера";
+      if (msgDay.getTime() === today.getTime())     return this._t("today");
+      if (msgDay.getTime() === yesterday.getTime()) return this._t("yesterday");
       return d.toLocaleDateString("ru-RU", { day: "2-digit", month: "long", year: "numeric" });
     } catch { return str; }
   }
@@ -784,10 +902,10 @@ class SmsGammuPanel extends HTMLElement {
         this._renderMessages();
         await this._refreshContacts();
       } else {
-        this._showToast("Ошибка отправки");
+        this._showToast(this._t("send_error"));
       }
     } catch (e) {
-      this._showToast("Ошибка: " + e.message);
+      this._showToast(this._t("reset_error") + e.message);
     } finally {
       this._sending = false;
       if (btn) btn.disabled = false;
@@ -830,7 +948,7 @@ class SmsGammuPanel extends HTMLElement {
       if (chatHeader)   chatHeader.style.display = "";
       const titleEl = this.shadowRoot.getElementById("chat-title");
       const subEl   = this.shadowRoot.getElementById("chat-subtitle");
-      if (titleEl) titleEl.textContent = "Статус модема";
+      if (titleEl) titleEl.textContent = this._t("modem_status");
       if (subEl)   subEl.textContent = "";
       const delBtn = this.shadowRoot.getElementById("del-contact-btn");
       if (delBtn) delBtn.style.display = "none";
@@ -857,7 +975,7 @@ class SmsGammuPanel extends HTMLElement {
 
     const s = this._status;
     if (!s) {
-      page.innerHTML = `<div class="status-loading">Загрузка данных модема…</div>`;
+      page.innerHTML = `<div class="status-loading">${this._t("loading_modem")}</div>`;
       return;
     }
 
@@ -874,10 +992,10 @@ class SmsGammuPanel extends HTMLElement {
         ${rows}
       </div>`;
 
-    const signalCard = card("📶 Сигнал", `
+    const signalCard = card(this._t("signal"), `
       ${row("Уровень", pct != null ? pct + "%" : null)}
       ${row("dBm", s.signal?.SignalStrength)}
-      ${row("BER", s.signal?.BitErrorRate)}
+      ${row(this._t("ber"), s.signal?.BitErrorRate)}
       <div class="signal-bar-wrap">
         <div class="signal-label">${pct}%</div>
         <div class="signal-bar-bg">
@@ -886,28 +1004,28 @@ class SmsGammuPanel extends HTMLElement {
       </div>
     `);
 
-    const networkCard = card("🌐 Сеть", `
-      ${row("Оператор", s.network?.NetworkName)}
-      ${row("Статус", s.network?.State)}
-      ${row("Код сети", s.network?.NetworkCode)}
-      ${row("Cell ID", s.network?.CID)}
+    const networkCard = card(this._t("network"), `
+      ${row(this._t("operator"), s.network?.NetworkName)}
+      ${row(this._t("status"), s.network?.State)}
+      ${row(this._t("network_code"), s.network?.NetworkCode)}
+      ${row(this._t("cell_id"), s.network?.CID)}
       ${row("LAC", s.network?.LAC)}
     `);
 
-    const modemCard = card("📟 Модем", `
-      ${row("Производитель", s.modem?.Manufacturer)}
-      ${row("Модель", s.modem?.Model)}
-      ${row("Прошивка", s.modem?.Firmware)}
-      ${row("IMEI", s.modem?.IMEI)}
+    const modemCard = card(this._t("modem_card"), `
+      ${row(this._t("manufacturer"), s.modem?.Manufacturer)}
+      ${row(this._t("model"), s.modem?.Model)}
+      ${row(this._t("firmware"), s.modem?.Firmware)}
+      ${row(this._t("imei"), s.modem?.IMEI)}
     `);
 
     const simCapacity = s.capacity;
     const simUsed = simCapacity ? `${simCapacity.SIMUsed}/${simCapacity.SIMSize}` : null;
     const phoneUsed = simCapacity ? `${simCapacity.PhoneUsed}/${simCapacity.PhoneSize}` : null;
-    const memCard = card("💾 Память", `
-      ${row("SIM (занято/всего)", simUsed)}
-      ${row("Телефон (занято/всего)", phoneUsed)}
-      ${row("IMSI", s.sim?.IMSI)}
+    const memCard = card(this._t("memory"), `
+      ${row(this._t("sim_used"), simUsed)}
+      ${row(this._t("phone_used"), phoneUsed)}
+      ${row(this._t("imsi"), s.sim?.IMSI)}
     `);
 
     page.innerHTML = `
@@ -917,17 +1035,17 @@ class SmsGammuPanel extends HTMLElement {
         ${modemCard}
         ${memCard}
       </div>
-      <button class="reset-btn" id="reset-modem-btn">🔄 Перезагрузить модем</button>`;
+      <button class="reset-btn" id="reset-modem-btn">${this._t("reset_modem")}</button>`;
 
     page.querySelector("#reset-modem-btn")?.addEventListener("click", async () => {
-      if (!confirm("Перезагрузить модем?")) return;
+      if (!confirm(this._t("reset_confirm"))) return;
       try {
         await this._api("reset_modem", "POST");
         const btn = page.querySelector("#reset-modem-btn");
-        if (btn) { btn.textContent = "⏳ Перезагружается…"; btn.disabled = true; }
+        if (btn) { btn.textContent = this._t("resetting"); btn.disabled = true; }
         setTimeout(() => this._loadStatus(), 6000);
       } catch (e) {
-        alert("Ошибка: " + e.message);
+        alert(this._t("reset_error") + e.message);
       }
     });
   }
@@ -951,7 +1069,7 @@ class SmsGammuPanel extends HTMLElement {
               </button>
               <h2>SMS</h2>
               <span class="unread-badge" id="unread-badge"></span>
-              <button class="icon-btn" id="modem-btn" title="Статус модема">
+              <button class="icon-btn" id="modem-btn" title="${this._t('modem_status')}">
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                   <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
                   <line x1="12" y1="18" x2="12.01" y2="18"/>
@@ -965,9 +1083,9 @@ class SmsGammuPanel extends HTMLElement {
                 </svg>
               </button>
             </div>
-            <input class="search" id="search" type="text" placeholder="Поиск…" />
+            <input class="search" id="search" type="text" placeholder="${this._t("search")}" />
           </div>
-          <div class="status-bar" id="status-bar">Загрузка статуса…</div>
+          <div class="status-bar" id="status-bar">${this._t("loading_modem")}</div>
           <div class="contact-list" id="contact-list"></div>
         </div>
 
@@ -979,10 +1097,10 @@ class SmsGammuPanel extends HTMLElement {
               </svg>
             </button>
             <div style="flex:1">
-              <div class="chat-title" id="chat-title">Выберите диалог</div>
+              <div class="chat-title" id="chat-title"></div>
               <div class="chat-subtitle" id="chat-subtitle"></div>
             </div>
-            <button class="icon-btn danger" id="delete-contact-btn" title="Удалить переписку" style="display:none">
+            <button class="icon-btn danger" id="delete-contact-btn" title="${this._t('delete_chat')}" style="display:none">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="3 6 5 6 21 6"/>
                 <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
@@ -996,12 +1114,12 @@ class SmsGammuPanel extends HTMLElement {
               <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
               </svg>
-              <p>Выберите диалог слева</p>
+              <p>${this._t("select_dialog_left")}</p>
             </div>
           </div>
           <div class="status-main" id="status-main" style="display:none"></div>
           <div class="send-bar" id="send-bar" style="display:none">
-            <textarea class="send-input" id="send-input" rows="1" placeholder="Написать сообщение…"></textarea>
+            <textarea class="send-input" id="send-input" rows="1" placeholder="…"></textarea>
             <button class="send-btn" id="send-btn" disabled title="Отправить">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                 <line x1="22" y1="2" x2="11" y2="13"/>
@@ -1027,6 +1145,14 @@ class SmsGammuPanel extends HTMLElement {
     this.shadowRoot.getElementById("menu-btn").addEventListener("click", () => {
       this.dispatchEvent(new Event("hass-toggle-menu", { bubbles: true, composed: true }));
     });
+
+    // Устанавливаем локализованные атрибуты
+    const searchEl = this.shadowRoot.getElementById("search");
+    if (searchEl) searchEl.placeholder = this._t("search");
+    const sendInputEl = this.shadowRoot.getElementById("send-input");
+    if (sendInputEl) sendInputEl.placeholder = this._t("send_placeholder");
+    const titleEl = this.shadowRoot.getElementById("chat-title");
+    if (titleEl) titleEl.textContent = this._t("select_dialog");
 
     const ta = this.shadowRoot.getElementById("send-input");
     ta.addEventListener("input", () => {
@@ -1095,7 +1221,7 @@ class SmsGammuPanel extends HTMLElement {
       const streak = this._modemError.streak || "";
       bar.innerHTML = `
         <span class="signal-dot bad"></span>
-        <span>⚠ Модем недоступен${streak ? " · " + streak + " ошибок" : ""} — перезагрузка…</span>
+        <span>${streak ? this._t("modem_unavailable_streak", streak) : this._t("modem_unavailable")}</span>
       `;
       return;
     }
@@ -1104,12 +1230,12 @@ class SmsGammuPanel extends HTMLElement {
     if (s?.collecting) {
       bar.innerHTML = `
         <span class="signal-dot collecting"></span>
-        <span>Получение SMS…</span>
+        <span>${this._t("collecting")}</span>
       `;
       return;
     }
     if (!s?.signal) {
-      bar.innerHTML = `<span class="signal-dot bad"></span><span>Нет связи с модемом</span>`;
+      bar.innerHTML = `<span class="signal-dot bad"></span><span>${this._t("no_modem")}</span>`;
       return;
     }
     const pct = s.signal?.SignalPercent ?? "?";
@@ -1118,7 +1244,7 @@ class SmsGammuPanel extends HTMLElement {
     const dotClass = pct >= 50 ? "" : pct >= 20 ? "mid" : "bad";
     bar.innerHTML = `
       <span class="signal-dot ${dotClass}"></span>
-      <span>${net ? net + " · " : ""}${pct}% · опрос каждые ${interval}с</span>
+      <span>${net ? net + " · " : ""}${pct}% · ${this._t("poll_every", interval)}</span>
     `;
   }
 
@@ -1134,7 +1260,7 @@ class SmsGammuPanel extends HTMLElement {
     const items = this._filteredContacts();
     if (items.length === 0) {
       list.innerHTML = `<div class="empty" style="height:120px"><p>${
-        this._search ? "Ничего не найдено" : "Нет сообщений"
+        this._search ? this._t("nothing_found") : this._t("no_messages")
       }</p></div>`;
       return;
     }
@@ -1174,7 +1300,7 @@ class SmsGammuPanel extends HTMLElement {
     const sendBar = this.shadowRoot.getElementById("send-bar");
 
     if (!this._activeNumber) {
-      titleEl && (titleEl.textContent = "Выберите диалог");
+      titleEl && (titleEl.textContent = this._t("select_dialog"));
       subEl && (subEl.textContent = "");
       delBtn && (delBtn.style.display = "none");
       sendBar && (sendBar.style.display = "none");
@@ -1183,7 +1309,7 @@ class SmsGammuPanel extends HTMLElement {
           <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
           </svg>
-          <p>Выберите диалог слева</p>
+          <p>${this._t("select_dialog_left")}</p>
         </div>`;
       return;
     }
@@ -1192,11 +1318,11 @@ class SmsGammuPanel extends HTMLElement {
     const contact = this._contacts.find((c) => c.number === this._activeNumber);
     const count = contact?.total ?? this._messages.length;
     titleEl && (titleEl.textContent = this._activeNumber);
-    subEl && (subEl.textContent = `${count} сообщ.`);
+    subEl && (subEl.textContent = this._t("messages_count", count));
     delBtn && (delBtn.style.display = "");
 
     if (this._messages.length === 0) {
-      area.innerHTML = `<div class="empty"><p>Нет сообщений</p></div>`;
+      area.innerHTML = `<div class="empty"><p>${this._t("no_messages")}</p></div>`;
       return;
     }
 
@@ -1214,7 +1340,7 @@ class SmsGammuPanel extends HTMLElement {
           <div class="msg-meta">
             ${!m.is_read ? '<span class="msg-unread-dot"></span>' : ""}
             <span class="msg-date">${this._formatFull(m.date)}</span>
-            <button class="msg-delete" data-id="${m.id}" title="Удалить">🗑</button>
+            <button class="msg-delete" data-id="${m.id}" title="${this._t('delete_msg')}">🗑</button>
           </div>
         </div>`;
     }
@@ -1235,9 +1361,9 @@ class SmsGammuPanel extends HTMLElement {
           await navigator.clipboard.writeText(text);
           bubble?.classList.add("copied");
           setTimeout(() => bubble?.classList.remove("copied"), 800);
-          this._showToast("Скопировано");
+          this._showToast(this._t("copied"));
         } catch (_) {
-          this._showToast("Не удалось скопировать");
+          this._showToast(this._t("copy_failed"));
         }
       });
     });
@@ -1247,6 +1373,7 @@ class SmsGammuPanel extends HTMLElement {
 }
 
 customElements.define("sms-gammu-panel", SmsGammuPanel);
+
 
 
 
