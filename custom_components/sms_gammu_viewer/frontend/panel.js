@@ -431,6 +431,60 @@ const CSS = `
   /* ─── Mobile ─── */
   .back-btn { display: none; }
 
+  /* ─── FAB new chat ─── */
+  .fab {
+    position: absolute;
+    bottom: 20px; right: 16px;
+    width: 52px; height: 52px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 3px 12px rgba(0,0,0,.25);
+    transition: transform .15s, box-shadow .15s;
+    z-index: 10;
+  }
+  .fab:hover { transform: scale(1.08); box-shadow: 0 5px 18px rgba(0,0,0,.3); }
+  .fab:active { transform: scale(.96); }
+
+  /* ─── New chat modal ─── */
+  .new-chat-overlay {
+    display: none; position: absolute; inset: 0;
+    background: rgba(0,0,0,.4); z-index: 20;
+    align-items: flex-end; justify-content: center;
+  }
+  .new-chat-overlay.open { display: flex; }
+  .new-chat-sheet {
+    background: var(--card); border-radius: 18px 18px 0 0;
+    padding: 20px 20px 32px; width: 100%; max-width: 500px;
+  }
+  .new-chat-title {
+    font-size: 16px; font-weight: 600; color: var(--text);
+    margin-bottom: 16px;
+  }
+  .new-chat-input {
+    width: 100%; padding: 10px 14px;
+    border: 1px solid var(--line); border-radius: 10px;
+    background: var(--bg); color: var(--text);
+    font-size: 14px; font-family: inherit; outline: none;
+    transition: border-color .2s; margin-bottom: 10px;
+  }
+  .new-chat-input:focus { border-color: var(--accent); }
+  .new-chat-actions {
+    display: flex; gap: 10px; justify-content: flex-end; margin-top: 14px;
+  }
+  .btn-cancel {
+    padding: 9px 18px; border-radius: 8px; border: 1px solid var(--line);
+    background: none; color: var(--sub); cursor: pointer; font-size: 14px;
+  }
+  .btn-start {
+    padding: 9px 18px; border-radius: 8px; border: none;
+    background: var(--accent); color: #fff; cursor: pointer;
+    font-size: 14px; font-weight: 500; transition: opacity .2s;
+  }
+  .btn-start:disabled { opacity: .4; cursor: default; }
+
   /* ─── Language picker ─── */
   .lang-picker {
     position: relative;
@@ -542,7 +596,7 @@ class SmsGammuPanel extends HTMLElement {
 
   set narrow(val) {
     this._narrow = val;
-    this._updateMenuBtn();
+    if (this._ready) this._updateMenuBtn();
   }
 
   set hass(hass) {
@@ -846,6 +900,23 @@ class SmsGammuPanel extends HTMLElement {
     }
   }
 
+  _openNewChat() {
+    const overlay = this.shadowRoot.getElementById("new-chat-overlay");
+    const numInput = this.shadowRoot.getElementById("new-chat-number");
+    const txtInput = this.shadowRoot.getElementById("new-chat-text");
+    const sendBtn  = this.shadowRoot.getElementById("new-chat-send");
+    if (!overlay) return;
+    numInput.value = "";
+    txtInput.value = "";
+    sendBtn.disabled = true;
+    overlay.classList.add("open");
+    numInput.focus();
+  }
+
+  _closeNewChat() {
+    this.shadowRoot.getElementById("new-chat-overlay")?.classList.remove("open");
+  }
+
   async _sendSms() {
     const number = this._activeNumber;
     const text = this._sendText.trim();
@@ -1061,6 +1132,29 @@ class SmsGammuPanel extends HTMLElement {
           </div>
           <div class="status-bar" id="status-bar">${this._t("loading_status")}</div>
           <div class="contact-list" id="contact-list"></div>
+
+          <!-- FAB: новый чат -->
+          <button class="fab" id="fab-new-chat" title="Новый чат">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+              <line x1="12" y1="5" x2="12" y2="19"/>
+              <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+          </button>
+
+          <!-- Modal: новый чат -->
+          <div class="new-chat-overlay" id="new-chat-overlay">
+            <div class="new-chat-sheet">
+              <div class="new-chat-title" id="new-chat-title">Новое сообщение</div>
+              <input class="new-chat-input" id="new-chat-number" type="tel"
+                placeholder="+79001234567" />
+              <textarea class="new-chat-input" id="new-chat-text" rows="3"
+                placeholder="Текст сообщения…" style="resize:none"></textarea>
+              <div class="new-chat-actions">
+                <button class="btn-cancel" id="new-chat-cancel">Отмена</button>
+                <button class="btn-start" id="new-chat-send" disabled>Отправить</button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="chat" id="chat">
@@ -1151,6 +1245,54 @@ class SmsGammuPanel extends HTMLElement {
     this.shadowRoot.addEventListener("click", () => {
       this.shadowRoot.getElementById("lang-dropdown")?.classList.remove("open");
     });
+
+    // FAB — новый чат
+    this.shadowRoot.getElementById("fab-new-chat").addEventListener("click", (e) => {
+      e.stopPropagation();
+      this._openNewChat();
+    });
+    this.shadowRoot.getElementById("new-chat-overlay").addEventListener("click", (e) => {
+      if (e.target === this.shadowRoot.getElementById("new-chat-overlay")) {
+        this._closeNewChat();
+      }
+    });
+    this.shadowRoot.getElementById("new-chat-cancel").addEventListener("click", () => {
+      this._closeNewChat();
+    });
+
+    const numInput  = this.shadowRoot.getElementById("new-chat-number");
+    const txtInput  = this.shadowRoot.getElementById("new-chat-text");
+    const sendBtn2  = this.shadowRoot.getElementById("new-chat-send");
+
+    const checkReady = () => {
+      sendBtn2.disabled = !numInput.value.trim() || !txtInput.value.trim();
+    };
+    numInput.addEventListener("input", checkReady);
+    txtInput.addEventListener("input", checkReady);
+
+    sendBtn2.addEventListener("click", async () => {
+      const number = numInput.value.trim();
+      const text   = txtInput.value.trim();
+      if (!number || !text) return;
+      sendBtn2.disabled = true;
+      try {
+        const res = await this._api("send", "POST", { number, text });
+        if (res.ok) {
+          this._closeNewChat();
+          await this._selectContact(number);
+          await this._refreshContacts();
+        } else {
+          this._showToast(this._t("send_error"));
+          sendBtn2.disabled = false;
+        }
+      } catch (e) {
+        this._showToast(this._t("send_error") + ": " + e.message);
+        sendBtn2.disabled = false;
+      }
+    });
+
+    // Применяем состояние narrow если уже знаем
+    this._updateMenuBtn();
 
     const ta = this.shadowRoot.getElementById("send-input");
     ta.addEventListener("input", () => {
@@ -1371,6 +1513,7 @@ class SmsGammuPanel extends HTMLElement {
 }
 
 customElements.define("sms-gammu-panel", SmsGammuPanel);
+
 
 
 
