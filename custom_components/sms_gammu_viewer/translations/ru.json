@@ -1,0 +1,35 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Настройка SMS Gammu Viewer",
+        "description": "Укажи адрес и данные доступа к аддону sms-gammu-gateway.",
+        "data": {
+          "host": "Хост (IP или hostname)",
+          "port": "Порт REST API",
+          "username": "Логин",
+          "password": "Пароль"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Не удалось подключиться к шлюзу. Проверь адрес и порт.",
+      "invalid_auth": "Неверный логин или пароль."
+    },
+    "abort": {
+      "already_configured": "Этот шлюз уже настроен."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Настройки SMS Gammu Viewer",
+        "description": "Интервал опроса и устройства для уведомлений.\n\nДоступно notify-сервисов: {notify_count}.",
+        "data": {
+          "poll_interval": "Интервал опроса (секунды, минимум 5)",
+          "notify_targets": "Устройства для уведомлений при новом SMS"
+        }
+      }
+    }
+  }
+}
