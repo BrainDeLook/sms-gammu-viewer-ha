@@ -432,21 +432,24 @@ const CSS = `
   .back-btn { display: none; }
 
   /* ─── FAB new chat ─── */
+  .fab-bar {
+    padding: 10px 14px;
+    border-top: 1px solid var(--line);
+    background: var(--card);
+    flex-shrink: 0;
+  }
   .fab {
-    position: absolute;
-    bottom: 20px; right: 16px;
-    width: 52px; height: 52px;
-    border-radius: 50%;
+    width: 100%; height: 40px;
+    border-radius: 20px;
     background: var(--accent);
     color: #fff;
     border: none; cursor: pointer;
     display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 3px 12px rgba(0,0,0,.25);
-    transition: transform .15s, box-shadow .15s;
-    z-index: 10;
+    gap: 8px; font-size: 14px; font-weight: 500;
+    transition: opacity .2s;
   }
-  .fab:hover { transform: scale(1.08); box-shadow: 0 5px 18px rgba(0,0,0,.3); }
-  .fab:active { transform: scale(.96); }
+  .fab:hover { opacity: .85; }
+  .fab:active { opacity: .7; }
 
   /* ─── New chat modal ─── */
   .new-chat-overlay {
@@ -589,6 +592,8 @@ class SmsGammuPanel extends HTMLElement {
     if (sendInput) sendInput.placeholder = this._t("send_placeholder");
     const titleEl = this.shadowRoot?.getElementById("chat-title");
     if (titleEl && !this._activeNumber) titleEl.textContent = this._t("select_dialog");
+    const fabLabel = this.shadowRoot?.getElementById("fab-label");
+    if (fabLabel) fabLabel.textContent = this._t("new_conversation");
     this._renderStatusBar();
     this._renderContacts();
     this._renderMessages();
@@ -905,12 +910,19 @@ class SmsGammuPanel extends HTMLElement {
     const numInput = this.shadowRoot.getElementById("new-chat-number");
     const txtInput = this.shadowRoot.getElementById("new-chat-text");
     const sendBtn  = this.shadowRoot.getElementById("new-chat-send");
+    const titleEl  = this.shadowRoot.getElementById("new-chat-title");
+    const cancelEl = this.shadowRoot.getElementById("new-chat-cancel");
     if (!overlay) return;
+    if (titleEl) titleEl.textContent = this._t("new_conversation");
+    if (cancelEl) cancelEl.textContent = this._t("cancel");
+    if (sendBtn) sendBtn.textContent = this._t("send");
     numInput.value = "";
+    numInput.placeholder = this._t("number_placeholder");
     txtInput.value = "";
+    txtInput.placeholder = this._t("message_placeholder");
     sendBtn.disabled = true;
     overlay.classList.add("open");
-    numInput.focus();
+    setTimeout(() => numInput.focus(), 50);
   }
 
   _closeNewChat() {
@@ -1133,13 +1145,15 @@ class SmsGammuPanel extends HTMLElement {
           <div class="status-bar" id="status-bar">${this._t("loading_status")}</div>
           <div class="contact-list" id="contact-list"></div>
 
-          <!-- FAB: новый чат -->
-          <button class="fab" id="fab-new-chat" title="Новый чат">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-              <line x1="12" y1="5" x2="12" y2="19"/>
-              <line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
-          </button>
+          <div class="fab-bar">
+            <button class="fab" id="fab-new-chat">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              <span id="fab-label">Новое сообщение</span>
+            </button>
+          </div>
 
           <!-- Modal: новый чат -->
           <div class="new-chat-overlay" id="new-chat-overlay">
@@ -1513,6 +1527,7 @@ class SmsGammuPanel extends HTMLElement {
 }
 
 customElements.define("sms-gammu-panel", SmsGammuPanel);
+
 
 
 
