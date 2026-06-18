@@ -135,6 +135,11 @@ const CSS = `
     font-weight: 700;
     flex-shrink: 0;
   }
+  .avatar.alpha {
+    background: #78909c;
+    font-size: 12px;
+    letter-spacing: -.5px;
+  }
 
   .contact-info { flex: 1; min-width: 0; }
 
@@ -653,8 +658,19 @@ class SmsGammuPanel extends HTMLElement {
   }
 
   _avatar(number) {
-    const d = (number || "?").replace(/\D/g, "");
-    return d.slice(-2) || "?";
+    const s = (number || "?").trim();
+    const digits = s.replace(/\D/g, "");
+    if (digits.length > 0) {
+      // Номер телефона — последние 2 цифры
+      return digits.slice(-2);
+    }
+    // Текстовое имя — первые 2 буквы в верхнем регистре
+    const letters = s.replace(/[^a-zA-Zа-яёА-ЯЁ]/g, "");
+    return letters.slice(0, 2).toUpperCase() || s.slice(0, 2).toUpperCase() || "?";
+  }
+
+  _isAlphaTag(number) {
+    return number && !/^[+\d\s\-()]+$/.test(number.trim());
   }
 
   _esc(s) {
@@ -974,7 +990,7 @@ class SmsGammuPanel extends HTMLElement {
       <div class="contact-item ${c.unread > 0 ? "has-unread" : ""} ${
         c.number === this._activeNumber ? "active" : ""
       }" data-number="${this._esc(c.number)}">
-        <div class="avatar">${this._esc(this._avatar(c.number))}</div>
+        <div class="avatar ${this._isAlphaTag(c.number) ? 'alpha' : ''}">${this._esc(this._avatar(c.number))}</div>
         <div class="contact-info">
           <div class="contact-row1">
             <span class="contact-number">${this._esc(c.number)}</span>
@@ -1059,6 +1075,7 @@ class SmsGammuPanel extends HTMLElement {
 }
 
 customElements.define("sms-gammu-panel", SmsGammuPanel);
+
 
 
 
