@@ -257,6 +257,13 @@ const CSS = `
     line-height: 1.6;
     white-space: pre-wrap;
     word-break: break-word;
+    cursor: pointer;
+    user-select: text;
+  }
+  .msg-text:active { opacity: .7; }
+  .msg-bubble.copied {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
   }
 
   .msg-meta {
@@ -451,6 +458,7 @@ class SmsGammuPanel extends HTMLElement {
     this._activeTab = 'chats';
     this._sendText = '';
     this._sending = false;
+    this._modemError = null;
     this._narrow = false;
   }
 
@@ -586,6 +594,13 @@ class SmsGammuPanel extends HTMLElement {
         } else if (ev.type === "message_deleted" || ev.type === "contact_deleted") {
           needContacts = true;
           needMessages = true;
+        } else if (ev.type === "modem_status") {
+          if (!ev.data.ok) {
+            this._modemError = ev.data;
+          } else {
+            this._modemError = null;
+          }
+          this._renderStatusBar();
         }
       }
 
@@ -1075,15 +1090,32 @@ class SmsGammuPanel extends HTMLElement {
   _renderStatusBar() {
     const bar = this.shadowRoot.getElementById("status-bar");
     if (!bar) return;
+
+    if (this._modemError) {
+      const streak = this._modemError.streak || "";
+      bar.innerHTML = `
+        <span class="signal-dot bad"></span>
+        <span>⚠ Модем недоступен${streak ? " · " + streak + " ошибок" : ""} — перезагрузка…</span>
+      `;
+      return;
+    }
+
     const s = this._status;
-    if (!s || !s.signal) {
-      bar.innerHTML = `<span>Нет связи с модемом</span>`;
+    if (s?.collecting) {
+      bar.innerHTML = `
+        <span class="signal-dot collecting"></span>
+        <span>Получение SMS…</span>
+      `;
+      return;
+    }
+    if (!s?.signal) {
+      bar.innerHTML = `<span class="signal-dot bad"></span><span>Нет связи с модемом</span>`;
       return;
     }
     const pct = s.signal?.SignalPercent ?? "?";
     const net = s.network?.NetworkName ?? "";
     const interval = this._pollInterval;
-    let dotClass = pct >= 50 ? "" : pct >= 20 ? "mid" : "bad";
+    const dotClass = pct >= 50 ? "" : pct >= 20 ? "mid" : "bad";
     bar.innerHTML = `
       <span class="signal-dot ${dotClass}"></span>
       <span>${net ? net + " · " : ""}${pct}% · опрос каждые ${interval}с</span>
@@ -1195,11 +1227,27 @@ class SmsGammuPanel extends HTMLElement {
       });
     });
 
+    area.querySelectorAll(".msg-text").forEach((el) => {
+      el.addEventListener("click", async () => {
+        const text = el.textContent;
+        const bubble = el.closest(".msg-bubble");
+        try {
+          await navigator.clipboard.writeText(text);
+          bubble?.classList.add("copied");
+          setTimeout(() => bubble?.classList.remove("copied"), 800);
+          this._showToast("Скопировано");
+        } catch (_) {
+          this._showToast("Не удалось скопировать");
+        }
+      });
+    });
+
     area.scrollTop = area.scrollHeight;
   }
 }
 
 customElements.define("sms-gammu-panel", SmsGammuPanel);
+
 
 
 
