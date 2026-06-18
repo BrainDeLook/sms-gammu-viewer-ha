@@ -50,6 +50,11 @@ export default {
   refresh: "Refresh",
   send: "Send",
   language: "Language",
+  new_conversation: "New message",
+  cancel: "Cancel",
+  send: "Send",
+  number_placeholder: "+1234567890",
+  message_placeholder: "Message text…",
   back: "Back",
   modem_btn: "Modem status",
 };
