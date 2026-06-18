@@ -50,6 +50,11 @@ export default {
   refresh: "Обновить",
   send: "Отправить",
   language: "Язык",
+  new_conversation: "Новое сообщение",
+  cancel: "Отмена",
+  send: "Отправить",
+  number_placeholder: "+79001234567",
+  message_placeholder: "Текст сообщения…",
   back: "Назад",
   modem_btn: "Статус модема",
 };
