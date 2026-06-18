@@ -38,7 +38,8 @@ CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 COLLECT_INTERVAL  = 3
 COLLECT_EMPTY_MAX = 5
-MODEM_ERROR_RESET_THRESHOLD = 5
+MODEM_ERROR_RESET_THRESHOLD = 5  # После N ошибок подряд — сброс модема
+MODEM_RESET_COOLDOWN = 120       # Пауза после сброса (секунды)
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
@@ -150,6 +151,8 @@ class SmsCoordinator:
         self._error_streak = 0
         self._last_event_id = 0
         self._events: list[dict] = []  # SSE события для фронтенда
+        self._last_reset_at: float = 0.0
+        self._modem_ok: bool = True
 
     @property
     def _interval(self) -> int:
@@ -345,18 +348,37 @@ class SmsCoordinator:
         return got_new
 
     async def _safe_get_all(self) -> list[dict] | None:
+        import time
         try:
             result = await self.client.get_all_sms()
+            if not self._modem_ok:
+                self._modem_ok = True
+                self.push_event("modem_status", {"ok": True})
+                _LOGGER.info("Modem connection restored")
             self._error_streak = 0
             return result
         except Exception as e:
             self._error_streak += 1
-            _LOGGER.warning("get_all_sms failed (%d): %s", self._error_streak, e)
-            if self._error_streak >= MODEM_ERROR_RESET_THRESHOLD:
-                _LOGGER.warning("Too many errors, attempting modem reset")
+            self._modem_ok = False
+            _LOGGER.warning("get_all_sms failed (%d/%d): %s",
+                            self._error_streak, MODEM_ERROR_RESET_THRESHOLD, e)
+            self.push_event("modem_status", {
+                "ok": False,
+                "error": str(e),
+                "streak": self._error_streak,
+            })
+
+            now = time.monotonic()
+            if (self._error_streak >= MODEM_ERROR_RESET_THRESHOLD
+                    and now - self._last_reset_at > MODEM_RESET_COOLDOWN):
+                _LOGGER.warning("Too many errors — resetting modem")
+                self._last_reset_at = now
                 try:
                     await self.client.reset_modem()
                     self._error_streak = 0
+                    _LOGGER.info("Modem reset command sent")
+                    # Пауза чтобы модем успел перезагрузиться
+                    await asyncio.sleep(15)
                 except Exception as re:
                     _LOGGER.error("Modem reset failed: %s", re)
             return None
@@ -549,6 +571,7 @@ class SmsApiView(HomeAssistantView):
             status=status,
             content_type="application/json",
         )
+
 
 
 
