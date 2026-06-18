@@ -291,6 +291,34 @@ const CSS = `
   }
   .msg-bubble:hover .msg-delete { color: var(--sub); }
 
+  /* ─── Send bar ─── */
+  .send-bar {
+    display: flex; gap: 8px; padding: 10px 14px;
+    border-top: 1px solid var(--line);
+    background: var(--card); align-items: flex-end;
+    flex-shrink: 0;
+  }
+  .send-input {
+    flex: 1; padding: 9px 14px;
+    border: 1px solid var(--line); border-radius: 20px;
+    background: var(--bg); color: var(--text);
+    font-size: 14px; font-family: inherit;
+    outline: none; resize: none;
+    max-height: 120px; line-height: 1.5;
+    transition: border-color .2s;
+  }
+  .send-input:focus { border-color: var(--accent); }
+  .send-input::placeholder { color: var(--sub); }
+  .send-btn {
+    width: 38px; height: 38px; border-radius: 50%;
+    background: var(--accent); color: #fff;
+    border: none; cursor: pointer; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    transition: opacity .2s, transform .15s;
+  }
+  .send-btn:hover { opacity: .85; transform: scale(1.05); }
+  .send-btn:disabled { opacity: .35; cursor: default; transform: none; }
+
   /* ─── Date divider ─── */
   .date-divider {
     display: flex; align-items: center; gap: 10px;
@@ -421,6 +449,8 @@ class SmsGammuPanel extends HTMLElement {
     this._eventTimer = null;
     this._lastEventId = 0;
     this._activeTab = 'chats';
+    this._sendText = '';
+    this._sending = false;
     this._narrow = false;
   }
 
@@ -699,6 +729,50 @@ class SmsGammuPanel extends HTMLElement {
     }
   }
 
+  async _sendSms() {
+    const number = this._activeNumber;
+    const text = this._sendText.trim();
+    if (!number || !text || this._sending) return;
+
+    this._sending = true;
+    const btn = this.shadowRoot.getElementById("send-btn");
+    const ta  = this.shadowRoot.getElementById("send-input");
+    if (btn) btn.disabled = true;
+
+    try {
+      const res = await this._api("send", "POST", { number, text });
+      if (res.ok) {
+        this._sendText = "";
+        if (ta) { ta.value = ""; ta.style.height = "auto"; }
+        // Обновляем чат
+        this._messages = await this._api(`messages/${encodeURIComponent(number)}`);
+        this._renderMessages();
+        await this._refreshContacts();
+      } else {
+        this._showToast("Ошибка отправки");
+      }
+    } catch (e) {
+      this._showToast("Ошибка: " + e.message);
+    } finally {
+      this._sending = false;
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  _showToast(msg, duration = 2500) {
+    let toast = this.shadowRoot.getElementById("toast");
+    if (!toast) {
+      toast = document.createElement("div");
+      toast.id = "toast";
+      toast.style.cssText = "position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#323232;color:#fff;padding:8px 18px;border-radius:20px;font-size:13px;z-index:9999;transition:opacity .3s;opacity:0;pointer-events:none;";
+      this.shadowRoot.appendChild(toast);
+    }
+    toast.textContent = msg;
+    toast.style.opacity = "1";
+    clearTimeout(this._toastTimer);
+    this._toastTimer = setTimeout(() => { toast.style.opacity = "0"; }, duration);
+  }
+
   // ─── Tab switching ───
 
   _switchTab() {
@@ -715,6 +789,8 @@ class SmsGammuPanel extends HTMLElement {
       if (searchBox)    searchBox.style.display = "none";
       if (messagesArea) messagesArea.style.display = "none";
       if (statusMain)   statusMain.style.display = "";
+      const sendBarEl = this.shadowRoot.getElementById("send-bar");
+      if (sendBarEl) sendBarEl.style.display = "none";
       // Показываем хедер с заголовком "Модем" и кнопкой назад
       if (chatHeader)   chatHeader.style.display = "";
       const titleEl = this.shadowRoot.getElementById("chat-title");
@@ -889,6 +965,15 @@ class SmsGammuPanel extends HTMLElement {
             </div>
           </div>
           <div class="status-main" id="status-main" style="display:none"></div>
+          <div class="send-bar" id="send-bar" style="display:none">
+            <textarea class="send-input" id="send-input" rows="1" placeholder="Написать сообщение…"></textarea>
+            <button class="send-btn" id="send-btn" disabled title="Отправить">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13"/>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
     `;
@@ -907,6 +992,22 @@ class SmsGammuPanel extends HTMLElement {
     this.shadowRoot.getElementById("menu-btn").addEventListener("click", () => {
       this.dispatchEvent(new Event("hass-toggle-menu", { bubbles: true, composed: true }));
     });
+
+    const ta = this.shadowRoot.getElementById("send-input");
+    ta.addEventListener("input", () => {
+      this._sendText = ta.value;
+      const btn = this.shadowRoot.getElementById("send-btn");
+      if (btn) btn.disabled = !this._sendText.trim() || this._sending;
+      ta.style.height = "auto";
+      ta.style.height = Math.min(ta.scrollHeight, 120) + "px";
+    });
+    ta.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        this._sendSms();
+      }
+    });
+    this.shadowRoot.getElementById("send-btn").addEventListener("click", () => this._sendSms());
 
     this.shadowRoot.getElementById("search").addEventListener("input", (e) => {
       this._search = e.target.value;
@@ -1018,10 +1119,13 @@ class SmsGammuPanel extends HTMLElement {
     const delBtn = this.shadowRoot.getElementById("delete-contact-btn");
     if (!area) return;
 
+    const sendBar = this.shadowRoot.getElementById("send-bar");
+
     if (!this._activeNumber) {
       titleEl && (titleEl.textContent = "Выберите диалог");
       subEl && (subEl.textContent = "");
       delBtn && (delBtn.style.display = "none");
+      sendBar && (sendBar.style.display = "none");
       area.innerHTML = `
         <div class="empty">
           <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
@@ -1032,6 +1136,7 @@ class SmsGammuPanel extends HTMLElement {
       return;
     }
 
+    sendBar && (sendBar.style.display = "");
     const contact = this._contacts.find((c) => c.number === this._activeNumber);
     const count = contact?.total ?? this._messages.length;
     titleEl && (titleEl.textContent = this._activeNumber);
@@ -1075,6 +1180,7 @@ class SmsGammuPanel extends HTMLElement {
 }
 
 customElements.define("sms-gammu-panel", SmsGammuPanel);
+
 
 
 
