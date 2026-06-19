@@ -245,6 +245,7 @@ const CSS = `
   }
   .icon-btn:hover { background: rgba(0,0,0,.06); color: var(--text); }
   .icon-btn.danger:hover { background: rgba(229,57,53,.1); color: var(--danger); }
+  .icon-btn.muted-active { color: #ff9800; background: rgba(255,152,0,.12); }
   .icon-btn.spin svg { animation: spin 1s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -817,6 +818,26 @@ class SmsGammuPanel extends HTMLElement {
     }
   }
 
+  async _toggleMute(number) {
+    const contact = this._contacts.find((c) => c.number === number);
+    const currentlyMuted = contact?.is_muted || false;
+    try {
+      const action = currentlyMuted ? "unmute" : "mute";
+      await this._api(`${action}/${encodeURIComponent(number)}`, "POST");
+      if (contact) contact.is_muted = !currentlyMuted;
+      this._updateMuteBtn(!currentlyMuted);
+      this._renderContacts();
+    } catch (e) {
+      this._showToast(this._t("send_error") + ": " + e.message);
+    }
+  }
+
+  _updateMuteBtn(isMuted) {
+    const btn = this.shadowRoot.getElementById("mute-contact-btn");
+    if (!btn) return;
+    btn.classList.toggle("muted-active", isMuted);
+    btn.title = isMuted ? this._t("unmute_chat") : this._t("mute_chat");
+  }
   async _pollNow() {
     try {
       await this._api("poll_now", "POST");
@@ -1181,6 +1202,13 @@ class SmsGammuPanel extends HTMLElement {
               <div class="chat-title" id="chat-title">Выберите диалог</div>
               <div class="chat-subtitle" id="chat-subtitle"></div>
             </div>
+            <button class="icon-btn" id="mute-contact-btn" title="Без звука" style="display:none">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M11 5L6 9H2v6h4l5 4V5z"/>
+                <line x1="23" y1="9" x2="17" y2="15"/>
+                <line x1="17" y1="9" x2="23" y2="15"/>
+              </svg>
+            </button>
             <button class="icon-btn danger" id="delete-contact-btn" title="Удалить переписку" style="display:none">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="3 6 5 6 21 6"/>
@@ -1347,6 +1375,10 @@ class SmsGammuPanel extends HTMLElement {
     this.shadowRoot.getElementById("delete-contact-btn").addEventListener("click", () => {
       if (this._activeNumber) this._deleteContact(this._activeNumber);
     });
+
+    this.shadowRoot.getElementById("mute-contact-btn").addEventListener("click", () => {
+      if (this._activeNumber) this._toggleMute(this._activeNumber);
+    });
   }
 
   _updateRefreshBtn() {
@@ -1425,7 +1457,7 @@ class SmsGammuPanel extends HTMLElement {
         <div class="avatar ${this._isAlphaTag(c.number) ? 'alpha' : ''}">${this._esc(this._avatar(c.number))}</div>
         <div class="contact-info">
           <div class="contact-row1">
-            <span class="contact-number">${this._esc(c.number)}</span>
+            <span class="contact-number">${c.is_muted ? "🔇 " : ""}${this._esc(c.number)}</span>
             <span class="contact-date">${this._formatShort(c.last_date)}</span>
           </div>
           <div class="contact-preview">
@@ -1448,6 +1480,7 @@ class SmsGammuPanel extends HTMLElement {
     const titleEl = this.shadowRoot.getElementById("chat-title");
     const subEl = this.shadowRoot.getElementById("chat-subtitle");
     const delBtn = this.shadowRoot.getElementById("delete-contact-btn");
+    const muteBtn = this.shadowRoot.getElementById("mute-contact-btn");
     if (!area) return;
 
     const sendBar = this.shadowRoot.getElementById("send-bar");
@@ -1456,6 +1489,7 @@ class SmsGammuPanel extends HTMLElement {
       titleEl && (titleEl.textContent = this._t("select_dialog"));
       subEl && (subEl.textContent = "");
       delBtn && (delBtn.style.display = "none");
+      muteBtn && (muteBtn.style.display = "none");
       sendBar && (sendBar.style.display = "none");
       area.innerHTML = `
         <div class="empty">
@@ -1473,6 +1507,8 @@ class SmsGammuPanel extends HTMLElement {
     titleEl && (titleEl.textContent = this._activeNumber);
     subEl && (subEl.textContent = this._t("messages_count", count));
     delBtn && (delBtn.style.display = "");
+    muteBtn && (muteBtn.style.display = "");
+    this._updateMuteBtn(contact?.is_muted || false);
 
     if (this._messages.length === 0) {
       area.innerHTML = `<div class="empty"><p>Нет сообщений</p></div>`;
@@ -1526,6 +1562,7 @@ class SmsGammuPanel extends HTMLElement {
 }
 
 customElements.define("sms-gammu-panel", SmsGammuPanel);
+
 
 
 
