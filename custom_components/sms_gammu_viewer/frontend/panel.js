@@ -982,6 +982,44 @@ class SmsGammuPanel extends HTMLElement {
     }
   }
 
+  async _copyToClipboard(text) {
+    // Современный API — работает только на HTTPS / localhost
+    if (navigator.clipboard && window.isSecureContext) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch (_) {
+        // падаем дальше на fallback
+      }
+    }
+
+    // Fallback для http:// — execCommand('copy')
+    try {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.style.position = "fixed";
+      textarea.style.top = "0";
+      textarea.style.left = "0";
+      textarea.style.width = "1px";
+      textarea.style.height = "1px";
+      textarea.style.padding = "0";
+      textarea.style.border = "none";
+      textarea.style.outline = "none";
+      textarea.style.boxShadow = "none";
+      textarea.style.background = "transparent";
+      textarea.style.opacity = "0";
+      this.shadowRoot.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      textarea.setSelectionRange(0, textarea.value.length);
+      const ok = document.execCommand("copy");
+      this.shadowRoot.removeChild(textarea);
+      return ok;
+    } catch (_) {
+      return false;
+    }
+  }
+
   _showToast(msg, duration = 2500) {
     let toast = this.shadowRoot.getElementById("toast");
     if (!toast) {
@@ -1546,12 +1584,12 @@ class SmsGammuPanel extends HTMLElement {
       el.addEventListener("click", async () => {
         const text = el.textContent;
         const bubble = el.closest(".msg-bubble");
-        try {
-          await navigator.clipboard.writeText(text);
+        const ok = await this._copyToClipboard(text);
+        if (ok) {
           bubble?.classList.add("copied");
           setTimeout(() => bubble?.classList.remove("copied"), 800);
           this._showToast(this._t("copied"));
-        } catch (_) {
+        } else {
           this._showToast(this._t("copy_failed"));
         }
       });
@@ -1562,6 +1600,7 @@ class SmsGammuPanel extends HTMLElement {
 }
 
 customElements.define("sms-gammu-panel", SmsGammuPanel);
+
 
 
 
