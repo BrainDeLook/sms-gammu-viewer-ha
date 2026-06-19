@@ -57,7 +57,16 @@ export default {
   message_placeholder: "Message text…",
   mute_chat: "Mute",
   unmute_chat: "Unmute",
+  call_number: "Call",
+  hangup: "Hang up",
+  calling: (n) => `Calling ${n}…`,
+  call_error: "Call failed",
+  call_answered: "Answered",
+  call_not_answered: "Not answered",
+  call_declined: "Declined",
+  call_failed: "Modem error",
   back: "Back",
   modem_btn: "Modem status",
 };
+
 
