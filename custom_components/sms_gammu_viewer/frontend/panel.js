@@ -50,6 +50,7 @@ const CSS = `
     flex-direction: column;
     background: var(--card);
     border-right: 1px solid var(--line);
+    position: relative;
   }
 
   .contacts-header {
@@ -432,24 +433,21 @@ const CSS = `
   .back-btn { display: none; }
 
   /* ─── FAB new chat ─── */
-  .fab-bar {
-    padding: 10px 14px;
-    border-top: 1px solid var(--line);
-    background: var(--card);
-    flex-shrink: 0;
-  }
   .fab {
-    width: 100%; height: 40px;
-    border-radius: 20px;
+    position: absolute;
+    bottom: 18px; right: 16px;
+    width: 50px; height: 50px;
+    border-radius: 50%;
     background: var(--accent);
     color: #fff;
     border: none; cursor: pointer;
     display: flex; align-items: center; justify-content: center;
-    gap: 8px; font-size: 14px; font-weight: 500;
-    transition: opacity .2s;
+    box-shadow: 0 3px 10px rgba(0,0,0,.25);
+    transition: transform .15s, box-shadow .15s, opacity .2s;
+    z-index: 10;
   }
-  .fab:hover { opacity: .85; }
-  .fab:active { opacity: .7; }
+  .fab:hover { transform: scale(1.07); box-shadow: 0 5px 16px rgba(0,0,0,.3); }
+  .fab:active { transform: scale(.95); }
 
   /* ─── New chat modal ─── */
   .new-chat-overlay {
@@ -592,8 +590,8 @@ class SmsGammuPanel extends HTMLElement {
     if (sendInput) sendInput.placeholder = this._t("send_placeholder");
     const titleEl = this.shadowRoot?.getElementById("chat-title");
     if (titleEl && !this._activeNumber) titleEl.textContent = this._t("select_dialog");
-    const fabLabel = this.shadowRoot?.getElementById("fab-label");
-    if (fabLabel) fabLabel.textContent = this._t("new_conversation");
+    const fabBtn = this.shadowRoot?.getElementById("fab-new-chat");
+    if (fabBtn) fabBtn.title = this._t("new_conversation");
     this._renderStatusBar();
     this._renderContacts();
     this._renderMessages();
@@ -1145,15 +1143,12 @@ class SmsGammuPanel extends HTMLElement {
           <div class="status-bar" id="status-bar">${this._t("loading_status")}</div>
           <div class="contact-list" id="contact-list"></div>
 
-          <div class="fab-bar">
-            <button class="fab" id="fab-new-chat">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-                <line x1="12" y1="5" x2="12" y2="19"/>
-                <line x1="5" y1="12" x2="19" y2="12"/>
-              </svg>
-              <span id="fab-label">Новое сообщение</span>
-            </button>
-          </div>
+          <button class="fab" id="fab-new-chat" title="New message">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+              <line x1="12" y1="5" x2="12" y2="19"/>
+              <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+          </button>
 
           <!-- Modal: новый чат -->
           <div class="new-chat-overlay" id="new-chat-overlay">
@@ -1527,6 +1522,7 @@ class SmsGammuPanel extends HTMLElement {
 }
 
 customElements.define("sms-gammu-panel", SmsGammuPanel);
+
 
 
 
