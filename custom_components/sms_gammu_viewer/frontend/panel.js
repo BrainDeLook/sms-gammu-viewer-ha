@@ -617,6 +617,11 @@ class SmsGammuPanel extends HTMLElement {
         this._loadStatus();
         this._startTimer();
       });
+    } else if (!this._activeNumber && !this._restoreAttempted) {
+      // Инстанс переиспользован (pull-to-refresh не пересоздал компонент) —
+      // пробуем восстановить чат если ещё не пытались в этой сессии
+      this._restoreAttempted = true;
+      this._restoreActiveChat();
     }
   }
 
@@ -636,12 +641,25 @@ class SmsGammuPanel extends HTMLElement {
     let saved = null;
     try { saved = localStorage.getItem("sms_gammu_active_number"); } catch {}
     if (!saved) return;
-    const exists = this._contacts.some((c) => c.number === saved);
-    if (exists) {
-      this._selectContact(saved);
-    } else {
-      try { localStorage.removeItem("sms_gammu_active_number"); } catch {}
-    }
+
+    const tryRestore = (attemptsLeft) => {
+      const exists = this._contacts.some((c) => c.number === saved);
+      if (exists) {
+        this._selectContact(saved);
+        return;
+      }
+      if (attemptsLeft <= 0) {
+        try { localStorage.removeItem("sms_gammu_active_number"); } catch {}
+        return;
+      }
+      // Контакты ещё не подгружены — пробуем ещё раз через паузу
+      setTimeout(async () => {
+        try { this._contacts = await this._api("contacts"); } catch {}
+        tryRestore(attemptsLeft - 1);
+      }, 400);
+    };
+
+    tryRestore(5);
   }
 
   disconnectedCallback() {
@@ -1615,6 +1633,7 @@ class SmsGammuPanel extends HTMLElement {
 }
 
 customElements.define("sms-gammu-panel", SmsGammuPanel);
+
 
 
 
