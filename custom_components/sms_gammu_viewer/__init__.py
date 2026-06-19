@@ -63,7 +63,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     hass.http.register_view(SmsApiView(hass))
     await coordinator.start()
-    await hass.config_entries.async_forward_entry_setups(entry, ["sensor"])
+    await hass.config_entries.async_forward_entry_setups(entry, ["sensor", "notify"])
     entry.async_on_unload(entry.add_update_listener(_options_updated))
 
     _LOGGER.info("SMS Gammu Viewer started: %s", entry.title)
@@ -77,7 +77,7 @@ async def _options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    await hass.config_entries.async_unload_platforms(entry, ["sensor"])
+    await hass.config_entries.async_unload_platforms(entry, ["sensor", "notify"])
     coord = hass.data[DOMAIN].pop(entry.entry_id, None)
     if coord:
         await coord.stop()
@@ -490,6 +490,7 @@ class SmsApiView(HomeAssistantView):
                 "unread": unread,
                 "collecting": coord.collecting,
                 "error_streak": coord._error_streak,
+                "call_enabled": bool(coord.entry.data.get("call_device", "").strip()),
             })
 
         if action == "poll_interval":
@@ -554,6 +555,42 @@ class SmsApiView(HomeAssistantView):
             ok = await coord.client.send_sms(number, text)
             return self._json({"ok": ok})
 
+        if action.startswith("call/"):
+            number = action[len("call/"):]
+            call_device = coord.entry.data.get("call_device", "").strip()
+            if not call_device:
+                return self._error("Call device not configured", 503)
+            from .dialer import dial_number, DialError, validate_phone_number
+            from .const import (
+                CONF_CALL_DIAL_TIMEOUT, CONF_CALL_DURATION,
+                DEFAULT_CALL_DIAL_TIMEOUT, DEFAULT_CALL_DURATION,
+            )
+            try:
+                validate_phone_number(number)
+            except DialError as e:
+                return self._error(str(e), 400)
+
+            dial_timeout = coord.entry.data.get(CONF_CALL_DIAL_TIMEOUT, DEFAULT_CALL_DIAL_TIMEOUT)
+            call_duration = coord.entry.data.get(CONF_CALL_DURATION, DEFAULT_CALL_DURATION)
+
+            async def _do_call():
+                reason = await dial_number(
+                    call_device, number,
+                    dial_timeout_sec=dial_timeout, call_duration_sec=call_duration,
+                )
+                coord.push_event("call_ended", {"number": number, "reason": reason.value})
+
+            self.hass.async_create_task(_do_call())
+            return self._json({"ok": True, "calling": True})
+
+        if action == "hangup":
+            call_device = coord.entry.data.get("call_device", "").strip()
+            if not call_device:
+                return self._error("Call device not configured", 503)
+            from .dialer import hangup as hangup_call
+            ok = await hangup_call(call_device)
+            return self._json({"ok": ok})
+
         if action == "poll_now":
             if not coord.collecting:
                 async def _manual():
@@ -611,6 +648,7 @@ class SmsApiView(HomeAssistantView):
             status=status,
             content_type="application/json",
         )
+
 
 
 
