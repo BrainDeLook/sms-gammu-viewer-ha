@@ -738,6 +738,9 @@ class SmsGammuPanel extends HTMLElement {
     this._renderStatusBar();
     if (this._activeTab === "status") {
       this._renderStatusPage();
+    } else if (this._activeNumber) {
+      // Обновляем шапку чата — там зависит call_enabled от статуса
+      this._renderMessages();
     }
   }
 
@@ -1691,6 +1694,7 @@ class SmsGammuPanel extends HTMLElement {
 }
 
 customElements.define("sms-gammu-panel", SmsGammuPanel);
+
 
 
 
