@@ -409,6 +409,13 @@ class SmsCoordinator:
                             "url": "/sms-viewer",
                             "tag": "sms_gammu_viewer",
                             "group": "sms_gammu_viewer",
+                            "actions": [
+                                {
+                                    "action": "URI",
+                                    "title": "Открыть SMS",
+                                    "uri": "/sms-viewer",
+                                }
+                            ],
                         },
                     },
                     blocking=False,
@@ -573,6 +580,7 @@ class SmsApiView(HomeAssistantView):
             status=status,
             content_type="application/json",
         )
+
 
 
 
