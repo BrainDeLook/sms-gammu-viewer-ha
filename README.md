@@ -14,11 +14,6 @@ After installation, an **SMS** tab appears in the sidebar. Messages are stored i
   <img src="screenshots/desktop.jpg" alt="Desktop view" width="70%"><br>
   <sub>Desktop — chat list, conversation thread, send box</sub>
 </p>
-<p align="center">
-  <img src="screenshots/mobile.jpg" alt="Mobile view" width="32%">
-  <br>
-  <sub>Mobile — full-width contact list with hamburger menu and floating new-message button</sub>
-</p>
 
 ---
 
