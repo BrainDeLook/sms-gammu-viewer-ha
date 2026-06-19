@@ -58,13 +58,6 @@
 4. Найди **SMS Gammu Viewer** → **Скачать**
 5. Перезапусти Home Assistant
 
-> **Важно:** HACS не создаёт вложенные подпапки автоматически. После установки/обновления один раз скачай файлы языков вручную:
-> ```bash
-> mkdir -p /config/custom_components/sms_gammu_viewer/frontend/locales
-> curl -o /config/custom_components/sms_gammu_viewer/frontend/locales/ru.js https://raw.githubusercontent.com/BrainDeLook/sms-gammu-viewer-ha/main/custom_components/sms_gammu_viewer/frontend/locales/ru.js
-> curl -o /config/custom_components/sms_gammu_viewer/frontend/locales/en.js https://raw.githubusercontent.com/BrainDeLook/sms-gammu-viewer-ha/main/custom_components/sms_gammu_viewer/frontend/locales/en.js
-> ```
-
 ### Ручная установка
 
 1. Скачай [последний релиз](https://github.com/BrainDeLook/sms-gammu-viewer-ha/releases)
@@ -218,3 +211,4 @@ SMS длиннее 160 символов (латиница) или 70 (кирил
 ## Лицензия
 
 MIT
+
