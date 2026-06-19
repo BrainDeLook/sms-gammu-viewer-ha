@@ -20,3 +20,13 @@ DEFAULT_PASSWORD = "password"
 DEFAULT_POLL_INTERVAL = 30
 
 DB_FILENAME = "sms_gammu_viewer.db"
+
+# Опциональный голосовой интерфейс модема (например /dev/serial/by-id/...-if02-port0)
+CONF_CALL_DEVICE = "call_device"
+CONF_CALL_DIAL_TIMEOUT = "call_dial_timeout"
+CONF_CALL_DURATION = "call_duration"
+
+DEFAULT_CALL_DIAL_TIMEOUT = 25
+DEFAULT_CALL_DURATION = 30
+
+EVENT_CALL_ENDED = f"{DOMAIN}_call_ended"
