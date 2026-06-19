@@ -35,6 +35,12 @@ class SmsStore:
                 )
             except Exception:
                 pass
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS muted_numbers (
+                    number TEXT PRIMARY KEY,
+                    muted_at TEXT NOT NULL
+                )
+            """)
 
     def _conn(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self._path)
@@ -123,22 +129,26 @@ class SmsStore:
         return [dict(r) for r in rows]
 
     def get_contacts(self) -> list[dict[str, Any]]:
-        """Список уникальных номеров с последним SMS и количеством непрочитанных."""
+        """Список уникальных номеров с последним SMS, непрочитанными и mute-статусом."""
         with self._conn() as conn:
             rows = conn.execute("""
                 SELECT
-                    number,
+                    m.number as number,
                     COUNT(*) as total,
                     SUM(CASE WHEN is_read=0 THEN 1 ELSE 0 END) as unread,
                     MAX(date) as last_date,
                     (SELECT text FROM messages m2
                      WHERE m2.number = m.number
-                     ORDER BY date DESC, id DESC LIMIT 1) as last_text
+                     ORDER BY date DESC, id DESC LIMIT 1) as last_text,
+                    (SELECT 1 FROM muted_numbers mn WHERE mn.number = m.number) as is_muted
                 FROM messages m
                 GROUP BY number
                 ORDER BY last_date DESC
             """).fetchall()
-        return [dict(r) for r in rows]
+        result = [dict(r) for r in rows]
+        for r in result:
+            r["is_muted"] = bool(r["is_muted"])
+        return result
 
     def unread_count(self) -> int:
         with self._conn() as conn:
@@ -146,3 +156,27 @@ class SmsStore:
                 "SELECT COUNT(*) FROM messages WHERE is_read=0"
             ).fetchone()
         return row[0] if row else 0
+
+    def mute(self, number: str) -> None:
+        with self._conn() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO muted_numbers (number, muted_at) VALUES (?, ?)",
+                (number, datetime.now().isoformat(timespec="seconds")),
+            )
+
+    def unmute(self, number: str) -> None:
+        with self._conn() as conn:
+            conn.execute("DELETE FROM muted_numbers WHERE number=?", (number,))
+
+    def is_muted(self, number: str) -> bool:
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT 1 FROM muted_numbers WHERE number=?", (number,)
+            ).fetchone()
+        return row is not None
+
+    def get_muted_numbers(self) -> list[str]:
+        with self._conn() as conn:
+            rows = conn.execute("SELECT number FROM muted_numbers").fetchall()
+        return [r[0] for r in rows]
+
