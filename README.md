@@ -58,13 +58,6 @@ Or manually:
 4. Find **SMS Gammu Viewer** → **Download**
 5. Restart Home Assistant
 
-> **Note:** HACS does not create nested subfolders automatically. After installing/updating, manually download the locale files once:
-> ```bash
-> mkdir -p /config/custom_components/sms_gammu_viewer/frontend/locales
-> curl -o /config/custom_components/sms_gammu_viewer/frontend/locales/ru.js https://raw.githubusercontent.com/BrainDeLook/sms-gammu-viewer-ha/main/custom_components/sms_gammu_viewer/frontend/locales/ru.js
-> curl -o /config/custom_components/sms_gammu_viewer/frontend/locales/en.js https://raw.githubusercontent.com/BrainDeLook/sms-gammu-viewer-ha/main/custom_components/sms_gammu_viewer/frontend/locales/en.js
-> ```
-
 ### Manual installation
 
 1. Download the [latest release](https://github.com/BrainDeLook/sms-gammu-viewer-ha/releases)
@@ -218,3 +211,4 @@ The panel UI text (not just config flow) is fully translatable, independent of H
 ## License
 
 MIT
+
