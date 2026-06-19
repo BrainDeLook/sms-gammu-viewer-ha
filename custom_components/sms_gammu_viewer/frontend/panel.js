@@ -520,6 +520,10 @@ const CSS = `
     .root.chat-open .chat { display: flex; }
     .root.chat-open .back-btn { display: flex !important; }
     .status-grid { grid-template-columns: 1fr; }
+    .fab {
+      width: 60px; height: 60px;
+      bottom: 28px; left: 24px;
+    }
   }
 
   .menu-btn {
@@ -1522,6 +1526,7 @@ class SmsGammuPanel extends HTMLElement {
 }
 
 customElements.define("sms-gammu-panel", SmsGammuPanel);
+
 
 
 
