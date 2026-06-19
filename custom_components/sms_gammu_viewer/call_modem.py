@@ -25,12 +25,13 @@ class CallModem:
         end_markers: list[str],
         terminator: str = DEFAULT_EOL,
     ) -> list[str]:
-        self.send_command(command, terminator)
+        await self.send_command(command, terminator)
         return await self._read_response(timeout, end_markers)
 
-    def send_command(self, command: str, terminator: str = DEFAULT_EOL) -> None:
+    async def send_command(self, command: str, terminator: str = DEFAULT_EOL) -> None:
         _LOGGER.debug("AT >> %s", command)
         self.writer.write(f"{command}{terminator}".encode())
+        await self.writer.drain()
 
     async def _read_response(self, timeout: float, end_markers: list[str]) -> list[str]:
         lines: list[str] = []
@@ -55,3 +56,4 @@ class CallModem:
             await self.writer.wait_closed()
         except Exception as e:
             _LOGGER.debug("Error closing call modem connection: %s", e)
+
