@@ -57,7 +57,16 @@ export default {
   message_placeholder: "Текст сообщения…",
   mute_chat: "Без звука",
   unmute_chat: "Включить звук",
+  call_number: "Позвонить",
+  hangup: "Положить трубку",
+  calling: (n) => `Звонок ${n}…`,
+  call_error: "Ошибка звонка",
+  call_answered: "Ответили",
+  call_not_answered: "Не ответили",
+  call_declined: "Отклонён",
+  call_failed: "Ошибка модема",
   back: "Назад",
   modem_btn: "Статус модема",
 };
+
 
