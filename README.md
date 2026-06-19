@@ -12,8 +12,6 @@ After installation, an **SMS** tab appears in the sidebar. Messages are stored i
 
 ---
 
-<img width="1662" height="908" alt="image" src="https://github.com/user-attachments/assets/53653d67-a62a-4902-8545-6c8c51d256a9" />
-
 
 ## Features
 
