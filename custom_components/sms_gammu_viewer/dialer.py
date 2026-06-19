@@ -48,6 +48,19 @@ async def _connect(device_path: str, baudrate: int = DEFAULT_BAUDRATE) -> CallMo
         stopbits=serial.STOPBITS_ONE,
         limit=READ_LIMIT,
     )
+
+    # Некоторым модемам (в т.ч. Huawei) нужны активные DTR/RTS и пауза
+    # после открытия порта, иначе первая запись завершается Broken pipe
+    try:
+        transport = writer.transport
+        serial_obj = getattr(transport, "serial", None)
+        if serial_obj is not None:
+            serial_obj.dtr = True
+            serial_obj.rts = True
+    except Exception as e:
+        _LOGGER.debug("Could not set DTR/RTS: %s", e)
+
+    await asyncio.sleep(0.3)
     return CallModem(reader, writer)
 
 
@@ -66,6 +79,16 @@ async def dial_number(
 
     try:
         modem = await _connect(device_path)
+
+        # Пробный AT перед звонком — проверяем что порт живой,
+        # и даём более понятную ошибку если нет
+        try:
+            probe = await modem.execute_at(
+                "AT", timeout=3, end_markers=["OK", "ERROR"]
+            )
+            _LOGGER.debug("AT probe reply: %s", probe)
+        except Exception as e:
+            _LOGGER.warning("AT probe failed: %s", e)
 
         _LOGGER.info("Dialing +%s...", number)
         lines = await modem.execute_at(
@@ -182,3 +205,4 @@ async def _passive_wait(modem: CallModem, call_duration_sec: int) -> CallEndedRe
                     return CallEndedReason.DECLINED
     except TimeoutError:
         return CallEndedReason.NOT_ANSWERED
+
