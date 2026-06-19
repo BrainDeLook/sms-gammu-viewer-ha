@@ -153,6 +153,7 @@ class SmsCoordinator:
         self._events: list[dict] = []  # SSE события для фронтенда
         self._last_reset_at: float = 0.0
         self._modem_ok: bool = True
+        self._sensor_listeners: list = []
 
     @property
     def _interval(self) -> int:
@@ -161,6 +162,13 @@ class SmsCoordinator:
     @property
     def _notify_targets(self) -> list[str]:
         return self.entry.data.get(CONF_NOTIFY_TARGETS, [])
+
+    def register_sensor_listener(self, callback_fn) -> None:
+        self._sensor_listeners.append(callback_fn)
+
+    def unregister_sensor_listener(self, callback_fn) -> None:
+        if callback_fn in self._sensor_listeners:
+            self._sensor_listeners.remove(callback_fn)
 
     async def start(self) -> None:
         self._task = self.hass.async_create_background_task(
@@ -190,6 +198,11 @@ class SmsCoordinator:
         })
         if len(self._events) > 100:
             self._events = self._events[-100:]
+        for listener in list(self._sensor_listeners):
+            try:
+                listener(event_type, data)
+            except Exception as e:
+                _LOGGER.debug("Sensor listener error: %s", e)
 
     def get_events_since(self, last_id: int) -> list[dict]:
         return [e for e in self._events if e["id"] > last_id]
@@ -580,6 +593,7 @@ class SmsApiView(HomeAssistantView):
             status=status,
             content_type="application/json",
         )
+
 
 
 
