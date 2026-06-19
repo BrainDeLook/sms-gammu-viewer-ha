@@ -406,6 +406,12 @@ class SmsCoordinator:
         targets = self._notify_targets
         if not targets:
             return
+        try:
+            if await self.hass.async_add_executor_job(self.store.is_muted, number):
+                _LOGGER.debug("Skipping notification: %s is muted", number)
+                return
+        except Exception as e:
+            _LOGGER.debug("is_muted check failed: %s", e)
         preview = text if len(text) <= 150 else text[:150] + "…"
         message = f"От: {number}\nТекст: {preview}"
         for target in targets:
@@ -524,6 +530,18 @@ class SmsApiView(HomeAssistantView):
             coord.push_event("contact_deleted", {"number": number})
             return self._json({"ok": True})
 
+        if action.startswith("mute/"):
+            number = action[len("mute/"):]
+            await self.hass.async_add_executor_job(store.mute, number)
+            coord.push_event("contact_muted", {"number": number, "muted": True})
+            return self._json({"ok": True, "muted": True})
+
+        if action.startswith("unmute/"):
+            number = action[len("unmute/"):]
+            await self.hass.async_add_executor_job(store.unmute, number)
+            coord.push_event("contact_muted", {"number": number, "muted": False})
+            return self._json({"ok": True, "muted": False})
+
         if action == "send":
             try:
                 body = await request.json()
@@ -593,6 +611,7 @@ class SmsApiView(HomeAssistantView):
             status=status,
             content_type="application/json",
         )
+
 
 
 
