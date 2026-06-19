@@ -46,21 +46,12 @@ async def _connect(device_path: str, baudrate: int = DEFAULT_BAUDRATE) -> CallMo
         bytesize=serial.EIGHTBITS,
         parity=serial.PARITY_NONE,
         stopbits=serial.STOPBITS_ONE,
+        xonxoff=False,
+        rtscts=False,
+        dsrdtr=False,
         limit=READ_LIMIT,
     )
-
-    # Некоторым модемам (в т.ч. Huawei) нужны активные DTR/RTS и пауза
-    # после открытия порта, иначе первая запись завершается Broken pipe
-    try:
-        transport = writer.transport
-        serial_obj = getattr(transport, "serial", None)
-        if serial_obj is not None:
-            serial_obj.dtr = True
-            serial_obj.rts = True
-    except Exception as e:
-        _LOGGER.debug("Could not set DTR/RTS: %s", e)
-
-    await asyncio.sleep(0.3)
+    await asyncio.sleep(0.2)
     return CallModem(reader, writer)
 
 
@@ -205,4 +196,5 @@ async def _passive_wait(modem: CallModem, call_duration_sec: int) -> CallEndedRe
                     return CallEndedReason.DECLINED
     except TimeoutError:
         return CallEndedReason.NOT_ANSWERED
+
 
