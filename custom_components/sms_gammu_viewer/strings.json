@@ -27,9 +27,13 @@
         "description": "Configure polling interval and notification targets.\n\nFound {notify_count} notify service(s) available.",
         "data": {
           "poll_interval": "Polling interval (seconds, min 5)",
-          "notify_targets": "Devices to notify on new SMS"
+          "notify_targets": "Devices to notify on new SMS",
+          "call_device": "Voice call serial port (optional, e.g. /dev/serial/by-id/...-if02-port0)",
+          "call_dial_timeout": "Dial timeout (seconds)",
+          "call_duration": "Max call duration after answer (seconds)"
         }
       }
     }
   }
 }
+
