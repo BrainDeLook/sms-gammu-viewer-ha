@@ -18,12 +18,17 @@ from homeassistant.helpers.selector import (
 )
 
 from .const import (
+    CONF_CALL_DEVICE,
+    CONF_CALL_DIAL_TIMEOUT,
+    CONF_CALL_DURATION,
     CONF_HOST,
     CONF_NOTIFY_TARGETS,
     CONF_PASSWORD,
     CONF_POLL_INTERVAL,
     CONF_PORT,
     CONF_USERNAME,
+    DEFAULT_CALL_DIAL_TIMEOUT,
+    DEFAULT_CALL_DURATION,
     DEFAULT_PASSWORD,
     DEFAULT_POLL_INTERVAL,
     DEFAULT_PORT,
@@ -88,12 +93,16 @@ class SmsGammuOptionsFlow(OptionsFlow):
     ) -> ConfigFlowResult:
         if user_input is not None:
             targets = user_input.get(CONF_NOTIFY_TARGETS, [])
+            call_device = user_input.get(CONF_CALL_DEVICE, "").strip()
             self.hass.config_entries.async_update_entry(
                 self._entry,
                 data={
                     **self._entry.data,
                     CONF_POLL_INTERVAL: int(user_input[CONF_POLL_INTERVAL]),
                     CONF_NOTIFY_TARGETS: targets,
+                    CONF_CALL_DEVICE: call_device,
+                    CONF_CALL_DIAL_TIMEOUT: int(user_input.get(CONF_CALL_DIAL_TIMEOUT, DEFAULT_CALL_DIAL_TIMEOUT)),
+                    CONF_CALL_DURATION: int(user_input.get(CONF_CALL_DURATION, DEFAULT_CALL_DURATION)),
                 },
             )
             return self.async_create_entry(title="", data={})
@@ -138,6 +147,25 @@ class SmsGammuOptionsFlow(OptionsFlow):
                 default=", ".join(current_targets),
             )] = str
 
+        schema_fields[vol.Optional(
+            CONF_CALL_DEVICE,
+            default=self._entry.data.get(CONF_CALL_DEVICE, ""),
+        )] = str
+
+        schema_fields[vol.Optional(
+            CONF_CALL_DIAL_TIMEOUT,
+            default=self._entry.data.get(CONF_CALL_DIAL_TIMEOUT, DEFAULT_CALL_DIAL_TIMEOUT),
+        )] = NumberSelector(
+            NumberSelectorConfig(min=5, max=120, step=1, mode=NumberSelectorMode.BOX, unit_of_measurement="сек")
+        )
+
+        schema_fields[vol.Optional(
+            CONF_CALL_DURATION,
+            default=self._entry.data.get(CONF_CALL_DURATION, DEFAULT_CALL_DURATION),
+        )] = NumberSelector(
+            NumberSelectorConfig(min=5, max=300, step=1, mode=NumberSelectorMode.BOX, unit_of_measurement="сек")
+        )
+
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(schema_fields),
@@ -165,3 +193,4 @@ class SmsGammuOptionsFlow(OptionsFlow):
             return result
         except Exception:
             return []
+
