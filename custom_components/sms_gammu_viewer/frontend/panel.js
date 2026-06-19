@@ -613,7 +613,7 @@ class SmsGammuPanel extends HTMLElement {
       this._ready = true;
       this._initLocale().then(() => {
         this._render();
-        this._load();
+        this._load().then(() => this._restoreActiveChat());
         this._loadStatus();
         this._startTimer();
       });
@@ -625,10 +625,22 @@ class SmsGammuPanel extends HTMLElement {
       this._ready = true;
       this._initLocale().then(() => {
         this._render();
-        this._load();
+        this._load().then(() => this._restoreActiveChat());
         this._loadStatus();
         this._startTimer();
       });
+    }
+  }
+
+  _restoreActiveChat() {
+    let saved = null;
+    try { saved = localStorage.getItem("sms_gammu_active_number"); } catch {}
+    if (!saved) return;
+    const exists = this._contacts.some((c) => c.number === saved);
+    if (exists) {
+      this._selectContact(saved);
+    } else {
+      try { localStorage.removeItem("sms_gammu_active_number"); } catch {}
     }
   }
 
@@ -762,6 +774,7 @@ class SmsGammuPanel extends HTMLElement {
 
   async _selectContact(number) {
     this._activeNumber = number;
+    try { localStorage.setItem("sms_gammu_active_number", number); } catch {}
     this.shadowRoot.querySelector(".root")?.classList.add("chat-open");
     try {
       this._messages = await this._api(
@@ -807,6 +820,7 @@ class SmsGammuPanel extends HTMLElement {
       this._contacts = this._contacts.filter((c) => c.number !== number);
       if (this._activeNumber === number) {
         this._activeNumber = null;
+        try { localStorage.removeItem("sms_gammu_active_number"); } catch {}
         this._messages = [];
         this.shadowRoot.querySelector(".root")?.classList.remove("chat-open");
       }
@@ -1404,6 +1418,7 @@ class SmsGammuPanel extends HTMLElement {
         this._switchTab();
       } else {
         this._activeNumber = null;
+        try { localStorage.removeItem("sms_gammu_active_number"); } catch {}
         this.shadowRoot.getElementById("root").classList.remove("chat-open");
         this._renderContacts();
         this._renderMessages();
@@ -1600,6 +1615,7 @@ class SmsGammuPanel extends HTMLElement {
 }
 
 customElements.define("sms-gammu-panel", SmsGammuPanel);
+
 
 
 
