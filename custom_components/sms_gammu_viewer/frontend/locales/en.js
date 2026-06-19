@@ -55,6 +55,9 @@ export default {
   send: "Send",
   number_placeholder: "+1234567890",
   message_placeholder: "Message text…",
+  mute_chat: "Mute",
+  unmute_chat: "Unmute",
   back: "Back",
   modem_btn: "Modem status",
 };
+
