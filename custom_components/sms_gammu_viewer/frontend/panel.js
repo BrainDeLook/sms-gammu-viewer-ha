@@ -450,6 +450,10 @@ const CSS = `
     z-index: 10;
   }
   .fab:hover { transform: scale(1.07); box-shadow: 0 5px 16px rgba(0,0,0,.3); }
+  .fab-call {
+    left: auto; right: 16px;
+    background: #4caf50;
+  }
   .fab:active { transform: scale(.95); }
 
   /* ─── New chat modal ─── */
@@ -526,6 +530,9 @@ const CSS = `
     .fab {
       width: 60px; height: 60px;
       bottom: 28px; left: 24px;
+    }
+    .fab-call {
+      left: auto; right: 24px;
     }
   }
 
@@ -736,6 +743,12 @@ class SmsGammuPanel extends HTMLElement {
     } catch (_) {}
 
     this._renderStatusBar();
+
+    const fabCall = this.shadowRoot.getElementById("fab-call");
+    if (fabCall) {
+      fabCall.style.display = this._status?.call_enabled ? "" : "none";
+    }
+
     if (this._activeTab === "status") {
       this._renderStatusPage();
     } else if (this._activeNumber) {
@@ -1031,6 +1044,27 @@ class SmsGammuPanel extends HTMLElement {
     this.shadowRoot.getElementById("new-chat-overlay")?.classList.remove("open");
   }
 
+  _openDialModal() {
+    const overlay  = this.shadowRoot.getElementById("dial-overlay");
+    const numInput = this.shadowRoot.getElementById("dial-number");
+    const dialBtn  = this.shadowRoot.getElementById("dial-start");
+    const titleEl  = this.shadowRoot.getElementById("dial-title");
+    const cancelEl = this.shadowRoot.getElementById("dial-cancel");
+    if (!overlay) return;
+    if (titleEl) titleEl.textContent = this._t("call_number");
+    if (cancelEl) cancelEl.textContent = this._t("cancel");
+    if (dialBtn) dialBtn.textContent = this._t("call_number");
+    numInput.value = "";
+    numInput.placeholder = this._t("number_placeholder");
+    dialBtn.disabled = true;
+    overlay.classList.add("open");
+    setTimeout(() => numInput.focus(), 50);
+  }
+
+  _closeDialModal() {
+    this.shadowRoot.getElementById("dial-overlay")?.classList.remove("open");
+  }
+
   async _sendSms() {
     const number = this._activeNumber;
     const text = this._sendText.trim();
@@ -1292,6 +1326,12 @@ class SmsGammuPanel extends HTMLElement {
             </svg>
           </button>
 
+          <button class="fab fab-call" id="fab-call" title="Call" style="display:none">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
+            </svg>
+          </button>
+
           <!-- Modal: новый чат -->
           <div class="new-chat-overlay" id="new-chat-overlay">
             <div class="new-chat-sheet">
@@ -1303,6 +1343,18 @@ class SmsGammuPanel extends HTMLElement {
               <div class="new-chat-actions">
                 <button class="btn-cancel" id="new-chat-cancel">Отмена</button>
                 <button class="btn-start" id="new-chat-send" disabled>Отправить</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="new-chat-overlay" id="dial-overlay">
+            <div class="new-chat-sheet">
+              <div class="new-chat-title" id="dial-title">Позвонить</div>
+              <input class="new-chat-input" id="dial-number" type="tel"
+                placeholder="+79001234567" />
+              <div class="new-chat-actions">
+                <button class="btn-cancel" id="dial-cancel">Отмена</button>
+                <button class="btn-start" id="dial-start" disabled>Позвонить</button>
               </div>
             </div>
           </div>
@@ -1452,6 +1504,40 @@ class SmsGammuPanel extends HTMLElement {
         this._showToast(this._t("send_error") + ": " + e.message);
         sendBtn2.disabled = false;
       }
+    });
+
+    // FAB — позвонить (независимо от существующих чатов)
+    this.shadowRoot.getElementById("fab-call").addEventListener("click", (e) => {
+      e.stopPropagation();
+      this._openDialModal();
+    });
+    this.shadowRoot.getElementById("dial-overlay").addEventListener("click", (e) => {
+      if (e.target === this.shadowRoot.getElementById("dial-overlay")) {
+        this._closeDialModal();
+      }
+    });
+    this.shadowRoot.getElementById("dial-cancel").addEventListener("click", () => {
+      this._closeDialModal();
+    });
+
+    const dialInput = this.shadowRoot.getElementById("dial-number");
+    const dialBtn   = this.shadowRoot.getElementById("dial-start");
+
+    dialInput.addEventListener("input", () => {
+      dialBtn.disabled = !dialInput.value.trim();
+    });
+    dialInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && dialInput.value.trim()) {
+        e.preventDefault();
+        dialBtn.click();
+      }
+    });
+
+    dialBtn.addEventListener("click", async () => {
+      const number = dialInput.value.trim();
+      if (!number) return;
+      this._closeDialModal();
+      await this._callNumber(number);
     });
 
     // Применяем состояние narrow если уже знаем
