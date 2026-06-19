@@ -435,7 +435,7 @@ const CSS = `
   /* ─── FAB new chat ─── */
   .fab {
     position: absolute;
-    bottom: 18px; right: 16px;
+    bottom: 18px; left: 16px;
     width: 50px; height: 50px;
     border-radius: 50%;
     background: var(--accent);
@@ -1522,6 +1522,7 @@ class SmsGammuPanel extends HTMLElement {
 }
 
 customElements.define("sms-gammu-panel", SmsGammuPanel);
+
 
 
 
