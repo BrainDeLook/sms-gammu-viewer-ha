@@ -246,6 +246,8 @@ const CSS = `
   .icon-btn:hover { background: rgba(0,0,0,.06); color: var(--text); }
   .icon-btn.danger:hover { background: rgba(229,57,53,.1); color: var(--danger); }
   .icon-btn.muted-active { color: #ff9800; background: rgba(255,152,0,.12); }
+  .icon-btn.calling-active { color: #4caf50; background: rgba(76,175,80,.12); animation: pulse-call 1s infinite; }
+  @keyframes pulse-call { 0%,100%{opacity:1} 50%{opacity:.5} }
   .icon-btn.spin svg { animation: spin 1s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -775,6 +777,8 @@ class SmsGammuPanel extends HTMLElement {
             this._modemError = null;
           }
           this._renderStatusBar();
+        } else if (ev.type === "call_ended") {
+          this._onCallEnded(ev.data);
         }
       }
 
@@ -870,6 +874,46 @@ class SmsGammuPanel extends HTMLElement {
     btn.classList.toggle("muted-active", isMuted);
     btn.title = isMuted ? this._t("unmute_chat") : this._t("mute_chat");
   }
+
+  async _callNumber(number) {
+    const btn = this.shadowRoot.getElementById("call-contact-btn");
+    if (this._calling) {
+      // Уже звоним — кнопка работает как "положить трубку"
+      try {
+        await this._api("hangup", "POST");
+      } catch (_) {}
+      return;
+    }
+    this._calling = true;
+    btn?.classList.add("calling-active");
+    if (btn) btn.title = this._t("hangup");
+    this._showToast(this._t("calling", number));
+    try {
+      await this._api(`call/${encodeURIComponent(number)}`, "POST");
+    } catch (e) {
+      this._showToast(this._t("call_error") + ": " + e.message);
+      this._calling = false;
+      btn?.classList.remove("calling-active");
+      if (btn) btn.title = this._t("call_number");
+    }
+  }
+
+  _onCallEnded(data) {
+    this._calling = false;
+    const btn = this.shadowRoot.getElementById("call-contact-btn");
+    btn?.classList.remove("calling-active");
+    if (btn) btn.title = this._t("call_number");
+
+    const reasonMap = {
+      answered: this._t("call_answered"),
+      not_answered: this._t("call_not_answered"),
+      declined: this._t("call_declined"),
+      error: this._t("call_failed"),
+    };
+    const text = reasonMap[data.reason] || data.reason;
+    this._showToast(`${data.number}: ${text}`);
+  }
+
   async _pollNow() {
     try {
       await this._api("poll_now", "POST");
@@ -1272,6 +1316,11 @@ class SmsGammuPanel extends HTMLElement {
               <div class="chat-title" id="chat-title">Выберите диалог</div>
               <div class="chat-subtitle" id="chat-subtitle"></div>
             </div>
+            <button class="icon-btn" id="call-contact-btn" title="Позвонить" style="display:none">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
+              </svg>
+            </button>
             <button class="icon-btn" id="mute-contact-btn" title="Без звука" style="display:none">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M11 5L6 9H2v6h4l5 4V5z"/>
@@ -1450,6 +1499,10 @@ class SmsGammuPanel extends HTMLElement {
     this.shadowRoot.getElementById("mute-contact-btn").addEventListener("click", () => {
       if (this._activeNumber) this._toggleMute(this._activeNumber);
     });
+
+    this.shadowRoot.getElementById("call-contact-btn").addEventListener("click", () => {
+      if (this._activeNumber) this._callNumber(this._activeNumber);
+    });
   }
 
   _updateRefreshBtn() {
@@ -1552,6 +1605,7 @@ class SmsGammuPanel extends HTMLElement {
     const subEl = this.shadowRoot.getElementById("chat-subtitle");
     const delBtn = this.shadowRoot.getElementById("delete-contact-btn");
     const muteBtn = this.shadowRoot.getElementById("mute-contact-btn");
+    const callBtn = this.shadowRoot.getElementById("call-contact-btn");
     if (!area) return;
 
     const sendBar = this.shadowRoot.getElementById("send-bar");
@@ -1561,6 +1615,7 @@ class SmsGammuPanel extends HTMLElement {
       subEl && (subEl.textContent = "");
       delBtn && (delBtn.style.display = "none");
       muteBtn && (muteBtn.style.display = "none");
+      callBtn && (callBtn.style.display = "none");
       sendBar && (sendBar.style.display = "none");
       area.innerHTML = `
         <div class="empty">
@@ -1580,6 +1635,9 @@ class SmsGammuPanel extends HTMLElement {
     delBtn && (delBtn.style.display = "");
     muteBtn && (muteBtn.style.display = "");
     this._updateMuteBtn(contact?.is_muted || false);
+    if (callBtn) {
+      callBtn.style.display = this._status?.call_enabled ? "" : "none";
+    }
 
     if (this._messages.length === 0) {
       area.innerHTML = `<div class="empty"><p>Нет сообщений</p></div>`;
@@ -1633,6 +1691,7 @@ class SmsGammuPanel extends HTMLElement {
 }
 
 customElements.define("sms-gammu-panel", SmsGammuPanel);
+
 
 
 
