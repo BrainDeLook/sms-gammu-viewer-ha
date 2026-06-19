@@ -12,8 +12,6 @@
 
 ---
 
-<img width="1662" height="908" alt="image" src="https://github.com/user-attachments/assets/1ebe8041-420b-4f9a-9830-adcf8e6d6421" />
-
 
 ## Возможности
 
