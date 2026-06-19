@@ -55,6 +55,9 @@ export default {
   send: "Отправить",
   number_placeholder: "+79001234567",
   message_placeholder: "Текст сообщения…",
+  mute_chat: "Без звука",
+  unmute_chat: "Включить звук",
   back: "Назад",
   modem_btn: "Статус модема",
 };
+
