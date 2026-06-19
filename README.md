@@ -10,27 +10,40 @@ A native panel for viewing and sending SMS messages directly in Home Assistant. 
 
 After installation, an **SMS** tab appears in the sidebar. Messages are stored in an internal SQLite database and are automatically deleted from the modem after being received.
 
+<p align="center">
+  <img src="screenshots/desktop.jpg" alt="Desktop view" width="70%"><br>
+  <sub>Desktop — chat list, conversation thread, send box</sub>
+</p>
+<p align="center">
+  <img src="screenshots/mobile.jpg" alt="Mobile view" width="32%">
+  <br>
+  <sub>Mobile — full-width contact list with hamburger menu and floating new-message button</sub>
+</p>
+
 ---
 
 
 ## Features
 
 - 💬 Chat-style view — all SMS from one sender in one thread
-- ✍️ **Send SMS** — reply from inside a chat, or start a brand-new conversation via the "New message" button
-- 🌐 **Multi-language UI** (English / Russian) — switchable via the 🌐 button in the header, independent of HA's language. Add your own language by dropping a `frontend/locales/{code}.js` file and opening a PR
+- ✍️ **Send SMS** — reply from inside a chat, or start a brand-new conversation via the compact `+` button
+- 🔇 **Per-conversation mute** — silence push notifications for a specific number while still saving and showing its messages normally
 - 🔢 Unread SMS counter badge on the sidebar icon (`sensor.sms_unread_count`)
+- 📨 Sensors for the last received SMS — `sensor.sms_last_sms_number` and `sensor.sms_last_sms_text`, updated instantly on arrival (handy for automations)
+- 🌐 **Multi-language UI** (English / Russian) — switchable via the 🌐 button in the header, independent of HA's language. Add your own language by dropping a `frontend/locales/{code}.js` file and opening a PR
 - 🔔 Push notifications on new SMS with tap-to-open (iOS & Android)
 - 🔄 Auto-refresh — chat updates automatically when new messages arrive (event polling every 4s)
+- 💾 Open chat is restored after a full page reload (F5 / pull-to-refresh)
+- 📋 Tap any message to copy its text — works on plain HTTP too, not just HTTPS
 - 📶 Modem status page — signal, operator, IMEI, SIM capacity, modem reset
 - 🩺 **Automatic modem recovery** — after 5 consecutive failed polls the integration resets the modem itself (2-minute cooldown between resets), with a live warning in the status bar
 - 🗄 Internal SQLite storage — messages persist independently of SIM card memory
 - 🧩 Smart multipart SMS assembly — long messages collected in full before saving, including messages split across multiple delivery waves
 - 🏷 Alpha-tag sender support — shows names like `Yandex` or bank senders correctly, not just phone numbers
 - 🔍 Search by phone number or message text
-- 📋 Tap any message to copy its text
 - 🗑 Delete individual messages or entire conversations
 - ⚙️ Configurable polling interval and notification targets from the HA UI
-- 📱 Mobile-friendly: hamburger menu button to open the HA sidebar, back navigation, full-width "New message" button
+- 📱 Mobile-friendly: hamburger menu button to open the HA sidebar, back navigation, compact floating "new message" button
 - 🗓 Date dividers in chat (Today, Yesterday, full date)
 
 ---
@@ -182,6 +195,12 @@ The panel UI text (not just config flow) is fully translatable, independent of H
 
 ## Changelog
 
+### v2.4.0
+- 🔇 Per-conversation mute button
+- 📨 New sensors: `sensor.sms_last_sms_number` and `sensor.sms_last_sms_text`
+- 📋 Copy-on-click now works over plain HTTP
+- 💾 Open chat is restored after a full page reload
+
 ### v2.3.1
 - ✍️ "New message" button moved to a full-width button at the bottom of the contacts sidebar — visible on mobile
 - 🔧 Fixed hamburger menu button not appearing on mobile
@@ -212,4 +231,5 @@ The panel UI text (not just config flow) is fully translatable, independent of H
 ## License
 
 MIT
+
 
