@@ -72,9 +72,25 @@ export default {
   call_reason_not_answered: "Not answered",
   call_reason_declined: "Declined",
   call_reason_error: "Error",
+  sim_phone_number: "SIM phone number",
+  not_set: "not set",
+  edit: "Edit",
+  save: "Save",
+  saved: "Saved",
+  voice_port: "📞 Voice port",
+  checking: "Checking…",
+  check_port: "Check port",
+  port_ok: "Port is responding",
+  port_not_configured: "Port not configured",
+  port_not_found: "Device not found",
+  port_permission_denied: "Permission denied",
+  port_connection_failed: "Connection failed",
+  port_no_response: "No OK response from modem",
+  port_check_failed: "Check failed",
   back: "Back",
   modem_btn: "Modem status",
 };
+
 
 
 
