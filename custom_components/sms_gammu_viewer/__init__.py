@@ -588,6 +588,7 @@ class SmsApiView(HomeAssistantView):
                 "error_streak": coord._error_streak,
                 "call_enabled": bool(coord.entry.data.get("call_device", "").strip()),
                 "sim_phone_number": sim_phone_number,
+                "language": coord.entry.data.get("language", "ru"),
             })
 
         if action == "poll_interval":
@@ -811,6 +812,7 @@ class SmsApiView(HomeAssistantView):
             status=status,
             content_type="application/json",
         )
+
 
 
 
