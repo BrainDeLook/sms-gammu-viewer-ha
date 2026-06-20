@@ -65,8 +65,16 @@ export default {
   call_not_answered: "Не ответили",
   call_declined: "Отклонён",
   call_failed: "Ошибка модема",
+  call_history: "История звонков",
+  clear: "Очистить",
+  no_calls: "Звонков ещё не было",
+  call_reason_answered: "Ответили",
+  call_reason_not_answered: "Не ответили",
+  call_reason_declined: "Отклонён",
+  call_reason_error: "Ошибка",
   back: "Назад",
   modem_btn: "Статус модема",
 };
+
 
 
