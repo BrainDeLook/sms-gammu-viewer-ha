@@ -1594,7 +1594,7 @@ class SmsGammuPanel extends HTMLElement {
     }
   }
 
-
+  _renderStatusPage() {
     const page = this.shadowRoot.getElementById("status-main");
     if (!page || this._activeTab !== "status") return;
 
@@ -2311,6 +2311,7 @@ class SmsGammuPanel extends HTMLElement {
 }
 
 customElements.define("sms-gammu-panel", SmsGammuPanel);
+
 
 
 
