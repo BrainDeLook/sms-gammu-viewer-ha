@@ -377,7 +377,18 @@ class SmsCoordinator:
 
             got_new = self._add_to_buffers(buffers, messages)
             await self._safe_delete_all()
-            empty_streak = 0 if got_new else empty_streak + 1
+            if got_new:
+                _LOGGER.debug(
+                    "Collect: new part(s) received (%d msg on SIM), resetting empty counter",
+                    len(messages)
+                )
+                empty_streak = 0
+            else:
+                empty_streak += 1
+                _LOGGER.debug(
+                    "Collect: %d msg on SIM but no new content, empty %d/%d",
+                    len(messages), empty_streak, collect_empty_max
+                )
 
         for number, buf in buffers.items():
             full_text = buf.full_text
@@ -754,6 +765,7 @@ class SmsApiView(HomeAssistantView):
             status=status,
             content_type="application/json",
         )
+
 
 
 
