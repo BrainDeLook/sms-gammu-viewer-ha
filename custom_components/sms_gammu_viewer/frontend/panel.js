@@ -566,7 +566,6 @@ const CSS = `
     overflow: hidden;
     z-index: 100;
     width: 280px;
-    max-height: 360px;
     flex-direction: column;
   }
   .call-history-dropdown.open { display: flex; }
@@ -604,7 +603,8 @@ const CSS = `
   }
   .ch-call-btn:disabled { opacity: .4; cursor: default; }
   .ch-list {
-    overflow-y: auto; flex: 1;
+    overflow-y: auto;
+    max-height: 208px; /* ~4 записи по 52px каждая */
   }
   .ch-empty {
     padding: 24px 14px; text-align: center;
@@ -2100,6 +2100,7 @@ class SmsGammuPanel extends HTMLElement {
 }
 
 customElements.define("sms-gammu-panel", SmsGammuPanel);
+
 
 
 
