@@ -21,6 +21,8 @@ from .const import (
     CONF_CALL_DEVICE,
     CONF_CALL_DIAL_TIMEOUT,
     CONF_CALL_DURATION,
+    CONF_COLLECT_EMPTY_MAX,
+    CONF_COLLECT_INTERVAL,
     CONF_HOST,
     CONF_NOTIFY_TARGETS,
     CONF_PASSWORD,
@@ -29,6 +31,8 @@ from .const import (
     CONF_USERNAME,
     DEFAULT_CALL_DIAL_TIMEOUT,
     DEFAULT_CALL_DURATION,
+    DEFAULT_COLLECT_EMPTY_MAX,
+    DEFAULT_COLLECT_INTERVAL,
     DEFAULT_PASSWORD,
     DEFAULT_POLL_INTERVAL,
     DEFAULT_PORT,
@@ -103,6 +107,8 @@ class SmsGammuOptionsFlow(OptionsFlow):
                     CONF_CALL_DEVICE: call_device,
                     CONF_CALL_DIAL_TIMEOUT: int(user_input.get(CONF_CALL_DIAL_TIMEOUT, DEFAULT_CALL_DIAL_TIMEOUT)),
                     CONF_CALL_DURATION: int(user_input.get(CONF_CALL_DURATION, DEFAULT_CALL_DURATION)),
+                    CONF_COLLECT_INTERVAL: int(user_input.get(CONF_COLLECT_INTERVAL, DEFAULT_COLLECT_INTERVAL)),
+                    CONF_COLLECT_EMPTY_MAX: int(user_input.get(CONF_COLLECT_EMPTY_MAX, DEFAULT_COLLECT_EMPTY_MAX)),
                 },
             )
             return self.async_create_entry(title="", data={})
@@ -166,6 +172,20 @@ class SmsGammuOptionsFlow(OptionsFlow):
             NumberSelectorConfig(min=5, max=300, step=1, mode=NumberSelectorMode.BOX, unit_of_measurement="сек")
         )
 
+        schema_fields[vol.Optional(
+            CONF_COLLECT_INTERVAL,
+            default=self._entry.data.get(CONF_COLLECT_INTERVAL, DEFAULT_COLLECT_INTERVAL),
+        )] = NumberSelector(
+            NumberSelectorConfig(min=1, max=15, step=1, mode=NumberSelectorMode.BOX, unit_of_measurement="сек")
+        )
+
+        schema_fields[vol.Optional(
+            CONF_COLLECT_EMPTY_MAX,
+            default=self._entry.data.get(CONF_COLLECT_EMPTY_MAX, DEFAULT_COLLECT_EMPTY_MAX),
+        )] = NumberSelector(
+            NumberSelectorConfig(min=1, max=20, step=1, mode=NumberSelectorMode.BOX, unit_of_measurement="опросов")
+        )
+
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(schema_fields),
@@ -193,4 +213,5 @@ class SmsGammuOptionsFlow(OptionsFlow):
             return result
         except Exception:
             return []
+
 
