@@ -226,63 +226,20 @@ class SmsCoordinator:
 
     async def _collect(self, first_batch: list[dict]) -> None:
         """
-        Два режима сборки multipart SMS:
+        Сборка multipart SMS таймером ожидания: после получения первой части
+        опрашиваем модем каждые COLLECT_INTERVAL секунд, пока не наберём
+        COLLECT_EMPTY_MAX пустых ответов подряд — тогда считаем что все части
+        собраны.
 
-        1. Аддон v1.7.1+: поле Complete=false означает что SMS ещё не полный.
-           Ждём пока все SMS станут Complete=true, потом сохраняем и удаляем.
-
-        2. Старый аддон (нет поля Complete): наш таймер — ждём COLLECT_EMPTY_MAX
-           пустых опросов подряд.
+        Примечание: проверялась возможность использовать поле Complete из API
+        sms-gammu-gateway (введено в одном из коммитов автора аддона), но на
+        практике в установленных версиях аддона это поле в ответе /sms не
+        встречается — реальный JSON содержит только Date/Number/State/Text.
+        Поэтому таймер остаётся единственным рабочим механизмом сборки.
         """
         self.collecting = True
         _LOGGER.info("Collect mode: %d messages on SIM", len(first_batch))
 
-        has_complete_field = any("Complete" in m for m in first_batch)
-
-        if has_complete_field:
-            await self._collect_with_complete_flag(first_batch)
-        else:
-            await self._collect_with_timer(first_batch)
-
-        self.collecting = False
-
-    async def _collect_with_complete_flag(self, first_batch: list[dict]) -> None:
-        """Режим v1.7.1+: используем поле Complete из API."""
-        _LOGGER.debug("Collect mode: using Complete field (addon v1.7.1+)")
-
-        for attempt in range(20):
-            messages = await self._safe_get_all() if attempt > 0 else first_batch
-
-            if not messages:
-                await asyncio.sleep(COLLECT_INTERVAL)
-                continue
-
-            incomplete = [m for m in messages if not m.get("Complete", True)]
-            complete   = [m for m in messages if m.get("Complete", True) and m.get("Text")]
-
-            if incomplete:
-                _LOGGER.info(
-                    "Waiting for %d incomplete multipart SMS (attempt %d/20)",
-                    len(incomplete), attempt + 1
-                )
-                await asyncio.sleep(COLLECT_INTERVAL)
-                continue
-
-            # Все SMS полные — сохраняем и удаляем
-            await self._save_messages(complete)
-            await self._safe_delete_all()
-            return
-
-        # Таймаут — сохраняем что есть
-        _LOGGER.warning("Collect timeout, saving whatever is complete")
-        messages = await self._safe_get_all() or []
-        complete = [m for m in messages if m.get("Text")]
-        await self._save_messages(complete)
-        await self._safe_delete_all()
-
-    async def _collect_with_timer(self, first_batch: list[dict]) -> None:
-        """Режим совместимости: таймер ожидания новых частей."""
-        _LOGGER.debug("Collect mode: using timer fallback (old addon)")
         buffers: dict[str, NumberBuffer] = {}
         self._add_to_buffers(buffers, first_batch)
         await self._safe_delete_all()
@@ -306,16 +263,7 @@ class SmsCoordinator:
             _LOGGER.info("SMS assembled from %s: %d parts, %d chars", number, len(buf.parts), len(full_text))
             await self._save_one(number, full_text, buf.first_date)
 
-    async def _save_messages(self, messages: list[dict]) -> None:
-        """Сохраняет список готовых SMS в БД."""
-        for msg in messages:
-            number = msg.get("Number", "Unknown")
-            text   = msg.get("Text", "")
-            date   = msg.get("Date", "")
-            parts  = msg.get("PartsReceived", 1)
-            expected = msg.get("PartsExpected", 1)
-            _LOGGER.info("Saving SMS from %s (%d/%d parts, %d chars)", number, parts, expected, len(text))
-            await self._save_one(number, text, date)
+        self.collecting = False
 
     async def _save_one(self, number: str, text: str, date: str) -> None:
         # Проверяем есть ли недавнее сообщение от этого номера (в рамках 2 минут)
@@ -685,6 +633,7 @@ class SmsApiView(HomeAssistantView):
             status=status,
             content_type="application/json",
         )
+
 
 
 
