@@ -775,8 +775,16 @@ class SmsGammuPanel extends HTMLElement {
   }
 
   _getLangPref() {
-    try { return localStorage.getItem("sms_gammu_lang") || this._hass?.language || "en"; }
-    catch { return this._hass?.language || "en"; }
+    // Если пользователь явно выбрал язык через 🌐 — уважаем выбор.
+    // Иначе берём из настроек интеграции (Options flow), и только
+    // в последнюю очередь — язык самой Home Assistant.
+    try {
+      const explicit = localStorage.getItem("sms_gammu_lang");
+      if (explicit) return explicit;
+    } catch {}
+    if (this._status?.language) return this._status.language;
+    try { return this._hass?.language || "en"; }
+    catch { return "en"; }
   }
 
   async _initLocale() {
@@ -923,11 +931,31 @@ class SmsGammuPanel extends HTMLElement {
   }
 
   async _loadStatus() {
+    const hadStatusBefore = !!this._status;
     try {
       const s = await this._api("status");
       this._status = s;
       this._pollInterval = s.poll_interval_hint || 30;
     } catch (_) {}
+
+    // Первая загрузка статуса — только теперь известна настройка языка
+    // из конфигурации интеграции. Если пользователь не выбирал язык
+    // явно через 🌐, применяем язык из настроек.
+    if (!hadStatusBefore && this._status?.language) {
+      let explicit = null;
+      try { explicit = localStorage.getItem("sms_gammu_lang"); } catch {}
+      if (!explicit) {
+        const code = AVAILABLE_LOCALES.includes(this._status.language)
+          ? this._status.language
+          : null;
+        if (code) {
+          this._locale = await loadLocale(code);
+          this._updateLocaleUI();
+          this._renderContacts();
+          this._renderMessages();
+        }
+      }
+    }
 
     try {
       const pi = await this._api("poll_interval");
@@ -2311,6 +2339,7 @@ class SmsGammuPanel extends HTMLElement {
 }
 
 customElements.define("sms-gammu-panel", SmsGammuPanel);
+
 
 
 
