@@ -43,4 +43,10 @@ CONF_COLLECT_EMPTY_MAX = "collect_empty_max"
 DEFAULT_COLLECT_INTERVAL = 2
 DEFAULT_COLLECT_EMPTY_MAX = 5
 
+# Язык интерфейса панели — настраивается централизованно через Options flow
+# вместо переключателя 🌐 внутри самой панели
+CONF_LANGUAGE = "language"
+DEFAULT_LANGUAGE = "ru"
+
+
 
