@@ -187,4 +187,3 @@ class SmsLastTextSensor(_BaseSmsSensor):
             text if len(text) <= LAST_SMS_TEXT_MAXLEN
             else text[: LAST_SMS_TEXT_MAXLEN - 1] + "…"
         )
-
