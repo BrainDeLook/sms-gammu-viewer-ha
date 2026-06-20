@@ -1,0 +1,19 @@
+send_sms:
+  name: Send SMS
+  description: Отправляет SMS через sms-gammu-gateway. Номер и текст — отдельными полями.
+  fields:
+    number:
+      name: Номер телефона
+      description: "Номер получателя, например +79001234567"
+      required: true
+      example: "+79001234567"
+      selector:
+        text:
+    message:
+      name: Текст
+      description: Текст SMS-сообщения
+      required: true
+      example: "Привет!"
+      selector:
+        text:
+          multiline: true
