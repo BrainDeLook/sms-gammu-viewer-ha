@@ -28,6 +28,7 @@ async def async_setup_entry(
             SmsUnreadSensor(hass, entry),
             SmsLastNumberSensor(hass, entry),
             SmsLastTextSensor(hass, entry),
+            SmsLastCallSensor(hass, entry),
         ],
         update_before_add=True,
     )
@@ -187,3 +188,69 @@ class SmsLastTextSensor(_BaseSmsSensor):
             text if len(text) <= LAST_SMS_TEXT_MAXLEN
             else text[: LAST_SMS_TEXT_MAXLEN - 1] + "…"
         )
+
+
+class SmsLastCallSensor(_BaseSmsSensor):
+    """Номер и результат последнего совершённого звонка."""
+
+    _attr_icon = "mdi:phone-log"
+    _attr_name = "Last Call"
+
+    def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
+        super().__init__(hass, entry)
+        self._value: str | None = None
+        self._reason: str | None = None
+        self._called_at: str | None = None
+        self._attr_unique_id = f"{entry.entry_id}_last_call"
+
+    @property
+    def native_value(self) -> str | None:
+        return self._value
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        return {
+            "reason": self._reason,
+            "called_at": self._called_at,
+            "panel_url": "/sms-viewer",
+        }
+
+    async def async_added_to_hass(self) -> None:
+        await self._load_initial()
+        coord = self._coord()
+        if coord:
+            coord.register_sensor_listener(self._on_event)
+            self.async_on_remove(lambda: coord.unregister_sensor_listener(self._on_event))
+
+    async def _load_initial(self) -> None:
+        coord = self._coord()
+        if not coord:
+            return
+        try:
+            rows = await self.hass.async_add_executor_job(coord.store.get_call_history, 1)
+            if rows:
+                self._set_call(
+                    rows[0].get("number"),
+                    rows[0].get("reason"),
+                    rows[0].get("called_at"),
+                )
+        except Exception as e:
+            _LOGGER.debug("Last call initial load error: %s", e)
+
+    @callback
+    def _on_event(self, event_type: str, data: dict) -> None:
+        if event_type != "call_ended":
+            return
+        from datetime import datetime
+        self._set_call(
+            data.get("number"),
+            data.get("reason"),
+            datetime.now().isoformat(timespec="seconds"),
+        )
+        self.async_write_ha_state()
+
+    def _set_call(self, number: str | None, reason: str | None, called_at: str | None) -> None:
+        self._value = number
+        self._reason = reason
+        self._called_at = called_at
+
