@@ -87,9 +87,21 @@ export default {
   port_connection_failed: "Connection failed",
   port_no_response: "No OK response from modem",
   port_check_failed: "Check failed",
+  phonebook_title: "Phonebook",
+  loading_phonebook: "Loading contacts…",
+  no_contacts: "No contacts yet",
+  add_contact: "Add contact",
+  open_chat: "Open chat",
+  contact_name_prompt: "Contact name:",
+  contact_number_prompt: "Phone number:",
+  contact_label_prompt: "Label (optional):",
+  name_required: "Name is required",
+  number_required: "Number is required",
+  delete_contact_confirm: "Delete this contact from the phonebook?",
   back: "Back",
   modem_btn: "Modem status",
 };
+
 
 
 
