@@ -24,7 +24,6 @@ from .const import (
     CONF_COLLECT_EMPTY_MAX,
     CONF_COLLECT_INTERVAL,
     CONF_HOST,
-    CONF_LANGUAGE,
     CONF_NOTIFY_TARGETS,
     CONF_PASSWORD,
     CONF_POLL_INTERVAL,
@@ -34,7 +33,6 @@ from .const import (
     DEFAULT_CALL_DURATION,
     DEFAULT_COLLECT_EMPTY_MAX,
     DEFAULT_COLLECT_INTERVAL,
-    DEFAULT_LANGUAGE,
     DEFAULT_PASSWORD,
     DEFAULT_POLL_INTERVAL,
     DEFAULT_PORT,
@@ -111,7 +109,6 @@ class SmsGammuOptionsFlow(OptionsFlow):
                     CONF_CALL_DURATION: int(user_input.get(CONF_CALL_DURATION, DEFAULT_CALL_DURATION)),
                     CONF_COLLECT_INTERVAL: int(user_input.get(CONF_COLLECT_INTERVAL, DEFAULT_COLLECT_INTERVAL)),
                     CONF_COLLECT_EMPTY_MAX: int(user_input.get(CONF_COLLECT_EMPTY_MAX, DEFAULT_COLLECT_EMPTY_MAX)),
-                    CONF_LANGUAGE: user_input.get(CONF_LANGUAGE, DEFAULT_LANGUAGE),
                 },
             )
             return self.async_create_entry(title="", data={})
@@ -189,22 +186,12 @@ class SmsGammuOptionsFlow(OptionsFlow):
             NumberSelectorConfig(min=1, max=20, step=1, mode=NumberSelectorMode.BOX, unit_of_measurement="опросов")
         )
 
-        schema_fields[vol.Optional(
-            CONF_LANGUAGE,
-            default=self._entry.data.get(CONF_LANGUAGE, DEFAULT_LANGUAGE),
-        )] = SelectSelector(
-            SelectSelectorConfig(
-                options=[
-                    {"value": "ru", "label": "Русский"},
-                    {"value": "en", "label": "English"},
-                ],
-                mode=SelectSelectorMode.DROPDOWN,
-            )
-        )
-
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(schema_fields),
+            description_placeholders={
+                "notify_count": str(len(notify_options)),
+            },
         )
 
     def _get_notify_options(self) -> list[dict]:
@@ -226,7 +213,5 @@ class SmsGammuOptionsFlow(OptionsFlow):
             return result
         except Exception:
             return []
-
-
 
 
