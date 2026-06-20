@@ -481,6 +481,9 @@ class SmsApiView(HomeAssistantView):
             sim     = await coord.client.get_sim()
             capacity = await coord.client.get_sms_capacity()
             unread  = await self.hass.async_add_executor_job(store.unread_count)
+            sim_phone_number = await self.hass.async_add_executor_job(
+                store.get_setting, "sim_phone_number"
+            )
             return self._json({
                 "signal": signal,
                 "network": network,
@@ -491,6 +494,7 @@ class SmsApiView(HomeAssistantView):
                 "collecting": coord.collecting,
                 "error_streak": coord._error_streak,
                 "call_enabled": bool(coord.entry.data.get("call_device", "").strip()),
+                "sim_phone_number": sim_phone_number,
             })
 
         if action == "poll_interval":
@@ -499,6 +503,12 @@ class SmsApiView(HomeAssistantView):
         if action == "call_history":
             data = await self.hass.async_add_executor_job(store.get_call_history)
             return self._json(data)
+
+        if action == "check_call_port":
+            call_device = coord.entry.data.get("call_device", "").strip()
+            from .dialer import check_port
+            result = await check_port(call_device)
+            return self._json(result)
 
         if action.startswith("events"):
             last_id = int(request.rel_url.query.get("since", "0"))
@@ -607,6 +617,17 @@ class SmsApiView(HomeAssistantView):
             await self.hass.async_add_executor_job(store.clear_call_history)
             return self._json({"ok": True})
 
+        if action == "set_sim_phone_number":
+            try:
+                body = await request.json()
+            except Exception:
+                return self._error("Invalid JSON", 400)
+            number = (body.get("number") or "").strip()
+            await self.hass.async_add_executor_job(
+                store.set_setting, "sim_phone_number", number
+            )
+            return self._json({"ok": True, "number": number})
+
         if action == "poll_now":
             if not coord.collecting:
                 async def _manual():
@@ -664,6 +685,7 @@ class SmsApiView(HomeAssistantView):
             status=status,
             content_type="application/json",
         )
+
 
 
 
