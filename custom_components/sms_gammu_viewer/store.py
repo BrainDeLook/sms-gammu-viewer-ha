@@ -41,6 +41,16 @@ class SmsStore:
                     muted_at TEXT NOT NULL
                 )
             """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS call_history (
+                    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                    number    TEXT NOT NULL,
+                    reason    TEXT NOT NULL,
+                    called_at TEXT NOT NULL
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_call_number ON call_history(number)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_call_date   ON call_history(called_at)")
 
     def _conn(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self._path)
@@ -179,4 +189,35 @@ class SmsStore:
         with self._conn() as conn:
             rows = conn.execute("SELECT number FROM muted_numbers").fetchall()
         return [r[0] for r in rows]
+
+    def add_call(self, number: str, reason: str) -> int | None:
+        """Записывает звонок в историю."""
+        try:
+            with self._conn() as conn:
+                cur = conn.execute(
+                    "INSERT INTO call_history (number, reason, called_at) VALUES (?, ?, ?)",
+                    (number, reason, datetime.now().isoformat(timespec="seconds")),
+                )
+                return cur.lastrowid
+        except Exception as e:
+            _LOGGER.error("SmsStore.add_call error: %s", e)
+            return None
+
+    def get_call_history(self, limit: int = 30) -> list[dict[str, Any]]:
+        """Последние звонки, новые сверху."""
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM call_history ORDER BY id DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def delete_call(self, call_id: int) -> None:
+        with self._conn() as conn:
+            conn.execute("DELETE FROM call_history WHERE id=?", (call_id,))
+
+    def clear_call_history(self) -> None:
+        with self._conn() as conn:
+            conn.execute("DELETE FROM call_history")
+
 
