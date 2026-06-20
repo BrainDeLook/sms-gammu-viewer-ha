@@ -22,6 +22,7 @@ After installation, an **SMS** tab appears in the sidebar. Messages are stored i
 
 - 💬 Chat-style view — all SMS from one sender in one thread
 - ✍️ **Send SMS** — reply from inside a chat, or start a brand-new conversation via the compact `+` button
+- 📞 **Outgoing voice calls** (dial-only) — via a separate voice AT interface on modems that expose multiple serial ports (e.g. Huawei). Standalone call FAB or call button in a chat, plus a `notify.sms_gammu_call` entity for automations
 - 🔇 **Per-conversation mute** — silence push notifications for a specific number while still saving and showing its messages normally
 - 🔢 Unread SMS counter badge on the sidebar icon (`sensor.sms_unread_count`)
 - 📨 Sensors for the last received SMS — `sensor.sms_last_sms_number` and `sensor.sms_last_sms_text`, updated instantly on arrival (handy for automations)
@@ -142,6 +143,44 @@ If the modem stops responding (5 consecutive failed polls), the integration **au
 
 ---
 
+## Voice Calls (Dial-Only)
+
+Some USB GSM modems (notably Huawei) expose **multiple serial interfaces** over a single USB connection — typically one for data/SMS and a separate one for voice AT commands (e.g. `/dev/serial/by-id/...-if00-port0` for data, `...-if02-port0` for voice). When that's the case, this integration can dial calls directly over the voice interface, completely independent of sms-gammu-gateway's REST API, with **no risk of port conflicts**.
+
+> This feature is **dial-only** — the call connects and rings on the recipient's end, but no audio is routed through Home Assistant. Useful for "ring my phone" style automations (doorbell-style notifications, alerts) rather than two-way conversations.
+
+### Setup
+
+1. Identify your modem's voice interface, e.g.:
+   ```
+   ls -la /dev/serial/by-id/
+   ```
+   Look for a second device path alongside the one used by sms-gammu-gateway.
+2. Go to **Settings → Devices & Services → SMS Gammu Viewer → Configure**
+3. Fill in the **voice call serial port** field with that path
+4. Save and restart Home Assistant
+
+Leave the field empty to keep this feature fully disabled — it has zero effect on SMS functionality either way.
+
+### Usage
+
+- **Standalone call button** — a green floating button (📞) appears next to "New message" in the contacts sidebar once a voice port is configured. Tap it, enter a number, and dial — no existing conversation required.
+- **Call button in chat** — also available in an open conversation's header.
+- **Automations** — call the `notify.sms_gammu_call` service with a phone number as the message:
+  ```yaml
+  service: notify.sms_gammu_call
+  data:
+    message: "+79001234567"
+  ```
+  Multiple numbers can be tried in sequence using `|` as a separator; dialing stops at the first answered call.
+- **Event** — `sms_gammu_viewer_call_ended` fires with `phone_number` and `reason` (`answered`, `not_answered`, `declined`, `error`) for use in automations.
+
+### Compatibility
+
+Requires a modem with hardware flow control support on its voice AT interface (`dsrdtr`/`rtscts`). Confirmed working on Huawei USB modems at baudrate 75600. If your modem only exposes a single serial port, this feature can't be used — leave the field empty.
+
+---
+
 ## How It Works
 
 ```
@@ -190,6 +229,10 @@ The panel UI text (not just config flow) is fully translatable, independent of H
 
 ## Changelog
 
+### v2.5.0
+- 📞 Outgoing voice calls (dial-only) via a separate voice AT interface, independent of the SMS gateway
+- New `notify.sms_gammu_call` entity and `sms_gammu_viewer_call_ended` event for automations
+
 ### v2.4.0
 - 🔇 Per-conversation mute button
 - 📨 New sensors: `sensor.sms_last_sms_number` and `sensor.sms_last_sms_text`
@@ -226,5 +269,6 @@ The panel UI text (not just config flow) is fully translatable, independent of H
 ## License
 
 MIT
+
 
 
