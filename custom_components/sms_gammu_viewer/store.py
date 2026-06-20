@@ -217,7 +217,7 @@ class SmsStore:
                     pb.label as contact_label
                 FROM messages m
                 LEFT JOIN phonebook pb ON pb.number = m.number
-                GROUP BY number
+                GROUP BY m.number
                 ORDER BY last_date DESC
             """).fetchall()
         result = [dict(r) for r in rows]
@@ -340,6 +340,7 @@ class SmsStore:
         with self._conn() as conn:
             rows = conn.execute("SELECT number, name, label FROM phonebook").fetchall()
         return {r["number"]: {"name": r["name"], "label": r["label"] or ""} for r in rows}
+
 
 
 
