@@ -205,9 +205,6 @@ class SmsGammuOptionsFlow(OptionsFlow):
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(schema_fields),
-            description_placeholders={
-                "notify_count": str(len(notify_options)),
-            },
         )
 
     def _get_notify_options(self) -> list[dict]:
@@ -229,6 +226,7 @@ class SmsGammuOptionsFlow(OptionsFlow):
             return result
         except Exception:
             return []
+
 
 
 
