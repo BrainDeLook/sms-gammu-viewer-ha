@@ -227,27 +227,39 @@ def _looks_like_wap_push(text: str) -> bool:
 
 
 class NumberBuffer:
+    """Хранит самую длинную версию текста, увиденную от номера за сессию сбора.
+
+    Gammu иногда отдаёт один и тот же объект SMS постепенно растущим по мере
+    того как приходят его части по эфиру — то есть это НЕ отдельные куски для
+    конкатенации, а прогрессивно дозаполняемая одна запись. Поэтому вместо
+    "".join(parts) просто берём самый длинный текст увиденный для этого
+    номера+даты — он и есть финальная полная версия.
+    """
+
     def __init__(self, number: str) -> None:
         self.number = number
-        self.parts: list[str] = []
+        self.best_text: str = ""
         self.first_date: str = ""
+        self.seen_count: int = 0
 
     def add(self, text: str, date: str) -> bool:
-        if text in self.parts:
-            return False
-        assembled = "".join(self.parts)
-        if text in assembled:
-            return False
-        self.parts.append(text)
+        self.seen_count += 1
         if not self.first_date:
             self.first_date = date
+
+        if len(text) <= len(self.best_text):
+            # Текст короче или равен уже сохранённому — не новость, но это
+            # ОЖИДАЕМЫЙ повторный опрос той же записи, не дублирующая часть
+            return False
+
+        self.best_text = text
         return True
 
     @property
     def full_text(self) -> str:
-        if any(_looks_like_wap_push(p) for p in self.parts):
+        if _looks_like_wap_push(self.best_text):
             return "📎 Входящий MMS (не поддерживается)"
-        return "".join(self.parts)
+        return self.best_text
 
 
 class SmsCoordinator:
@@ -358,7 +370,7 @@ class SmsCoordinator:
         self.collecting = True
         _LOGGER.info("Collect mode: %d messages on SIM", len(first_batch))
 
-        buffers: dict[str, NumberBuffer] = {}
+        buffers: dict[tuple, NumberBuffer] = {}
         self._add_to_buffers(buffers, first_batch)
         await self._safe_delete_all()
 
@@ -390,9 +402,9 @@ class SmsCoordinator:
                     len(messages), empty_streak, collect_empty_max
                 )
 
-        for number, buf in buffers.items():
+        for (number, _date), buf in buffers.items():
             full_text = buf.full_text
-            _LOGGER.info("SMS assembled from %s: %d parts, %d chars", number, len(buf.parts), len(full_text))
+            _LOGGER.info("SMS assembled from %s: %d updates seen, %d chars", number, buf.seen_count, len(full_text))
             await self._save_one(number, full_text, buf.first_date)
 
         self.collecting = False
@@ -426,7 +438,7 @@ class SmsCoordinator:
                 self.push_event("new_message", {"id": msg_id, "number": number, "text": text, "date": date, "is_read": 0})
                 await self._notify(number, text)
 
-    def _add_to_buffers(self, buffers: dict[str, NumberBuffer], messages: list[dict]) -> bool:
+    def _add_to_buffers(self, buffers: dict[tuple, NumberBuffer], messages: list[dict]) -> bool:
         got_new = False
         for msg in messages:
             number = msg.get("Number", "Unknown")
@@ -434,9 +446,10 @@ class SmsCoordinator:
             date   = msg.get("Date", "")
             if not text:
                 continue
-            if number not in buffers:
-                buffers[number] = NumberBuffer(number)
-            if buffers[number].add(text, date):
+            key = (number, date)
+            if key not in buffers:
+                buffers[key] = NumberBuffer(number)
+            if buffers[key].add(text, date):
                 got_new = True
         return got_new
 
@@ -765,6 +778,7 @@ class SmsApiView(HomeAssistantView):
             status=status,
             content_type="application/json",
         )
+
 
 
 
