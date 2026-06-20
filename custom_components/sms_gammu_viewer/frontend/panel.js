@@ -845,7 +845,18 @@ class SmsGammuPanel extends HTMLElement {
 
   _restoreActiveChat() {
     let saved = null;
-    try { saved = localStorage.getItem("sms_gammu_active_number"); } catch {}
+    try {
+      const raw = localStorage.getItem("sms_gammu_active_number");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const ttlMs = 30 * 60 * 1000; // 30 минут — после этого "забываем" открытый чат
+        if (Date.now() - parsed.ts < ttlMs) {
+          saved = parsed.number;
+        } else {
+          localStorage.removeItem("sms_gammu_active_number");
+        }
+      }
+    } catch {}
     if (!saved) return;
 
     const tryRestore = (attemptsLeft) => {
@@ -1036,7 +1047,12 @@ class SmsGammuPanel extends HTMLElement {
 
   async _selectContact(number) {
     this._activeNumber = number;
-    try { localStorage.setItem("sms_gammu_active_number", number); } catch {}
+    try {
+      localStorage.setItem(
+        "sms_gammu_active_number",
+        JSON.stringify({ number, ts: Date.now() })
+      );
+    } catch {}
     this.shadowRoot.querySelector(".root")?.classList.add("chat-open");
     try {
       this._messages = await this._api(
@@ -2292,6 +2308,7 @@ class SmsGammuPanel extends HTMLElement {
 }
 
 customElements.define("sms-gammu-panel", SmsGammuPanel);
+
 
 
 
