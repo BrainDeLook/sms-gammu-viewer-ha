@@ -643,6 +643,69 @@ const CSS = `
   }
   .ch-item:hover .ch-del-btn { opacity: 1; }
   .ch-del-btn:hover { color: var(--danger); }
+
+  /* ─── Phonebook page ─── */
+  .pb-page {
+    padding: 20px;
+    max-width: 600px;
+  }
+  .pb-add-btn {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 14px;
+    border: none;
+    border-radius: 10px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity .2s;
+  }
+  .pb-add-btn:hover { opacity: .9; }
+  .pb-list {
+    background: var(--card);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,.07);
+  }
+  .pb-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 11px 14px; cursor: default;
+    border-bottom: 1px solid var(--line);
+    transition: background .15s;
+  }
+  .pb-item:last-child { border-bottom: none; }
+  .pb-item:hover { background: rgba(0,0,0,.03); }
+  .pb-avatar {
+    width: 38px; height: 38px; border-radius: 50%;
+    background: var(--accent); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; font-weight: 700; flex-shrink: 0;
+  }
+  .pb-info { flex: 1; min-width: 0; }
+  .pb-name {
+    font-size: 14px; font-weight: 500; color: var(--text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .pb-meta {
+    font-size: 12px; color: var(--sub);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .pb-action-btn {
+    background: none; border: none; cursor: pointer;
+    color: var(--sub); padding: 6px; border-radius: 6px;
+    display: flex; align-items: center;
+    transition: background .15s, color .15s;
+    flex-shrink: 0;
+  }
+  .pb-action-btn:hover { background: rgba(0,0,0,.06); color: var(--text); }
+  .pb-action-btn.danger:hover { background: rgba(229,57,53,.1); color: var(--danger); }
+  .pb-empty {
+    padding: 30px 14px; text-align: center;
+    color: var(--sub); font-size: 13px;
+  }
+
   @media (max-width: 580px) {
     .contacts { width: 100%; border-right: none; }
     .chat { display: none; position: absolute; inset: 0; z-index: 10; background: var(--bg); }
@@ -701,6 +764,7 @@ class SmsGammuPanel extends HTMLElement {
     this._modemError = null;
     this._narrow = false;
     this._callHistory = [];
+    this._phonebook = [];
   }
 
   _t(key, ...args) {
@@ -1242,7 +1306,7 @@ class SmsGammuPanel extends HTMLElement {
       <div class="ch-item" data-number="${this._esc(c.number)}">
         <div class="ch-icon ${c.reason}">${reasonIcon[c.reason] || "?"}</div>
         <div class="ch-info">
-          <div class="ch-number">${this._esc(c.number)}</div>
+          <div class="ch-number">${this._esc(c.contact_name || c.number)}</div>
           <div class="ch-meta">${this._t("call_reason_" + c.reason)} · ${this._formatShort(c.called_at)}</div>
         </div>
         <button class="ch-del-btn" data-id="${c.id}" title="${this._t("delete_msg")}">
@@ -1361,6 +1425,8 @@ class SmsGammuPanel extends HTMLElement {
 
   _switchTab() {
     const isStatus = this._activeTab === "status";
+    const isPhonebook = this._activeTab === "phonebook";
+    const isOverlay = isStatus || isPhonebook;
     const root         = this.shadowRoot.getElementById("root");
     const contactList  = this.shadowRoot.getElementById("contact-list");
     const messagesArea = this.shadowRoot.getElementById("messages-area");
@@ -1368,24 +1434,28 @@ class SmsGammuPanel extends HTMLElement {
     const chatHeader   = this.shadowRoot.getElementById("chat-header");
     const searchBox    = this.shadowRoot.querySelector(".search");
 
-    if (isStatus) {
+    if (isOverlay) {
       if (contactList)  contactList.style.display = "none";
       if (searchBox)    searchBox.style.display = "none";
       if (messagesArea) messagesArea.style.display = "none";
       if (statusMain)   statusMain.style.display = "";
       const sendBarEl = this.shadowRoot.getElementById("send-bar");
       if (sendBarEl) sendBarEl.style.display = "none";
-      // Показываем хедер с заголовком "Модем" и кнопкой назад
+      // Показываем хедер с заголовком и кнопкой назад
       if (chatHeader)   chatHeader.style.display = "";
       const titleEl = this.shadowRoot.getElementById("chat-title");
       const subEl   = this.shadowRoot.getElementById("chat-subtitle");
-      if (titleEl) titleEl.textContent = this._t("modem_status");
+      if (titleEl) titleEl.textContent = isStatus ? this._t("modem_status") : this._t("phonebook_title");
       if (subEl)   subEl.textContent = "";
       const delBtn = this.shadowRoot.getElementById("del-contact-btn");
       if (delBtn) delBtn.style.display = "none";
       // На мобилке показываем правую область
       root?.classList.add("chat-open");
-      this._renderStatusPage();
+      if (isStatus) {
+        this._renderStatusPage();
+      } else {
+        this._loadPhonebook();
+      }
     } else {
       if (contactList)  contactList.style.display = "";
       if (searchBox)    searchBox.style.display = "";
@@ -1400,7 +1470,131 @@ class SmsGammuPanel extends HTMLElement {
     }
   }
 
-  _renderStatusPage() {
+  async _loadPhonebook() {
+    const page = this.shadowRoot.getElementById("status-main");
+    if (!page || this._activeTab !== "phonebook") return;
+    page.innerHTML = `<div class="status-loading">${this._t("loading_phonebook")}</div>`;
+    try {
+      this._phonebook = await this._api("phonebook");
+    } catch (e) {
+      this._phonebook = [];
+      this._phonebookError = e.message;
+    }
+    this._renderPhonebook();
+  }
+
+  _renderPhonebook() {
+    const page = this.shadowRoot.getElementById("status-main");
+    if (!page || this._activeTab !== "phonebook") return;
+
+    const items = this._phonebook || [];
+
+    const rows = items.length
+      ? items.map((c) => `
+          <div class="pb-item" data-number="${this._esc(c.number)}">
+            <div class="pb-avatar">${this._esc((c.name || "?").slice(0, 1).toUpperCase())}</div>
+            <div class="pb-info">
+              <div class="pb-name">${this._esc(c.name)}</div>
+              <div class="pb-meta">
+                ${this._esc(c.number)}${c.label ? " · " + this._esc(c.label) : ""}
+              </div>
+            </div>
+            <button class="pb-action-btn" data-action="open" data-number="${this._esc(c.number)}" title="${this._t("open_chat")}">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              </svg>
+            </button>
+            <button class="pb-action-btn" data-action="edit" data-number="${this._esc(c.number)}" title="${this._t("edit")}">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
+            </button>
+            <button class="pb-action-btn danger" data-action="delete" data-number="${this._esc(c.number)}" title="${this._t("delete_msg")}">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+              </svg>
+            </button>
+          </div>
+        `).join("")
+      : `<div class="pb-empty">${this._t("no_contacts")}</div>`;
+
+    page.innerHTML = `
+      <div class="pb-page">
+        <button class="pb-add-btn" id="pb-add-btn">+ ${this._t("add_contact")}</button>
+        <div class="pb-list">${rows}</div>
+      </div>
+    `;
+
+    page.querySelector("#pb-add-btn")?.addEventListener("click", () => this._openContactEditor());
+
+    page.querySelectorAll(".pb-action-btn").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const number = btn.dataset.number;
+        const action = btn.dataset.action;
+        if (action === "open") {
+          this._activeTab = "chats";
+          const pbBtn = this.shadowRoot.getElementById("phonebook-btn");
+          if (pbBtn) pbBtn.style.color = "";
+          this._switchTab();
+          this._selectContact(number);
+        } else if (action === "edit") {
+          const contact = this._phonebook.find((c) => c.number === number);
+          this._openContactEditor(contact);
+        } else if (action === "delete") {
+          this._deleteContactFromBook(number);
+        }
+      });
+    });
+  }
+
+  _openContactEditor(contact) {
+    const isEdit = !!contact;
+    const name = prompt(this._t("contact_name_prompt"), contact?.name || "");
+    if (name === null) return;
+    if (!name.trim()) {
+      this._showToast(this._t("name_required"));
+      return;
+    }
+    let number = contact?.number;
+    if (!isEdit) {
+      number = prompt(this._t("contact_number_prompt"), "");
+      if (number === null) return;
+      if (!number.trim()) {
+        this._showToast(this._t("number_required"));
+        return;
+      }
+    }
+    const label = prompt(this._t("contact_label_prompt"), contact?.label || "");
+    this._saveContact(number.trim(), name.trim(), (label || "").trim());
+  }
+
+  async _saveContact(number, name, label) {
+    try {
+      await this._api("add_contact", "POST", { number, name, label });
+      await this._loadPhonebook();
+      this._refreshContacts();
+      this._showToast(this._t("saved"));
+    } catch (e) {
+      this._showToast(this._t("send_error") + ": " + e.message);
+    }
+  }
+
+  async _deleteContactFromBook(number) {
+    if (!confirm(this._t("delete_contact_confirm"))) return;
+    try {
+      await this._api(`delete_phonebook_contact/${encodeURIComponent(number)}`, "POST");
+      this._phonebook = this._phonebook.filter((c) => c.number !== number);
+      this._renderPhonebook();
+      this._refreshContacts();
+    } catch (e) {
+      this._showToast(this._t("send_error") + ": " + e.message);
+    }
+  }
+
+
     const page = this.shadowRoot.getElementById("status-main");
     if (!page || this._activeTab !== "status") return;
 
@@ -1612,6 +1806,12 @@ class SmsGammuPanel extends HTMLElement {
                 </button>
                 <div class="lang-dropdown" id="lang-dropdown"></div>
               </div>
+              <button class="icon-btn" id="phonebook-btn" title="Телефонная книга">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                  <circle cx="12" cy="7" r="4"/>
+                </svg>
+              </button>
               <button class="icon-btn" id="modem-btn" title="Modem status">
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                   <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
@@ -1740,6 +1940,15 @@ class SmsGammuPanel extends HTMLElement {
       this._activeTab = this._activeTab === "status" ? "chats" : "status";
       const btn = this.shadowRoot.getElementById("modem-btn");
       btn.style.color = this._activeTab === "status" ? "var(--accent)" : "";
+      this._switchTab();
+    });
+
+    this.shadowRoot.getElementById("phonebook-btn").addEventListener("click", () => {
+      this._activeTab = this._activeTab === "phonebook" ? "chats" : "phonebook";
+      const btn = this.shadowRoot.getElementById("phonebook-btn");
+      btn.style.color = this._activeTab === "phonebook" ? "var(--accent)" : "";
+      const modemBtn = this.shadowRoot.getElementById("modem-btn");
+      if (modemBtn) modemBtn.style.color = "";
       this._switchTab();
     });
 
@@ -1886,11 +2095,13 @@ class SmsGammuPanel extends HTMLElement {
 
 
     this.shadowRoot.getElementById("back-btn").addEventListener("click", () => {
-      if (this._activeTab === "status") {
-        // Закрываем страницу модема — возврат к списку
+      if (this._activeTab === "status" || this._activeTab === "phonebook") {
+        // Закрываем оверлей (модем/телефонная книга) — возврат к списку чатов
         this._activeTab = "chats";
-        const btn = this.shadowRoot.getElementById("modem-btn");
-        if (btn) btn.style.color = "";
+        const modemBtn = this.shadowRoot.getElementById("modem-btn");
+        const pbBtn = this.shadowRoot.getElementById("phonebook-btn");
+        if (modemBtn) modemBtn.style.color = "";
+        if (pbBtn) pbBtn.style.color = "";
         this._switchTab();
       } else {
         this._activeNumber = null;
@@ -1987,10 +2198,10 @@ class SmsGammuPanel extends HTMLElement {
       <div class="contact-item ${c.unread > 0 ? "has-unread" : ""} ${
         c.number === this._activeNumber ? "active" : ""
       }" data-number="${this._esc(c.number)}">
-        <div class="avatar ${this._isAlphaTag(c.number) ? 'alpha' : ''}">${this._esc(this._avatar(c.number))}</div>
+        <div class="avatar ${this._isAlphaTag(c.number) ? 'alpha' : ''}">${this._esc(c.contact_name ? c.contact_name.slice(0,1).toUpperCase() : this._avatar(c.number))}</div>
         <div class="contact-info">
           <div class="contact-row1">
-            <span class="contact-number">${c.is_muted ? "🔇 " : ""}${this._esc(c.number)}</span>
+            <span class="contact-number">${c.is_muted ? "🔇 " : ""}${this._esc(c.contact_name || c.number)}</span>
             <span class="contact-date">${this._formatShort(c.last_date)}</span>
           </div>
           <div class="contact-preview">
@@ -2039,7 +2250,7 @@ class SmsGammuPanel extends HTMLElement {
     sendBar && (sendBar.style.display = "");
     const contact = this._contacts.find((c) => c.number === this._activeNumber);
     const count = contact?.total ?? this._messages.length;
-    titleEl && (titleEl.textContent = this._activeNumber);
+    titleEl && (titleEl.textContent = contact?.contact_name || this._activeNumber);
     subEl && (subEl.textContent = this._t("messages_count", count));
     delBtn && (delBtn.style.display = "");
     muteBtn && (muteBtn.style.display = "");
@@ -2100,6 +2311,7 @@ class SmsGammuPanel extends HTMLElement {
 }
 
 customElements.define("sms-gammu-panel", SmsGammuPanel);
+
 
 
 
