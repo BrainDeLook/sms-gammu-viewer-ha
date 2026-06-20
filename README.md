@@ -261,6 +261,14 @@ The panel UI text (not just config flow) is fully translatable, independent of H
 
 ---
 
+## Optional: Dashboard Card
+
+Want recent conversations visible right on your dashboard, not just in the sidebar panel? There's a separate Lovelace card for that: **[sms-gammu-viewer-card](https://github.com/BrainDeLook/sms-gammu-viewer-card)**.
+
+It's a separate HACS repository (Lovelace cards can't ship from the same repo as an integration) — install it the same way, as a custom repository with category **Dashboard**.
+
+---
+
 ## Credits & Inspiration
 
 This project builds on the work of several open-source projects:
@@ -332,6 +340,7 @@ This project builds on the work of several open-source projects:
 ## License
 
 MIT
+
 
 
 
