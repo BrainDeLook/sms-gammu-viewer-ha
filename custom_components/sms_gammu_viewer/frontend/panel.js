@@ -484,7 +484,6 @@ const CSS = `
   }
   .fab:hover { transform: scale(1.07); box-shadow: 0 5px 16px rgba(0,0,0,.3); }
   .fab-call {
-    left: auto; right: 16px;
     background: #4caf50;
   }
   .fab:active { transform: scale(.95); }
@@ -559,7 +558,7 @@ const CSS = `
     display: none;
     position: absolute;
     bottom: calc(100% + 10px);
-    left: 0;
+    right: 0;
     background: var(--card);
     border: 1px solid var(--line);
     border-radius: 12px;
@@ -655,8 +654,11 @@ const CSS = `
       width: 60px; height: 60px;
       bottom: 28px; left: 24px;
     }
+    #fab-call-anchor {
+      bottom: 28px !important; right: 24px !important;
+    }
     .fab-call {
-      left: auto; right: 24px;
+      width: 60px; height: 60px;
     }
   }
 
@@ -1636,8 +1638,8 @@ class SmsGammuPanel extends HTMLElement {
             </svg>
           </button>
 
-          <div class="call-fab-wrap" style="position:relative">
-            <button class="fab fab-call" id="fab-call" title="Call" style="display:none">
+          <div id="fab-call-anchor" style="position:absolute; bottom:18px; right:16px; z-index:10">
+            <button class="fab fab-call" id="fab-call" title="Call" style="display:none; position:static">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
               </svg>
@@ -2098,6 +2100,7 @@ class SmsGammuPanel extends HTMLElement {
 }
 
 customElements.define("sms-gammu-panel", SmsGammuPanel);
+
 
 
 
