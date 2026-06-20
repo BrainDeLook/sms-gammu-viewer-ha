@@ -17,3 +17,19 @@ send_sms:
       selector:
         text:
           multiline: true
+
+call:
+  name: Call
+  description: Звонит на номер через голосовой AT-интерфейс модема. Требует настроенный голосовой порт.
+  fields:
+    number:
+      name: Номер телефона
+      description: "Номер для звонка, например +79001234567"
+      required: true
+      example: "+79001234567"
+      selector:
+        text:
+
+hangup:
+  name: Hangup
+  description: Принудительно завершает текущий звонок.
