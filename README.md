@@ -31,7 +31,7 @@ After installation, an **SMS** tab appears in the sidebar. Messages are stored i
 - 🔄 Auto-refresh — chat updates automatically when new messages arrive (event polling every 4s)
 - 💾 Open chat is restored after a full page reload (F5 / pull-to-refresh)
 - 📋 Tap any message to copy its text — works on plain HTTP too, not just HTTPS
-- 📶 Modem status page — signal, operator, IMEI, SIM capacity, modem reset
+- 📶 Modem status page — signal, operator, IMEI, SIM capacity, editable SIM phone number, voice port diagnostics, modem reset
 - 🩺 **Automatic modem recovery** — after 5 consecutive failed polls the integration resets the modem itself (2-minute cooldown between resets), with a live warning in the status bar
 - 🗄 Internal SQLite storage — messages persist independently of SIM card memory
 - 🧩 Smart multipart SMS assembly — long messages collected in full before saving, including messages split across multiple delivery waves
@@ -51,6 +51,15 @@ After installation, an **SMS** tab appears in the sidebar. Messages are stored i
 - For push notifications: [Home Assistant Companion](https://companion.home-assistant.io/) app on your phone
 
 > ⚠️ **Important:** In the sms-gammu-gateway add-on configuration, **disable automatic SMS polling** (`SMS_CHECK_INTERVAL` or equivalent). Otherwise the add-on and this integration will simultaneously read and delete messages from the SIM, causing message loss. SMS Gammu Viewer takes over all polling logic.
+
+### Tested Hardware
+
+This integration (including the optional voice call feature) has been confirmed working on:
+
+- **Modem:** Huawei E1550 USB 3G modem
+- **Host:** Raspberry Pi 5 running Home Assistant OS
+
+Other USB GSM modems and hosts should work as long as Gammu supports them for SMS, and — for voice calls specifically — the modem exposes a separate serial interface for voice AT commands alongside the data interface.
 
 ---
 
@@ -239,6 +248,12 @@ This project builds on the work of several open-source projects:
 
 ## Changelog
 
+### v2.7.0
+- 🩺 Voice port diagnostics card on the modem status page — checks if the configured voice serial interface responds, with manual recheck button
+- 📱 Editable SIM phone number field (not auto-detected — most carriers don't store it on the SIM; enter it once manually)
+- 🐛 Fixed 400 error when a sender's alphanumeric name (e.g. some Beeline service messages) contained a stray newline character, which broke opening that conversation
+- 🐛 Fixed the call FAB jumping out of place when switching to the modem status page
+
 ### v2.6.0
 - 📋 Call history dropdown — tap the call button to see your last 30 calls with outcome icons (answered / not answered / declined / error), redial with one tap, delete individual entries or clear all
 - 🐛 Fixed stale call result toasts reappearing on page reload
@@ -283,6 +298,7 @@ This project builds on the work of several open-source projects:
 ## License
 
 MIT
+
 
 
 
