@@ -72,9 +72,25 @@ export default {
   call_reason_not_answered: "Не ответили",
   call_reason_declined: "Отклонён",
   call_reason_error: "Ошибка",
+  sim_phone_number: "Номер SIM",
+  not_set: "не указан",
+  edit: "Изменить",
+  save: "Сохранить",
+  saved: "Сохранено",
+  voice_port: "📞 Голосовой порт",
+  checking: "Проверка…",
+  check_port: "Проверить порт",
+  port_ok: "Порт отвечает",
+  port_not_configured: "Порт не настроен",
+  port_not_found: "Устройство не найдено",
+  port_permission_denied: "Нет доступа к порту",
+  port_connection_failed: "Не удалось подключиться",
+  port_no_response: "Нет ответа OK от модема",
+  port_check_failed: "Ошибка проверки",
   back: "Назад",
   modem_btn: "Статус модема",
 };
+
 
 
 
