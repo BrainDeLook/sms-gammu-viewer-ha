@@ -87,9 +87,21 @@ export default {
   port_connection_failed: "Не удалось подключиться",
   port_no_response: "Нет ответа OK от модема",
   port_check_failed: "Ошибка проверки",
+  phonebook_title: "Телефонная книга",
+  loading_phonebook: "Загрузка контактов…",
+  no_contacts: "Контактов ещё нет",
+  add_contact: "Добавить контакт",
+  open_chat: "Открыть чат",
+  contact_name_prompt: "Имя контакта:",
+  contact_number_prompt: "Номер телефона:",
+  contact_label_prompt: "Метка (необязательно):",
+  name_required: "Имя обязательно",
+  number_required: "Номер обязателен",
+  delete_contact_confirm: "Удалить этот контакт из телефонной книги?",
   back: "Назад",
   modem_btn: "Статус модема",
 };
+
 
 
 
