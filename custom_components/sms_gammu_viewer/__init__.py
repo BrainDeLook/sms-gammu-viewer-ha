@@ -496,6 +496,10 @@ class SmsApiView(HomeAssistantView):
         if action == "poll_interval":
             return self._json({"interval": coord._interval})
 
+        if action == "call_history":
+            data = await self.hass.async_add_executor_job(store.get_call_history)
+            return self._json(data)
+
         if action.startswith("events"):
             last_id = int(request.rel_url.query.get("since", "0"))
             events = coord.get_events_since(last_id)
@@ -578,6 +582,9 @@ class SmsApiView(HomeAssistantView):
                     call_device, number,
                     dial_timeout_sec=dial_timeout, call_duration_sec=call_duration,
                 )
+                await self.hass.async_add_executor_job(
+                    coord.store.add_call, number, reason.value
+                )
                 coord.push_event("call_ended", {"number": number, "reason": reason.value})
 
             self.hass.async_create_task(_do_call())
@@ -590,6 +597,15 @@ class SmsApiView(HomeAssistantView):
             from .dialer import hangup as hangup_call
             ok = await hangup_call(call_device)
             return self._json({"ok": ok})
+
+        if action.startswith("delete_call/"):
+            call_id = int(action[len("delete_call/"):])
+            await self.hass.async_add_executor_job(store.delete_call, call_id)
+            return self._json({"ok": True})
+
+        if action == "clear_call_history":
+            await self.hass.async_add_executor_job(store.clear_call_history)
+            return self._json({"ok": True})
 
         if action == "poll_now":
             if not coord.collecting:
@@ -648,6 +664,7 @@ class SmsApiView(HomeAssistantView):
             status=status,
             content_type="application/json",
         )
+
 
 
 
