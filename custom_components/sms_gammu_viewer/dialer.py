@@ -125,6 +125,42 @@ async def hangup(device_path: str) -> bool:
             await modem.close()
 
 
+async def check_port(device_path: str) -> dict:
+    """Диагностика голосового порта: открывается ли, отвечает ли на AT.
+
+    Возвращает словарь с полями ok, error, response_time_ms.
+    """
+    if not device_path or not device_path.strip():
+        return {"ok": False, "error": "not_configured"}
+
+    import time
+    start = time.monotonic()
+    modem: CallModem | None = None
+
+    try:
+        modem = await _connect(device_path)
+        lines = await modem.execute_at(
+            "AT", timeout=5, end_markers=["OK", "ERROR"]
+        )
+        elapsed_ms = round((time.monotonic() - start) * 1000)
+        reply = " ".join(lines)
+
+        if "OK" in reply:
+            return {"ok": True, "response_time_ms": elapsed_ms}
+
+        return {"ok": False, "error": "no_ok_response", "raw": reply}
+
+    except FileNotFoundError:
+        return {"ok": False, "error": "device_not_found"}
+    except PermissionError:
+        return {"ok": False, "error": "permission_denied"}
+    except Exception as e:
+        return {"ok": False, "error": "connection_failed", "detail": str(e)}
+    finally:
+        if modem:
+            await modem.close()
+
+
 async def _wait_for_call_end(
     modem: CallModem, dial_timeout_sec: int, call_duration_sec: int
 ) -> CallEndedReason:
@@ -184,6 +220,7 @@ async def _passive_wait(modem: CallModem, call_duration_sec: int) -> CallEndedRe
                     return CallEndedReason.DECLINED
     except TimeoutError:
         return CallEndedReason.NOT_ANSWERED
+
 
 
 
