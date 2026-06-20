@@ -22,7 +22,7 @@ After installation, an **SMS** tab appears in the sidebar. Messages are stored i
 
 - 💬 Chat-style view — all SMS from one sender in one thread
 - ✍️ **Send SMS** — reply from inside a chat, or start a brand-new conversation via the compact `+` button
-- 📞 **Outgoing voice calls** (dial-only) — via a separate voice AT interface on modems that expose multiple serial ports (e.g. Huawei). Standalone call FAB or call button in a chat, plus a `notify.sms_gammu_call` entity for automations
+- 📞 **Outgoing voice calls** (dial-only) — via a separate voice AT interface on modems that expose multiple serial ports (e.g. Huawei). Standalone call FAB or call button in a chat, plus dedicated `sms_gammu_viewer.call` / `sms_gammu_viewer.hangup` services for automations
 - 🔇 **Per-conversation mute** — silence push notifications for a specific number while still saving and showing its messages normally
 - 🔢 Unread SMS counter badge on the sidebar icon (`sensor.sms_unread_count`)
 - 📨 Sensors for the last received SMS — `sensor.sms_last_sms_number` and `sensor.sms_last_sms_text`, updated instantly on arrival (handy for automations)
@@ -332,6 +332,7 @@ This project builds on the work of several open-source projects:
 ## License
 
 MIT
+
 
 
 
