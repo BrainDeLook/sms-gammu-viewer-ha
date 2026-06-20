@@ -771,12 +771,6 @@ class SmsGammuPanel extends HTMLElement {
         this._loadStatus();
         this._startTimer();
       });
-    } else if (this._ready) {
-      // Панель переиспользуется (SPA-навигация назад на страницу) —
-      // проверяем не появился ли новый "целевой" номер в localStorage
-      // (например, после клика в карточке на дашборде)
-      this._restoreAttempted = false;
-      this._restoreActiveChat();
     }
   }
 
