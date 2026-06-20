@@ -17,7 +17,7 @@ PHONE_NUMBER_RE = re.compile(r"^\+?[1-9]\d{1,14}$")
 
 DEFAULT_DIAL_TIMEOUT_SEC = 25
 DEFAULT_CALL_DURATION_SEC = 30
-DEFAULT_BAUDRATE = 9600
+DEFAULT_BAUDRATE = 75600
 
 
 class CallEndedReason(str, Enum):
@@ -46,12 +46,10 @@ async def _connect(device_path: str, baudrate: int = DEFAULT_BAUDRATE) -> CallMo
         bytesize=serial.EIGHTBITS,
         parity=serial.PARITY_NONE,
         stopbits=serial.STOPBITS_ONE,
-        xonxoff=False,
-        rtscts=False,
-        dsrdtr=False,
+        dsrdtr=True,
+        rtscts=True,
         limit=READ_LIMIT,
     )
-    await asyncio.sleep(0.2)
     return CallModem(reader, writer)
 
 
@@ -70,16 +68,6 @@ async def dial_number(
 
     try:
         modem = await _connect(device_path)
-
-        # Пробный AT перед звонком — проверяем что порт живой,
-        # и даём более понятную ошибку если нет
-        try:
-            probe = await modem.execute_at(
-                "AT", timeout=3, end_markers=["OK", "ERROR"]
-            )
-            _LOGGER.debug("AT probe reply: %s", probe)
-        except Exception as e:
-            _LOGGER.warning("AT probe failed: %s", e)
 
         _LOGGER.info("Dialing +%s...", number)
         lines = await modem.execute_at(
@@ -196,5 +184,6 @@ async def _passive_wait(modem: CallModem, call_duration_sec: int) -> CallEndedRe
                     return CallEndedReason.DECLINED
     except TimeoutError:
         return CallEndedReason.NOT_ANSWERED
+
 
 
