@@ -24,7 +24,7 @@
     "step": {
       "init": {
         "title": "SMS Gammu Viewer Settings",
-        "description": "Configure polling interval and notification targets.",
+        "description": "Configure polling interval and notification targets.\n\nFound {notify_count} notify service(s) available.",
         "data": {
           "poll_interval": "Polling interval (seconds, min 5)",
           "notify_targets": "Devices to notify on new SMS",
@@ -32,14 +32,11 @@
           "call_dial_timeout": "Dial timeout (seconds)",
           "call_duration": "Max call duration after answer (seconds)",
           "collect_interval": "Delay between scans while assembling a multipart SMS (seconds)",
-          "collect_empty_max": "Number of empty scans before considering the SMS complete",
-          "language": "Panel interface language"
+          "collect_empty_max": "Number of empty scans before considering the SMS complete"
         }
       }
     }
   }
 }
-
-
 
 
