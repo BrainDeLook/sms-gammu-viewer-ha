@@ -65,8 +65,16 @@ export default {
   call_not_answered: "Not answered",
   call_declined: "Declined",
   call_failed: "Modem error",
+  call_history: "Call history",
+  clear: "Clear",
+  no_calls: "No calls yet",
+  call_reason_answered: "Answered",
+  call_reason_not_answered: "Not answered",
+  call_reason_declined: "Declined",
+  call_reason_error: "Error",
   back: "Back",
   modem_btn: "Modem status",
 };
+
 
 
