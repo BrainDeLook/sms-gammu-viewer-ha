@@ -19,9 +19,13 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_validation as cv
 
 from .const import (
+    CONF_COLLECT_EMPTY_MAX,
+    CONF_COLLECT_INTERVAL,
     CONF_NOTIFY_TARGETS,
     CONF_POLL_INTERVAL,
     DB_FILENAME,
+    DEFAULT_COLLECT_EMPTY_MAX,
+    DEFAULT_COLLECT_INTERVAL,
     DEFAULT_POLL_INTERVAL,
     DOMAIN,
     FRONTEND_PATH,
@@ -36,8 +40,6 @@ _LOGGER = logging.getLogger(__name__)
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
-COLLECT_INTERVAL  = 2
-COLLECT_EMPTY_MAX = 5
 MODEM_ERROR_RESET_THRESHOLD = 5  # После N ошибок подряд — сброс модема
 MODEM_RESET_COOLDOWN = 120       # Пауза после сброса (секунды)
 
@@ -268,6 +270,14 @@ class SmsCoordinator:
         return self.entry.data.get(CONF_POLL_INTERVAL, DEFAULT_POLL_INTERVAL)
 
     @property
+    def _collect_interval(self) -> int:
+        return self.entry.data.get(CONF_COLLECT_INTERVAL, DEFAULT_COLLECT_INTERVAL)
+
+    @property
+    def _collect_empty_max(self) -> int:
+        return self.entry.data.get(CONF_COLLECT_EMPTY_MAX, DEFAULT_COLLECT_EMPTY_MAX)
+
+    @property
     def _notify_targets(self) -> list[str]:
         return self.entry.data.get(CONF_NOTIFY_TARGETS, [])
 
@@ -352,14 +362,17 @@ class SmsCoordinator:
         self._add_to_buffers(buffers, first_batch)
         await self._safe_delete_all()
 
+        collect_interval = self._collect_interval
+        collect_empty_max = self._collect_empty_max
+
         empty_streak = 0
-        while empty_streak < COLLECT_EMPTY_MAX:
-            await asyncio.sleep(COLLECT_INTERVAL)
+        while empty_streak < collect_empty_max:
+            await asyncio.sleep(collect_interval)
             messages = await self._safe_get_all()
 
             if not messages:
                 empty_streak += 1
-                _LOGGER.debug("Collect: empty %d/%d", empty_streak, COLLECT_EMPTY_MAX)
+                _LOGGER.debug("Collect: empty %d/%d", empty_streak, collect_empty_max)
                 continue
 
             got_new = self._add_to_buffers(buffers, messages)
@@ -741,6 +754,7 @@ class SmsApiView(HomeAssistantView):
             status=status,
             content_type="application/json",
         )
+
 
 
 
