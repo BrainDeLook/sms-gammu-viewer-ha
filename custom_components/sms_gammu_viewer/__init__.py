@@ -58,8 +58,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coordinator = SmsCoordinator(hass, entry, store, client)
     hass.data[DOMAIN][entry.entry_id] = coordinator
 
-    if len(hass.data[DOMAIN]) == 1:
+    is_first = len(hass.data[DOMAIN]) == 1
+    if is_first:
         await _register_panel(hass)
+        await _register_services(hass)
 
     hass.http.register_view(SmsApiView(hass))
     await coordinator.start()
@@ -68,6 +70,40 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     _LOGGER.info("SMS Gammu Viewer started: %s", entry.title)
     return True
+
+
+async def _register_services(hass: HomeAssistant) -> None:
+    """Регистрирует sms_gammu_viewer.send_sms с раздельными полями number/message."""
+    import voluptuous as vol
+    from homeassistant.helpers import config_validation as cv
+
+    async def _handle_send_sms(call) -> None:
+        number = call.data.get("number", "").strip()
+        message = call.data.get("message", "").strip()
+        if not number:
+            raise ValueError("Поле number обязательно")
+        if not message:
+            raise ValueError("Поле message обязательно")
+
+        entries = hass.data.get(DOMAIN, {})
+        if not entries:
+            raise ValueError("Интеграция SMS Gammu Viewer не настроена")
+        coord = next(iter(entries.values()))
+
+        ok = await coord.client.send_sms(number, message)
+        if not ok:
+            raise ValueError(f"Не удалось отправить SMS на {number}")
+        _LOGGER.info("SMS sent to %s via send_sms service", number)
+
+    hass.services.async_register(
+        DOMAIN,
+        "send_sms",
+        _handle_send_sms,
+        schema=vol.Schema({
+            vol.Required("number"): cv.string,
+            vol.Required("message"): cv.string,
+        }),
+    )
 
 
 async def _options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
@@ -656,6 +692,7 @@ class SmsApiView(HomeAssistantView):
             status=status,
             content_type="application/json",
         )
+
 
 
 
