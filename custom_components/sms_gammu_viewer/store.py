@@ -335,14 +335,6 @@ class SmsStore:
             ).fetchall()
         return [dict(r) for r in rows]
 
-    def get_contact_names_map(self) -> dict[str, dict[str, str]]:
-        """Быстрая карта number -> {name, label} для подстановки в списках."""
-        with self._conn() as conn:
-            rows = conn.execute("SELECT number, name, label FROM phonebook").fetchall()
-        return {r["number"]: {"name": r["name"], "label": r["label"] or ""} for r in rows}
-
-
-
 
 
 
