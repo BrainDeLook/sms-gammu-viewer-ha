@@ -30,3 +30,8 @@ DEFAULT_CALL_DIAL_TIMEOUT = 25
 DEFAULT_CALL_DURATION = 30
 
 EVENT_CALL_ENDED = f"{DOMAIN}_call_ended"
+
+# Номер телефона самой SIM-карты — оператор не всегда хранит его на симке,
+# поэтому вводится вручную, не определяется автоматически
+CONF_SIM_PHONE_NUMBER = "sim_phone_number"
+
