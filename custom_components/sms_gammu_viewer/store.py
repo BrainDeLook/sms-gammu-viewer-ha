@@ -57,6 +57,15 @@ class SmsStore:
                     value TEXT
                 )
             """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS phonebook (
+                    number    TEXT PRIMARY KEY,
+                    name      TEXT NOT NULL,
+                    label     TEXT,
+                    created_at TEXT NOT NULL
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_phonebook_name ON phonebook(name)")
 
             # Миграция: чистим номера с переводами строк/лишними пробелами,
             # которые могли попасть в базу до добавления санитизации
@@ -192,7 +201,7 @@ class SmsStore:
         return [dict(r) for r in rows]
 
     def get_contacts(self) -> list[dict[str, Any]]:
-        """Список уникальных номеров с последним SMS, непрочитанными и mute-статусом."""
+        """Список уникальных номеров с последним SMS, непрочитанными, mute-статусом и именем из книги."""
         with self._conn() as conn:
             rows = conn.execute("""
                 SELECT
@@ -203,8 +212,11 @@ class SmsStore:
                     (SELECT text FROM messages m2
                      WHERE m2.number = m.number
                      ORDER BY date DESC, id DESC LIMIT 1) as last_text,
-                    (SELECT 1 FROM muted_numbers mn WHERE mn.number = m.number) as is_muted
+                    (SELECT 1 FROM muted_numbers mn WHERE mn.number = m.number) as is_muted,
+                    pb.name as contact_name,
+                    pb.label as contact_label
                 FROM messages m
+                LEFT JOIN phonebook pb ON pb.number = m.number
                 GROUP BY number
                 ORDER BY last_date DESC
             """).fetchall()
@@ -257,10 +269,15 @@ class SmsStore:
             return None
 
     def get_call_history(self, limit: int = 30) -> list[dict[str, Any]]:
-        """Последние звонки, новые сверху."""
+        """Последние звонки, новые сверху, с именем из телефонной книги."""
         with self._conn() as conn:
             rows = conn.execute(
-                "SELECT * FROM call_history ORDER BY id DESC LIMIT ?",
+                """
+                SELECT ch.*, pb.name as contact_name
+                FROM call_history ch
+                LEFT JOIN phonebook pb ON pb.number = ch.number
+                ORDER BY ch.id DESC LIMIT ?
+                """,
                 (limit,),
             ).fetchall()
         return [dict(r) for r in rows]
@@ -286,6 +303,44 @@ class SmsStore:
                 "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
                 (key, value),
             )
+
+    # ─── Телефонная книга ───────────────────────────────────────────
+
+    def add_contact(self, number: str, name: str, label: str = "") -> None:
+        number = self._sanitize_number(number)
+        with self._conn() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO phonebook (number, name, label, created_at) "
+                "VALUES (?, ?, ?, COALESCE((SELECT created_at FROM phonebook WHERE number=?), ?))",
+                (number, name, label, number, datetime.now().isoformat(timespec="seconds")),
+            )
+
+    def delete_contact(self, number: str) -> None:
+        number = self._sanitize_number(number)
+        with self._conn() as conn:
+            conn.execute("DELETE FROM phonebook WHERE number=?", (number,))
+
+    def get_contact(self, number: str) -> dict[str, Any] | None:
+        number = self._sanitize_number(number)
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM phonebook WHERE number=?", (number,)
+            ).fetchone()
+        return dict(row) if row else None
+
+    def get_all_contacts(self) -> list[dict[str, Any]]:
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM phonebook ORDER BY name COLLATE NOCASE"
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def get_contact_names_map(self) -> dict[str, dict[str, str]]:
+        """Быстрая карта number -> {name, label} для подстановки в списках."""
+        with self._conn() as conn:
+            rows = conn.execute("SELECT number, name, label FROM phonebook").fetchall()
+        return {r["number"]: {"name": r["name"], "label": r["label"] or ""} for r in rows}
+
 
 
 
