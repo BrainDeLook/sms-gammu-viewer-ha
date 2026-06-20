@@ -154,6 +154,8 @@ class SmsCoordinator:
         self._last_reset_at: float = 0.0
         self._modem_ok: bool = True
         self._sensor_listeners: list = []
+        self._active_call_task: asyncio.Task | None = None
+        self._active_call_number: str | None = None
 
     @property
     def _interval(self) -> int:
@@ -560,7 +562,11 @@ class SmsApiView(HomeAssistantView):
             call_device = coord.entry.data.get("call_device", "").strip()
             if not call_device:
                 return self._error("Call device not configured", 503)
-            from .dialer import dial_number, DialError, validate_phone_number
+
+            if coord._active_call_task and not coord._active_call_task.done():
+                return self._error("Already calling", 409)
+
+            from .dialer import dial_number, DialError, validate_phone_number, CallEndedReason
             from .const import (
                 CONF_CALL_DIAL_TIMEOUT, CONF_CALL_DURATION,
                 DEFAULT_CALL_DIAL_TIMEOUT, DEFAULT_CALL_DURATION,
@@ -574,22 +580,37 @@ class SmsApiView(HomeAssistantView):
             call_duration = coord.entry.data.get(CONF_CALL_DURATION, DEFAULT_CALL_DURATION)
 
             async def _do_call():
-                reason = await dial_number(
-                    call_device, number,
-                    dial_timeout_sec=dial_timeout, call_duration_sec=call_duration,
-                )
+                try:
+                    reason = await dial_number(
+                        call_device, number,
+                        dial_timeout_sec=dial_timeout, call_duration_sec=call_duration,
+                    )
+                except asyncio.CancelledError:
+                    reason = CallEndedReason.DECLINED
+                    raise
+                finally:
+                    coord._active_call_task = None
+                    coord._active_call_number = None
                 coord.push_event("call_ended", {"number": number, "reason": reason.value})
 
-            self.hass.async_create_task(_do_call())
+            coord._active_call_number = number
+            coord._active_call_task = self.hass.async_create_task(_do_call())
             return self._json({"ok": True, "calling": True})
 
         if action == "hangup":
-            call_device = coord.entry.data.get("call_device", "").strip()
-            if not call_device:
-                return self._error("Call device not configured", 503)
-            from .dialer import hangup as hangup_call
-            ok = await hangup_call(call_device)
-            return self._json({"ok": ok})
+            # Отменяем активную задачу звонка — она сама пошлёт AT+CHUP
+            # на УЖЕ открытом соединении и корректно завершится.
+            # НЕ открываем второе соединение к тому же порту параллельно.
+            if coord._active_call_task and not coord._active_call_task.done():
+                number = coord._active_call_number
+                coord._active_call_task.cancel()
+                try:
+                    await coord._active_call_task
+                except asyncio.CancelledError:
+                    pass
+                coord.push_event("call_ended", {"number": number, "reason": "declined"})
+                return self._json({"ok": True})
+            return self._json({"ok": False, "error": "No active call"})
 
         if action == "poll_now":
             if not coord.collecting:
@@ -648,6 +669,7 @@ class SmsApiView(HomeAssistantView):
             status=status,
             content_type="application/json",
         )
+
 
 
 
