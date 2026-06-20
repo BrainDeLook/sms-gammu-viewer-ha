@@ -9,5 +9,5 @@
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/BrainDeLook/sms-gammu-viewer-ha/issues",
   "requirements": ["pyserial-asyncio-fast>=0.13"],
-  "version": "2.8.0"
+  "version": "2.9.0"
 }
