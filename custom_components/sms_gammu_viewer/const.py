@@ -35,3 +35,12 @@ EVENT_CALL_ENDED = f"{DOMAIN}_call_ended"
 # поэтому вводится вручную, не определяется автоматически
 CONF_SIM_PHONE_NUMBER = "sim_phone_number"
 
+# Настройки сборки multipart SMS: задержка между опросами в режиме сбора
+# и сколько пустых опросов подряд означают что все части получены
+CONF_COLLECT_INTERVAL = "collect_interval"
+CONF_COLLECT_EMPTY_MAX = "collect_empty_max"
+
+DEFAULT_COLLECT_INTERVAL = 2
+DEFAULT_COLLECT_EMPTY_MAX = 5
+
+
