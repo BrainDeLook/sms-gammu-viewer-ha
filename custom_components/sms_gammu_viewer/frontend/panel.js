@@ -432,6 +432,39 @@ const CSS = `
   .reset-btn:hover { background: rgba(229,57,53,.2); }
   .status-loading { padding: 60px; text-align: center; color: var(--sub); font-size: 14px; }
 
+  /* ─── SIM phone number field ─── */
+  .sim-number-row .stat-val { display: flex; align-items: center; gap: 6px; }
+  .sim-edit-btn {
+    background: none; border: none; cursor: pointer;
+    color: var(--sub); padding: 3px; border-radius: 4px;
+    display: flex; align-items: center; transition: color .15s, background .15s;
+  }
+  .sim-edit-btn:hover { color: var(--accent); background: rgba(3,169,244,.1); }
+  .sim-number-edit {
+    display: flex; gap: 6px; margin-top: 8px;
+  }
+  .sim-number-input {
+    flex: 1; padding: 6px 10px;
+    border: 1px solid var(--line); border-radius: 6px;
+    background: var(--bg); color: var(--text);
+    font-size: 13px; outline: none;
+  }
+  .sim-number-input:focus { border-color: var(--accent); }
+  .sim-save-btn {
+    padding: 6px 14px; border: none; border-radius: 6px;
+    background: var(--accent); color: #fff; cursor: pointer;
+    font-size: 12px; font-weight: 500;
+  }
+
+  /* ─── Voice port diagnostics ─── */
+  .port-status-loading { font-size: 13px; color: var(--sub); }
+  .port-status-ok { font-size: 13px; color: #4caf50; font-weight: 500; }
+  .port-status-error { font-size: 13px; color: var(--danger); font-weight: 500; }
+  .port-ms { color: var(--sub); font-weight: 400; }
+  .port-check-btn {
+    width: 100%; box-sizing: border-box; text-align: center;
+  }
+
   /* ─── Mobile ─── */
   .back-btn { display: none; }
 
@@ -1418,11 +1451,42 @@ class SmsGammuPanel extends HTMLElement {
     const simCapacity = s.capacity;
     const simUsed = simCapacity ? `${simCapacity.SIMUsed}/${simCapacity.SIMSize}` : null;
     const phoneUsed = simCapacity ? `${simCapacity.PhoneUsed}/${simCapacity.PhoneSize}` : null;
-    const memCard = card(this._t("memory"), `
-      ${row(this._t("sim_used"), simUsed)}
-      ${row(this._t("phone_used"), phoneUsed)}
-      ${row("IMSI", s.sim?.IMSI)}
-    `);
+    const simNumber = s.sim_phone_number || "";
+    const memCard = `
+      <div class="stat-card">
+        <h3>${this._t("memory")}</h3>
+        ${row(this._t("sim_used"), simUsed)}
+        ${row(this._t("phone_used"), phoneUsed)}
+        ${row("IMSI", s.sim?.IMSI)}
+        <div class="stat-row sim-number-row">
+          <span class="stat-key">${this._t("sim_phone_number")}</span>
+          <span class="stat-val">
+            <span id="sim-number-display">${simNumber ? this._esc(simNumber) : this._t("not_set")}</span>
+            <button class="sim-edit-btn" id="sim-edit-btn" title="${this._t("edit")}">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
+            </button>
+          </span>
+        </div>
+        <div class="sim-number-edit" id="sim-number-edit" style="display:none">
+          <input class="sim-number-input" id="sim-number-input" type="tel" placeholder="+79001234567" value="${this._esc(simNumber)}" />
+          <button class="sim-save-btn" id="sim-save-btn">${this._t("save")}</button>
+        </div>
+      </div>`;
+
+    let portCard = "";
+    if (s.call_enabled) {
+      portCard = `
+        <div class="stat-card">
+          <h3>${this._t("voice_port")}</h3>
+          <div id="voice-port-status" class="port-status-loading">${this._t("checking")}</div>
+          <button class="reset-btn port-check-btn" id="check-port-btn" style="margin-top:10px">
+            ${this._t("check_port")}
+          </button>
+        </div>`;
+    }
 
     page.innerHTML = `
       <div class="status-grid">
@@ -1430,6 +1494,7 @@ class SmsGammuPanel extends HTMLElement {
         ${networkCard}
         ${modemCard}
         ${memCard}
+        ${portCard}
       </div>
       <button class="reset-btn" id="reset-modem-btn">${this._t("reset_modem")}</button>`;
 
@@ -1444,6 +1509,76 @@ class SmsGammuPanel extends HTMLElement {
         alert(this._t("reset_error") + e.message);
       }
     });
+
+    // SIM номер — inline редактирование
+    const simEditBtn = page.querySelector("#sim-edit-btn");
+    const simEditBox = page.querySelector("#sim-number-edit");
+    const simDisplay = page.querySelector("#sim-number-display");
+    const simInput   = page.querySelector("#sim-number-input");
+    const simSaveBtn = page.querySelector("#sim-save-btn");
+
+    simEditBtn?.addEventListener("click", () => {
+      simEditBox.style.display = simEditBox.style.display === "none" ? "flex" : "none";
+      if (simEditBox.style.display !== "none") {
+        setTimeout(() => simInput.focus(), 30);
+      }
+    });
+    simInput?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") simSaveBtn.click();
+    });
+    simSaveBtn?.addEventListener("click", async () => {
+      const number = simInput.value.trim();
+      try {
+        await this._api("set_sim_phone_number", "POST", { number });
+        simDisplay.textContent = number || this._t("not_set");
+        simEditBox.style.display = "none";
+        if (this._status) this._status.sim_phone_number = number;
+        this._showToast(this._t("saved"));
+      } catch (e) {
+        this._showToast(this._t("send_error") + ": " + e.message);
+      }
+    });
+
+    // Диагностика голосового порта
+    if (s.call_enabled) {
+      this._runPortCheck(page);
+      page.querySelector("#check-port-btn")?.addEventListener("click", () => {
+        this._runPortCheck(page);
+      });
+    }
+  }
+
+  async _runPortCheck(page) {
+    const statusEl = page.querySelector("#voice-port-status");
+    const btn = page.querySelector("#check-port-btn");
+    if (!statusEl) return;
+
+    statusEl.className = "port-status-loading";
+    statusEl.textContent = this._t("checking");
+    if (btn) btn.disabled = true;
+
+    try {
+      const result = await this._api("check_call_port");
+      if (result.ok) {
+        statusEl.className = "port-status-ok";
+        statusEl.innerHTML = `✓ ${this._t("port_ok")} <span class="port-ms">(${result.response_time_ms} ms)</span>`;
+      } else {
+        const errorMap = {
+          not_configured: this._t("port_not_configured"),
+          device_not_found: this._t("port_not_found"),
+          permission_denied: this._t("port_permission_denied"),
+          connection_failed: this._t("port_connection_failed"),
+          no_ok_response: this._t("port_no_response"),
+        };
+        statusEl.className = "port-status-error";
+        statusEl.textContent = `✕ ${errorMap[result.error] || result.error}`;
+      }
+    } catch (e) {
+      statusEl.className = "port-status-error";
+      statusEl.textContent = `✕ ${this._t("port_check_failed")}`;
+    } finally {
+      if (btn) btn.disabled = false;
+    }
   }
 
   // ─── Render ───
@@ -1963,6 +2098,7 @@ class SmsGammuPanel extends HTMLElement {
 }
 
 customElements.define("sms-gammu-panel", SmsGammuPanel);
+
 
 
 
