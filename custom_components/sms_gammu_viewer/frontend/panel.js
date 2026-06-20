@@ -885,7 +885,23 @@ class SmsGammuPanel extends HTMLElement {
     } catch (_) {}
   }
 
+  async _ensureFreshToken() {
+    // Превентивно обновляем токен за 2 минуты до истечения, чтобы
+    // не доводить дело до 401 — это и засоряет логи HA (http.ban
+    // фиксирует каждую такую попытку как неудачный логин), и создаёт
+    // лишнюю задержку на повторный запрос.
+    try {
+      const auth = this._hass?.auth?.data;
+      if (!auth?.expires) return;
+      const msLeft = auth.expires - Date.now();
+      if (msLeft < 120000) {
+        await this._refreshToken();
+      }
+    } catch (_) {}
+  }
+
   async _api(path, method = "GET", body = null) {
+    await this._ensureFreshToken();
     const opts = {
       method,
       headers: { Authorization: `Bearer ${this._token()}` },
@@ -2301,6 +2317,7 @@ class SmsGammuPanel extends HTMLElement {
 }
 
 customElements.define("sms-gammu-panel", SmsGammuPanel);
+
 
 
 
