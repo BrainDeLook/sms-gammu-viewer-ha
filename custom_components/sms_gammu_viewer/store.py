@@ -58,13 +58,60 @@ class SmsStore:
                 )
             """)
 
+            # Миграция: чистим номера с переводами строк/лишними пробелами,
+            # которые могли попасть в базу до добавления санитизации
+            try:
+                self._migrate_clean_numbers(conn)
+            except Exception as e:
+                _LOGGER.warning("Number cleanup migration failed: %s", e)
+
+    def _migrate_clean_numbers(self, conn: sqlite3.Connection) -> None:
+        rows = conn.execute(
+            "SELECT DISTINCT number FROM messages WHERE number LIKE '%' || char(10) || '%' "
+            "OR number LIKE '%' || char(13) || '%'"
+        ).fetchall()
+        for row in rows:
+            old_number = row[0]
+            new_number = self._sanitize_number(old_number)
+            if new_number == old_number:
+                continue
+            _LOGGER.info("Cleaning up number: %r -> %r", old_number, new_number)
+            # Переносим записи на чистый номер, избегая конфликта UNIQUE
+            existing_ids = conn.execute(
+                "SELECT id, date, text FROM messages WHERE number=?", (old_number,)
+            ).fetchall()
+            for r in existing_ids:
+                try:
+                    conn.execute(
+                        "UPDATE messages SET number=? WHERE id=?",
+                        (new_number, r[0]),
+                    )
+                except sqlite3.IntegrityError:
+                    # Уже есть такая же запись с чистым номером — удаляем дубликат
+                    conn.execute("DELETE FROM messages WHERE id=?", (r[0],))
+
     def _conn(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self._path)
         conn.row_factory = sqlite3.Row
         return conn
 
+    @staticmethod
+    def _sanitize_number(number: str) -> str:
+        """Убирает переводы строк и лишние пробелы из номера/имени отправителя.
+
+        Некоторые операторы (например Beeline) иногда присылают alphaTag
+        отправителя с мусорными символами вроде \\n, что ломает дальнейшую
+        работу с этим значением как частью URL-пути в API.
+        """
+        if not number:
+            return number
+        cleaned = number.replace("\r", " ").replace("\n", " ")
+        cleaned = " ".join(cleaned.split())
+        return cleaned
+
     def add(self, number: str, text: str, date: str) -> int | None:
         """Возвращает id только если SMS реально новый, None если дубликат."""
+        number = self._sanitize_number(number)
         received = datetime.now().isoformat(timespec="seconds")
         try:
             with self._conn() as conn:
@@ -239,6 +286,7 @@ class SmsStore:
                 "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
                 (key, value),
             )
+
 
 
 
