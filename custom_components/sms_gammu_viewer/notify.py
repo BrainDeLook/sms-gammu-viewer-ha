@@ -1,4 +1,4 @@
-"""Notify-платформа для звонков через прямой AT serial-интерфейс модема (например if02)."""
+"""Notify-платформа для звонков и SMS."""
 from __future__ import annotations
 
 import logging
@@ -19,6 +19,7 @@ from .const import (
     EVENT_CALL_ENDED,
 )
 from .dialer import CallEndedReason, DialError, dial_number, hangup, validate_phone_number
+from .gateway import GatewayClient
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -28,11 +29,49 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
+    entities = [SmsGammuSmsNotifyEntity(hass, entry)]
+
     call_device = entry.data.get(CONF_CALL_DEVICE, "").strip()
-    if not call_device:
-        # Голосовой порт не настроен — звонки недоступны, платформа не создаёт сущностей
-        return
-    async_add_entities([SmsGammuCallNotifyEntity(entry, call_device)])
+    if call_device:
+        entities.append(SmsGammuCallNotifyEntity(entry, call_device))
+
+    async_add_entities(entities)
+
+
+class SmsGammuSmsNotifyEntity(NotifyEntity):
+    """notify.sms_gammu_sms — отправь "номер|текст" в message чтобы отправить SMS."""
+
+    _attr_has_entity_name = True
+    _attr_name = "SMS"
+    _attr_icon = "mdi:message-arrow-right-outline"
+
+    def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
+        self.hass = hass
+        self._entry = entry
+        self._attr_unique_id = f"{entry.entry_id}_sms"
+
+    async def async_send_message(self, message: str, title: str | None = None) -> None:
+        """Отправляет SMS. Формат message: 'номер|текст'."""
+        if not message:
+            raise HomeAssistantError("Сообщение обязательно")
+
+        if "|" not in message:
+            raise HomeAssistantError("Формат сообщения: 'номер|текст'")
+
+        number, text = message.split("|", 1)
+        number = number.strip()
+        text = text.strip()
+
+        if not number:
+            raise HomeAssistantError("Номер телефона обязателен")
+        if not text:
+            raise HomeAssistantError("Текст SMS обязателен")
+
+        client = GatewayClient(self._entry.data)
+        ok = await client.send_sms(number, text)
+        if not ok:
+            raise HomeAssistantError(f"Не удалось отправить SMS на {number}")
+        _LOGGER.info("SMS sent to %s", number)
 
 
 class SmsGammuCallNotifyEntity(NotifyEntity):
@@ -96,3 +135,4 @@ async def async_hangup_call(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if not call_device:
         return False
     return await hangup(call_device)
+
