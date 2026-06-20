@@ -65,7 +65,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     hass.http.register_view(SmsApiView(hass))
     await coordinator.start()
-    await hass.config_entries.async_forward_entry_setups(entry, ["sensor", "notify"])
+    await hass.config_entries.async_forward_entry_setups(entry, ["sensor"])
     entry.async_on_unload(entry.add_update_listener(_options_updated))
 
     _LOGGER.info("SMS Gammu Viewer started: %s", entry.title)
@@ -73,9 +73,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def _register_services(hass: HomeAssistant) -> None:
-    """Регистрирует sms_gammu_viewer.send_sms с раздельными полями number/message."""
+    """Регистрирует sms_gammu_viewer.send_sms и sms_gammu_viewer.call."""
     import voluptuous as vol
     from homeassistant.helpers import config_validation as cv
+    from .dialer import dial_number, hangup as hangup_call, CallEndedReason, DialError, validate_phone_number
+    from .const import (
+        CONF_CALL_DEVICE, CONF_CALL_DIAL_TIMEOUT, CONF_CALL_DURATION,
+        DEFAULT_CALL_DIAL_TIMEOUT, DEFAULT_CALL_DURATION, EVENT_CALL_ENDED,
+    )
+
+    def _get_coord():
+        entries = hass.data.get(DOMAIN, {})
+        if not entries:
+            raise ValueError("Интеграция SMS Gammu Viewer не настроена")
+        return next(iter(entries.values()))
 
     async def _handle_send_sms(call) -> None:
         number = call.data.get("number", "").strip()
@@ -85,25 +96,63 @@ async def _register_services(hass: HomeAssistant) -> None:
         if not message:
             raise ValueError("Поле message обязательно")
 
-        entries = hass.data.get(DOMAIN, {})
-        if not entries:
-            raise ValueError("Интеграция SMS Gammu Viewer не настроена")
-        coord = next(iter(entries.values()))
-
+        coord = _get_coord()
         ok = await coord.client.send_sms(number, message)
         if not ok:
             raise ValueError(f"Не удалось отправить SMS на {number}")
         _LOGGER.info("SMS sent to %s via send_sms service", number)
 
+    async def _handle_call(call) -> None:
+        number = call.data.get("number", "").strip()
+        if not number:
+            raise ValueError("Поле number обязательно")
+
+        coord = _get_coord()
+        call_device = coord.entry.data.get(CONF_CALL_DEVICE, "").strip()
+        if not call_device:
+            raise ValueError("Голосовой порт не настроен в интеграции")
+
+        try:
+            validate_phone_number(number)
+        except DialError as e:
+            raise ValueError(str(e)) from e
+
+        dial_timeout = coord.entry.data.get(CONF_CALL_DIAL_TIMEOUT, DEFAULT_CALL_DIAL_TIMEOUT)
+        call_duration = coord.entry.data.get(CONF_CALL_DURATION, DEFAULT_CALL_DURATION)
+
+        _LOGGER.info("Calling +%s via call service...", number)
+        reason = await dial_number(
+            call_device, number,
+            dial_timeout_sec=dial_timeout, call_duration_sec=call_duration,
+        )
+        hass.bus.async_fire(EVENT_CALL_ENDED, {"phone_number": number, "reason": reason.value})
+        await hass.async_add_executor_job(coord.store.add_call, number, reason.value)
+        coord.push_event("call_ended", {"number": number, "reason": reason.value})
+        _LOGGER.info("Call to +%s ended: %s", number, reason.value)
+
+    async def _handle_hangup(call) -> None:
+        coord = _get_coord()
+        call_device = coord.entry.data.get(CONF_CALL_DEVICE, "").strip()
+        if not call_device:
+            raise ValueError("Голосовой порт не настроен в интеграции")
+        await hangup_call(call_device)
+
     hass.services.async_register(
-        DOMAIN,
-        "send_sms",
-        _handle_send_sms,
+        DOMAIN, "send_sms", _handle_send_sms,
         schema=vol.Schema({
             vol.Required("number"): cv.string,
             vol.Required("message"): cv.string,
         }),
     )
+
+    hass.services.async_register(
+        DOMAIN, "call", _handle_call,
+        schema=vol.Schema({
+            vol.Required("number"): cv.string,
+        }),
+    )
+
+    hass.services.async_register(DOMAIN, "hangup", _handle_hangup, schema=vol.Schema({}))
 
 
 async def _options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
@@ -113,7 +162,7 @@ async def _options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    await hass.config_entries.async_unload_platforms(entry, ["sensor", "notify"])
+    await hass.config_entries.async_unload_platforms(entry, ["sensor"])
     coord = hass.data[DOMAIN].pop(entry.entry_id, None)
     if coord:
         await coord.stop()
@@ -692,6 +741,7 @@ class SmsApiView(HomeAssistantView):
             status=status,
             content_type="application/json",
         )
+
 
 
 
