@@ -1824,16 +1824,6 @@ class SmsGammuPanel extends HTMLElement {
               </button>
               <h2>SMS</h2>
               <span class="unread-badge" id="unread-badge"></span>
-              <div class="lang-picker">
-                <button class="icon-btn" id="lang-btn" title="Language">
-                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="10"/>
-                    <line x1="2" y1="12" x2="22" y2="12"/>
-                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-                  </svg>
-                </button>
-                <div class="lang-dropdown" id="lang-dropdown"></div>
-              </div>
               <button class="icon-btn" id="phonebook-btn" title="Телефонная книга">
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
@@ -1984,36 +1974,8 @@ class SmsGammuPanel extends HTMLElement {
       this.dispatchEvent(new Event("hass-toggle-menu", { bubbles: true, composed: true }));
     });
 
-    this.shadowRoot.getElementById("lang-btn").addEventListener("click", (e) => {
-      e.stopPropagation();
-      const dd = this.shadowRoot.getElementById("lang-dropdown");
-      if (!dd) return;
-      const isOpen = dd.classList.contains("open");
-      if (isOpen) {
-        dd.classList.remove("open");
-        return;
-      }
-      const current = this._locale?.code || "en";
-      dd.innerHTML = AVAILABLE_LOCALES.map(code => `
-        <div class="lang-option ${code === current ? "active" : ""}" data-lang="${code}">
-          ${code === current ? "✓ " : ""}${LOCALE_NAMES[code] || code}
-        </div>
-      `).join("");
-      dd.querySelectorAll(".lang-option").forEach(opt => {
-        opt.addEventListener("click", async () => {
-          const lang = opt.dataset.lang;
-          try { localStorage.setItem("sms_gammu_lang", lang); } catch {}
-          dd.classList.remove("open");
-          this._locale = await loadLocale(lang);
-          this._updateLocaleUI();
-        });
-      });
-      dd.classList.add("open");
-    });
-
     // Закрываем dropdown при клике вне
     this.shadowRoot.addEventListener("click", () => {
-      this.shadowRoot.getElementById("lang-dropdown")?.classList.remove("open");
       this.shadowRoot.getElementById("call-history-dropdown")?.classList.remove("open");
     });
 
@@ -2339,6 +2301,7 @@ class SmsGammuPanel extends HTMLElement {
 }
 
 customElements.define("sms-gammu-panel", SmsGammuPanel);
+
 
 
 
