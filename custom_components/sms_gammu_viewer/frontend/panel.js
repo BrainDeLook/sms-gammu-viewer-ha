@@ -535,7 +535,6 @@ const CSS = `
     z-index: 100;
     width: 280px;
     max-height: 360px;
-    display: flex;
     flex-direction: column;
   }
   .call-history-dropdown.open { display: flex; }
@@ -1964,6 +1963,7 @@ class SmsGammuPanel extends HTMLElement {
 }
 
 customElements.define("sms-gammu-panel", SmsGammuPanel);
+
 
 
 
