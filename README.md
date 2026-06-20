@@ -164,7 +164,7 @@ Leave the field empty to keep this feature fully disabled — it has zero effect
 
 ### Usage
 
-- **Standalone call button** — a green floating button (📞) appears next to "New message" in the contacts sidebar once a voice port is configured. Tap it, enter a number, and dial — no existing conversation required.
+- **Standalone call button** — a green floating button (📞) appears next to "New message" in the contacts sidebar once a voice port is configured. Tap it to open a dropdown with your call history (last 30 calls, with outcome icons) and a field to dial a new number — no existing conversation required.
 - **Call button in chat** — also available in an open conversation's header.
 - **Automations** — call the `notify.sms_gammu_call` service with a phone number as the message:
   ```yaml
@@ -227,7 +227,21 @@ The panel UI text (not just config flow) is fully translatable, independent of H
 
 ---
 
+## Credits & Inspiration
+
+This project builds on the work of several open-source projects:
+
+- **[pajikos/sms-gammu-gateway](https://github.com/pajikos/sms-gammu-gateway)** and **[PavelVe/home-assistant-addons](https://github.com/PavelVe/home-assistant-addons)** — the underlying SMS gateway add-on this integration connects to via REST API.
+- **[Daring-Designs/meshtastic-ui-ha](https://github.com/Daring-Designs/meshtastic-ui-ha)** — the native HA sidebar panel architecture (custom panel registration via `async_register_built_in_panel`, static path serving) was modeled after this project.
+- **[black-roland/homeassistant-gsm-call](https://github.com/black-roland/homeassistant-gsm-call)** — the original voice call dialing logic (AT command sequences, `AT+CLCC` polling for call state, serial connection parameters) that this integration's call feature is closely based on. All credit for figuring out the working AT dialing approach for GSM modems goes to this project.
+
+---
+
 ## Changelog
+
+### v2.6.0
+- 📋 Call history dropdown — tap the call button to see your last 30 calls with outcome icons (answered / not answered / declined / error), redial with one tap, delete individual entries or clear all
+- 🐛 Fixed stale call result toasts reappearing on page reload
 
 ### v2.5.0
 - 📞 Outgoing voice calls (dial-only) via a separate voice AT interface, independent of the SMS gateway
@@ -269,6 +283,7 @@ The panel UI text (not just config flow) is fully translatable, independent of H
 ## License
 
 MIT
+
 
 
 
