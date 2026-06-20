@@ -116,6 +116,26 @@ Or manually:
 
 ---
 
+## Services for Automations
+
+All available under **Developer Tools → Services**, under the `sms_gammu_viewer` domain:
+
+| Service | Fields | Description |
+|---|---|---|
+| `sms_gammu_viewer.send_sms` | `number`, `message` | Sends an SMS |
+| `sms_gammu_viewer.call` | `number` | Dials a number (requires voice port configured) |
+| `sms_gammu_viewer.hangup` | — | Force-ends the current call |
+
+Example:
+```yaml
+service: sms_gammu_viewer.send_sms
+data:
+  number: "+79001234567"
+  message: "The garage door was left open"
+```
+
+---
+
 ## Settings (polling interval & notifications)
 
 Go to **Settings → Devices & Services → SMS Gammu Viewer → Configure** (⚙️):
@@ -173,15 +193,15 @@ Leave the field empty to keep this feature fully disabled — it has zero effect
 
 ### Usage
 
-- **Standalone call button** — a green floating button (📞) appears next to "New message" in the contacts sidebar once a voice port is configured. Tap it to open a dropdown with your call history (last 30 calls, with outcome icons) and a field to dial a new number — no existing conversation required.
+- **Standalone call button** — a green floating button (📞) appears next to "New message" in the contacts sidebar once a voice port is configured. Tap it to open a dropdown with your call history (last 30 calls, with outcome icons), showing the 4 most recent and scrollable for the rest, plus a field to dial a new number — no existing conversation required.
 - **Call button in chat** — also available in an open conversation's header.
-- **Automations** — call the `notify.sms_gammu_call` service with a phone number as the message:
+- **Automations** — call the `sms_gammu_viewer.call` service with a phone number:
   ```yaml
-  service: notify.sms_gammu_call
+  service: sms_gammu_viewer.call
   data:
-    message: "+79001234567"
+    number: "+79001234567"
   ```
-  Multiple numbers can be tried in sequence using `|` as a separator; dialing stops at the first answered call.
+  Use `sms_gammu_viewer.hangup` (no fields) to force-end the current call.
 - **Event** — `sms_gammu_viewer_call_ended` fires with `phone_number` and `reason` (`answered`, `not_answered`, `declined`, `error`) for use in automations.
 
 ### Compatibility
@@ -208,13 +228,18 @@ SMS panel in sidebar  +  Push notification  +  sensor.sms_unread_count
 
 ### Long SMS Assembly
 
-Messages over 160 Latin / 70 Cyrillic characters are split by the carrier. The integration:
+Messages over 160 Latin / 70 Cyrillic characters are split by the carrier into multiple parts. How Gammu's gateway actually exposes this matters: rather than returning each part as a separate record to concatenate, it returns the **same SMS record growing over time** — each poll of `/sms` gives a progressively longer snapshot of the same message as more radio parts arrive.
 
-1. Detects first part → enters active collection mode
-2. Polls modem every **3 seconds**, deletes each part from SIM immediately
-3. After **5 empty polls (~15 sec)** — considers the current wave complete
-4. If parts arrive in multiple separate waves within 2 minutes — automatically merges them into one message
-5. Saves as one message, sends notification with full text
+The integration handles this by:
+
+1. Detecting the first snapshot → entering active collection mode
+2. Polling the modem every **N seconds** (configurable, default 2s), deleting each snapshot from the SIM immediately after reading
+3. Tracking the **longest text seen** for each sender — a new poll either confirms the same length (ignored) or replaces the stored text with a longer, more complete version
+4. After **M empty polls in a row** (configurable, default 5) — considers the message complete and saves the longest version seen
+5. If parts arrive in separate waves more than the empty-poll window apart but within 2 minutes — automatically merges them as a fallback safety net
+6. Sends the notification with the full assembled text
+
+Both the polling delay and the empty-poll threshold are configurable in **Settings → SMS Gammu Viewer → Configure** — tune them to find the right balance of speed vs. reliability for your carrier and signal conditions.
 
 ### Multi-language UI
 
@@ -247,6 +272,15 @@ This project builds on the work of several open-source projects:
 ---
 
 ## Changelog
+
+### v2.8.0 — Major multipart SMS fix
+- 🎯 Fixed the root cause of long SMS getting truncated: Gammu returns the **same SMS record growing over time** rather than separate parts to concatenate. The assembly logic now tracks the longest text seen per sender instead of joining snapshots together.
+- ⚙️ Multipart assembly polling interval and empty-poll threshold are now configurable (Settings → Configure)
+- 🔧 Calls and SMS-sending consolidated under dedicated services: `sms_gammu_viewer.send_sms`, `sms_gammu_viewer.call`, `sms_gammu_viewer.hangup` — replacing the old `notify.sms_gammu_call` entity
+- 📎 WAP Push / MMS notifications now shown as a friendly placeholder instead of raw binary
+- 🐛 Fixed a 400 error when a sender's alphanumeric name contained a stray newline character
+- 🐛 Fixed the call history dropdown showing too many items — capped at ~4 visible with scroll
+- 🐛 Fixed the call button jumping out of position on the modem status page
 
 ### v2.7.0
 - 🩺 Voice port diagnostics card on the modem status page — checks if the configured voice serial interface responds, with manual recheck button
@@ -298,6 +332,7 @@ This project builds on the work of several open-source projects:
 ## License
 
 MIT
+
 
 
 
