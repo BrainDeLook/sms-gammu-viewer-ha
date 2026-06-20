@@ -568,6 +568,7 @@ class SmsGammuPanel extends HTMLElement {
     this._timer = null;
     this._eventTimer = null;
     this._lastEventId = 0;
+    this._eventsInitialized = false;
     this._activeTab = 'chats';
     this._sendText = '';
     this._sending = false;
@@ -771,7 +772,20 @@ class SmsGammuPanel extends HTMLElement {
   async _pollEvents() {
     try {
       const data = await this._api(`events?since=${this._lastEventId}`);
-      if (!data.events?.length) return;
+      if (!data.events?.length) {
+        this._eventsInitialized = true;
+        return;
+      }
+
+      // При первой загрузке страницы просто синхронизируем счётчик,
+      // не обрабатывая накопленные за время простоя события (иначе
+      // старые тосты вроде "Не ответили" всплывают заново при F5)
+      if (!this._eventsInitialized) {
+        this._lastEventId = data.last_id;
+        this._eventsInitialized = true;
+        return;
+      }
+
       this._lastEventId = data.last_id;
 
       let needContacts = false;
@@ -1780,6 +1794,7 @@ class SmsGammuPanel extends HTMLElement {
 }
 
 customElements.define("sms-gammu-panel", SmsGammuPanel);
+
 
 
 
