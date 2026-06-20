@@ -96,6 +96,19 @@ async def dial_number(
         _LOGGER.info("Call to +%s ended: %s", number, reason)
         return reason
 
+    except asyncio.CancelledError:
+        # Пользователь сам сбросил звонок (hangup) — шлём AT+CHUP
+        # на этом же соединении прежде чем дать задаче завершиться
+        _LOGGER.info("Call to +%s cancelled by user, hanging up", number)
+        if modem:
+            try:
+                await modem.execute_at(
+                    "AT+CHUP", timeout=5,
+                    end_markers=["OK", "ERROR", "NO CARRIER", "+CME ERROR"],
+                )
+            except Exception as e:
+                _LOGGER.debug("AT+CHUP on cancel failed: %s", e)
+        raise
     except asyncio.TimeoutError:
         _LOGGER.warning("Timeout while dialing +%s", number)
         return CallEndedReason.ERROR
@@ -184,6 +197,7 @@ async def _passive_wait(modem: CallModem, call_duration_sec: int) -> CallEndedRe
                     return CallEndedReason.DECLINED
     except TimeoutError:
         return CallEndedReason.NOT_ANSWERED
+
 
 
 
