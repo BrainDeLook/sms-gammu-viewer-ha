@@ -520,6 +520,98 @@ const CSS = `
   }
   .lang-option:hover { background: rgba(0,0,0,.05); }
   .lang-option.active { color: var(--accent); font-weight: 500; }
+
+  /* ─── Call history dropdown ─── */
+  .call-history-dropdown {
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 10px);
+    left: 0;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    box-shadow: 0 6px 24px rgba(0,0,0,.2);
+    overflow: hidden;
+    z-index: 100;
+    width: 280px;
+    max-height: 360px;
+    display: flex;
+    flex-direction: column;
+  }
+  .call-history-dropdown.open { display: flex; }
+  .ch-header {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--line);
+    font-size: 13px; font-weight: 600;
+    color: var(--text);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .ch-clear-btn {
+    background: none; border: none; cursor: pointer;
+    color: var(--sub); font-size: 11px;
+    padding: 2px 6px; border-radius: 4px;
+    transition: color .15s, background .15s;
+  }
+  .ch-clear-btn:hover { color: var(--danger); background: rgba(229,57,53,.08); }
+  .ch-new-input-row {
+    padding: 10px 14px;
+    display: flex; gap: 6px;
+    border-bottom: 1px solid var(--line);
+  }
+  .ch-new-input {
+    flex: 1; padding: 7px 10px;
+    border: 1px solid var(--line); border-radius: 8px;
+    background: var(--bg); color: var(--text);
+    font-size: 13px; outline: none;
+  }
+  .ch-new-input:focus { border-color: var(--accent); }
+  .ch-call-btn {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: #4caf50; color: #fff; border: none;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; transition: opacity .15s;
+  }
+  .ch-call-btn:disabled { opacity: .4; cursor: default; }
+  .ch-list {
+    overflow-y: auto; flex: 1;
+  }
+  .ch-empty {
+    padding: 24px 14px; text-align: center;
+    color: var(--sub); font-size: 12px;
+  }
+  .ch-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 14px; cursor: pointer;
+    transition: background .15s;
+    border-bottom: 1px solid var(--line);
+  }
+  .ch-item:last-child { border-bottom: none; }
+  .ch-item:hover { background: rgba(0,0,0,.04); }
+  .ch-icon {
+    width: 28px; height: 28px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; font-size: 13px;
+  }
+  .ch-icon.answered { background: rgba(76,175,80,.15); color: #4caf50; }
+  .ch-icon.not_answered { background: rgba(255,152,0,.15); color: #ff9800; }
+  .ch-icon.declined { background: rgba(229,57,53,.15); color: var(--danger); }
+  .ch-icon.error { background: rgba(0,0,0,.08); color: var(--sub); }
+  .ch-info { flex: 1; min-width: 0; }
+  .ch-number {
+    font-size: 13px; color: var(--text); font-weight: 500;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .ch-meta {
+    font-size: 11px; color: var(--sub);
+  }
+  .ch-del-btn {
+    background: none; border: none; cursor: pointer;
+    color: var(--sub); padding: 4px; border-radius: 4px;
+    opacity: 0; transition: opacity .15s, color .15s;
+    flex-shrink: 0;
+  }
+  .ch-item:hover .ch-del-btn { opacity: 1; }
+  .ch-del-btn:hover { color: var(--danger); }
   @media (max-width: 580px) {
     .contacts { width: 100%; border-right: none; }
     .chat { display: none; position: absolute; inset: 0; z-index: 10; background: var(--bg); }
@@ -574,6 +666,7 @@ class SmsGammuPanel extends HTMLElement {
     this._sending = false;
     this._modemError = null;
     this._narrow = false;
+    this._callHistory = [];
   }
 
   _t(key, ...args) {
@@ -942,6 +1035,14 @@ class SmsGammuPanel extends HTMLElement {
     };
     const text = reasonMap[data.reason] || data.reason;
     this._showToast(`${data.number}: ${text}`);
+
+    const dd = this.shadowRoot.getElementById("call-history-dropdown");
+    if (dd?.classList.contains("open")) {
+      this._api("call_history").then((h) => {
+        this._callHistory = h;
+        this._renderCallHistory();
+      }).catch(() => {});
+    }
   }
 
   async _pollNow() {
@@ -1058,25 +1159,86 @@ class SmsGammuPanel extends HTMLElement {
     this.shadowRoot.getElementById("new-chat-overlay")?.classList.remove("open");
   }
 
-  _openDialModal() {
-    const overlay  = this.shadowRoot.getElementById("dial-overlay");
-    const numInput = this.shadowRoot.getElementById("dial-number");
-    const dialBtn  = this.shadowRoot.getElementById("dial-start");
-    const titleEl  = this.shadowRoot.getElementById("dial-title");
-    const cancelEl = this.shadowRoot.getElementById("dial-cancel");
-    if (!overlay) return;
-    if (titleEl) titleEl.textContent = this._t("call_number");
-    if (cancelEl) cancelEl.textContent = this._t("cancel");
-    if (dialBtn) dialBtn.textContent = this._t("call_number");
+  async _openCallHistory() {
+    const dd = this.shadowRoot.getElementById("call-history-dropdown");
+    if (!dd) return;
+    const isOpen = dd.classList.contains("open");
+    if (isOpen) {
+      dd.classList.remove("open");
+      return;
+    }
+
+    const titleEl = this.shadowRoot.getElementById("ch-title");
+    const clearBtn = this.shadowRoot.getElementById("ch-clear-btn");
+    const numInput = this.shadowRoot.getElementById("ch-new-number");
+    if (titleEl) titleEl.textContent = this._t("call_history");
+    if (clearBtn) clearBtn.textContent = this._t("clear");
+    if (numInput) numInput.placeholder = this._t("number_placeholder");
+
+    dd.classList.add("open");
     numInput.value = "";
-    numInput.placeholder = this._t("number_placeholder");
-    dialBtn.disabled = true;
-    overlay.classList.add("open");
+    this.shadowRoot.getElementById("ch-call-btn").disabled = true;
+
+    try {
+      this._callHistory = await this._api("call_history");
+    } catch (_) {
+      this._callHistory = [];
+    }
+    this._renderCallHistory();
     setTimeout(() => numInput.focus(), 50);
   }
 
-  _closeDialModal() {
-    this.shadowRoot.getElementById("dial-overlay")?.classList.remove("open");
+  _closeCallHistory() {
+    this.shadowRoot.getElementById("call-history-dropdown")?.classList.remove("open");
+  }
+
+  _renderCallHistory() {
+    const list = this.shadowRoot.getElementById("ch-list");
+    if (!list) return;
+
+    const items = this._callHistory || [];
+    if (!items.length) {
+      list.innerHTML = `<div class="ch-empty">${this._t("no_calls")}</div>`;
+      return;
+    }
+
+    const reasonIcon = { answered: "✓", not_answered: "—", declined: "✕", error: "!" };
+
+    list.innerHTML = items.map((c) => `
+      <div class="ch-item" data-number="${this._esc(c.number)}">
+        <div class="ch-icon ${c.reason}">${reasonIcon[c.reason] || "?"}</div>
+        <div class="ch-info">
+          <div class="ch-number">${this._esc(c.number)}</div>
+          <div class="ch-meta">${this._t("call_reason_" + c.reason)} · ${this._formatShort(c.called_at)}</div>
+        </div>
+        <button class="ch-del-btn" data-id="${c.id}" title="${this._t("delete_msg")}">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+          </svg>
+        </button>
+      </div>
+    `).join("");
+
+    list.querySelectorAll(".ch-item").forEach((el) => {
+      el.addEventListener("click", (e) => {
+        if (e.target.closest(".ch-del-btn")) return;
+        const number = el.dataset.number;
+        this._closeCallHistory();
+        this._callNumber(number);
+      });
+    });
+    list.querySelectorAll(".ch-del-btn").forEach((btn) => {
+      btn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const id = parseInt(btn.dataset.id);
+        try {
+          await this._api(`delete_call/${id}`, "POST");
+          this._callHistory = this._callHistory.filter((c) => c.id !== id);
+          this._renderCallHistory();
+        } catch (_) {}
+      });
+    });
   }
 
   async _sendSms() {
@@ -1340,11 +1502,29 @@ class SmsGammuPanel extends HTMLElement {
             </svg>
           </button>
 
-          <button class="fab fab-call" id="fab-call" title="Call" style="display:none">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
-            </svg>
-          </button>
+          <div class="call-fab-wrap" style="position:relative">
+            <button class="fab fab-call" id="fab-call" title="Call" style="display:none">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
+              </svg>
+            </button>
+
+            <div class="call-history-dropdown" id="call-history-dropdown">
+              <div class="ch-header">
+                <span id="ch-title">История звонков</span>
+                <button class="ch-clear-btn" id="ch-clear-btn">Очистить</button>
+              </div>
+              <div class="ch-new-input-row">
+                <input class="ch-new-input" id="ch-new-number" type="tel" placeholder="+79001234567" />
+                <button class="ch-call-btn" id="ch-call-btn" disabled title="Позвонить">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
+                  </svg>
+                </button>
+              </div>
+              <div class="ch-list" id="ch-list"></div>
+            </div>
+          </div>
 
           <!-- Modal: новый чат -->
           <div class="new-chat-overlay" id="new-chat-overlay">
@@ -1357,18 +1537,6 @@ class SmsGammuPanel extends HTMLElement {
               <div class="new-chat-actions">
                 <button class="btn-cancel" id="new-chat-cancel">Отмена</button>
                 <button class="btn-start" id="new-chat-send" disabled>Отправить</button>
-              </div>
-            </div>
-          </div>
-
-          <div class="new-chat-overlay" id="dial-overlay">
-            <div class="new-chat-sheet">
-              <div class="new-chat-title" id="dial-title">Позвонить</div>
-              <input class="new-chat-input" id="dial-number" type="tel"
-                placeholder="+79001234567" />
-              <div class="new-chat-actions">
-                <button class="btn-cancel" id="dial-cancel">Отмена</button>
-                <button class="btn-start" id="dial-start" disabled>Позвонить</button>
               </div>
             </div>
           </div>
@@ -1473,6 +1641,7 @@ class SmsGammuPanel extends HTMLElement {
     // Закрываем dropdown при клике вне
     this.shadowRoot.addEventListener("click", () => {
       this.shadowRoot.getElementById("lang-dropdown")?.classList.remove("open");
+      this.shadowRoot.getElementById("call-history-dropdown")?.classList.remove("open");
     });
 
     // FAB — новый чат
@@ -1520,37 +1689,38 @@ class SmsGammuPanel extends HTMLElement {
       }
     });
 
-    // FAB — позвонить (независимо от существующих чатов)
+    // FAB — история звонков (независимо от существующих чатов)
     this.shadowRoot.getElementById("fab-call").addEventListener("click", (e) => {
       e.stopPropagation();
-      this._openDialModal();
+      this._openCallHistory();
     });
-    this.shadowRoot.getElementById("dial-overlay").addEventListener("click", (e) => {
-      if (e.target === this.shadowRoot.getElementById("dial-overlay")) {
-        this._closeDialModal();
-      }
+    this.shadowRoot.getElementById("call-history-dropdown").addEventListener("click", (e) => {
+      e.stopPropagation();
     });
-    this.shadowRoot.getElementById("dial-cancel").addEventListener("click", () => {
-      this._closeDialModal();
+    this.shadowRoot.getElementById("ch-clear-btn").addEventListener("click", async () => {
+      try {
+        await this._api("clear_call_history", "POST");
+        this._callHistory = [];
+        this._renderCallHistory();
+      } catch (_) {}
     });
 
-    const dialInput = this.shadowRoot.getElementById("dial-number");
-    const dialBtn   = this.shadowRoot.getElementById("dial-start");
+    const chInput   = this.shadowRoot.getElementById("ch-new-number");
+    const chCallBtn = this.shadowRoot.getElementById("ch-call-btn");
 
-    dialInput.addEventListener("input", () => {
-      dialBtn.disabled = !dialInput.value.trim();
+    chInput.addEventListener("input", () => {
+      chCallBtn.disabled = !chInput.value.trim();
     });
-    dialInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && dialInput.value.trim()) {
+    chInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && chInput.value.trim()) {
         e.preventDefault();
-        dialBtn.click();
+        chCallBtn.click();
       }
     });
-
-    dialBtn.addEventListener("click", async () => {
-      const number = dialInput.value.trim();
+    chCallBtn.addEventListener("click", async () => {
+      const number = chInput.value.trim();
       if (!number) return;
-      this._closeDialModal();
+      this._closeCallHistory();
       await this._callNumber(number);
     });
 
@@ -1794,6 +1964,7 @@ class SmsGammuPanel extends HTMLElement {
 }
 
 customElements.define("sms-gammu-panel", SmsGammuPanel);
+
 
 
 
