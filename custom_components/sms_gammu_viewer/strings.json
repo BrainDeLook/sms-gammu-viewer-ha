@@ -32,11 +32,13 @@
           "call_dial_timeout": "Dial timeout (seconds)",
           "call_duration": "Max call duration after answer (seconds)",
           "collect_interval": "Delay between scans while assembling a multipart SMS (seconds)",
-          "collect_empty_max": "Number of empty scans before considering the SMS complete"
+          "collect_empty_max": "Number of empty scans before considering the SMS complete",
+          "language": "Panel interface language"
         }
       }
     }
   }
 }
+
 
 
