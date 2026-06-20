@@ -118,6 +118,27 @@ async def _register_panel(hass: HomeAssistant) -> None:
     )
 
 
+WAP_PUSH_MARKERS = (
+    "application/vnd.wap.mms-message",
+    "application/vnd.wap.sic",
+    "application/vnd.wap.slc",
+    "x-wap-application:mms.ua",
+)
+
+
+def _looks_like_wap_push(text: str) -> bool:
+    """Определяет служебные WAP Push / MMS-уведомления (бинарный WBXML),
+    которые Gammu иногда отдаёт как сырой текст вместо настоящего SMS.
+    """
+    if not text:
+        return False
+    if any(marker in text for marker in WAP_PUSH_MARKERS):
+        return True
+    # WBXML обычно начинается с управляющих байт \x00-\x1f в большом количестве
+    control_chars = sum(1 for c in text[:40] if ord(c) < 9 or 13 < ord(c) < 32)
+    return control_chars >= 5
+
+
 class NumberBuffer:
     def __init__(self, number: str) -> None:
         self.number = number
@@ -137,6 +158,8 @@ class NumberBuffer:
 
     @property
     def full_text(self) -> str:
+        if any(_looks_like_wap_push(p) for p in self.parts):
+            return "📎 Входящий MMS (не поддерживается)"
         return "".join(self.parts)
 
 
@@ -633,6 +656,7 @@ class SmsApiView(HomeAssistantView):
             status=status,
             content_type="application/json",
         )
+
 
 
 
