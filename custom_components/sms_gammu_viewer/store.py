@@ -51,6 +51,12 @@ class SmsStore:
             """)
             conn.execute("CREATE INDEX IF NOT EXISTS idx_call_number ON call_history(number)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_call_date   ON call_history(called_at)")
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS settings (
+                    key   TEXT PRIMARY KEY,
+                    value TEXT
+                )
+            """)
 
     def _conn(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self._path)
@@ -219,5 +225,20 @@ class SmsStore:
     def clear_call_history(self) -> None:
         with self._conn() as conn:
             conn.execute("DELETE FROM call_history")
+
+    def get_setting(self, key: str) -> str | None:
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT value FROM settings WHERE key=?", (key,)
+            ).fetchone()
+        return row[0] if row else None
+
+    def set_setting(self, key: str, value: str) -> None:
+        with self._conn() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+                (key, value),
+            )
+
 
 
