@@ -37,6 +37,23 @@ class SmsGammuViewerCard extends HTMLElement {
     }
   }
 
+  set editMode(value) {
+    // HA выставляет это свойство когда карточка рендерится как live-превью
+    // внутри редактора настроек дашборда. Пока редактор открыт, останавливаем
+    // periodic polling — иначе обновление состояния карточки может сбрасывать
+    // фокус формы редактора во время набора текста.
+    this._editMode = value;
+    if (value) {
+      this._stopTimer();
+    } else if (this._initialized) {
+      this._startTimer();
+    }
+  }
+
+  get editMode() {
+    return this._editMode;
+  }
+
   getCardSize() {
     return 1 + Math.min(this._config.max_items || 5, 5);
   }
@@ -45,7 +62,7 @@ class SmsGammuViewerCard extends HTMLElement {
     if (this._hass && !this._initialized) {
       this._initialized = true;
       this._load();
-      this._startTimer();
+      if (!this._editMode) this._startTimer();
     }
   }
 
@@ -55,6 +72,7 @@ class SmsGammuViewerCard extends HTMLElement {
 
   _startTimer() {
     this._stopTimer();
+    if (this._editMode) return;
     this._timer = setInterval(() => this._load(), 15000);
   }
 
@@ -420,6 +438,7 @@ window.customCards.push({
   description: "Shows recent SMS conversations from SMS Gammu Viewer integration",
   preview: true,
 });
+
 
 
 
