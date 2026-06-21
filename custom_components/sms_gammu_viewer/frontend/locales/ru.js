@@ -92,6 +92,8 @@ export default {
   phonebook_title: "Телефонная книга",
   loading_phonebook: "Загрузка контактов…",
   no_contacts: "Контактов ещё нет",
+  no_search_results: "Ничего не найдено",
+  search_contacts: "Поиск по имени, номеру или метке",
   add_contact: "Добавить контакт",
   open_chat: "Открыть чат",
   contact_name_prompt: "Имя контакта:",
@@ -103,6 +105,7 @@ export default {
   back: "Назад",
   modem_btn: "Статус модема",
 };
+
 
 
 
