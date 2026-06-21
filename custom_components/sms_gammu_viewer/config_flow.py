@@ -105,26 +105,19 @@ class SmsGammuOptionsFlow(OptionsFlow):
     ) -> ConfigFlowResult:
         """Главное меню Options flow: общие настройки или управление сущностями звонков.
 
-        Используем словарь {step_id: label} вместо списка с переводом через
-        strings.json — у HA frontend есть известный баг с переводом
-        menu_options именно для Options Flow (списочный вариант), при
-        котором подписи пунктов остаются пустыми. Захардкоженный словарь
-        — официально поддерживаемый способ обойти это, поэтому язык
-        выбираем вручную из настройки "Язык интерфейса панели".
+        Текст всегда на английском, захардкожен напрямую. У HA frontend есть
+        известный баг с переводом menu_options через strings.json именно для
+        Options Flow (issue home-assistant/frontend#21887/#21889) — подписи
+        пунктов остаются пустыми. Раз меню всего из двух статичных пунктов,
+        проще оставить фиксированный английский текст, чем гоняться за
+        нестабильным поведением системы переводов.
         """
-        lang = self._entry.data.get(CONF_LANGUAGE, DEFAULT_LANGUAGE)
-        labels = {
-            "ru": {
-                "settings": "Общие настройки",
-                "call_entities": "Сущности звонков (cover/button на номер телефона)",
-            },
-        }.get(lang, {
-            "settings": "General settings",
-            "call_entities": "Call entities (cover/button per phone number)",
-        })
         return self.async_show_menu(
             step_id="init",
-            menu_options=labels,
+            menu_options={
+                "settings": "General settings",
+                "call_entities": "Call entities (cover/button per phone number)",
+            },
         )
 
     async def async_step_settings(
@@ -414,6 +407,7 @@ class SmsGammuOptionsFlow(OptionsFlow):
             return result
         except Exception:
             return []
+
 
 
 
