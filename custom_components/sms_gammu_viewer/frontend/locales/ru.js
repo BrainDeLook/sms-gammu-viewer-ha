@@ -6,6 +6,8 @@ export default {
   select_dialog: "Выберите диалог",
   select_dialog_left: "Выберите диалог слева",
   no_messages: "Нет сообщений",
+  open_all_messages: "Открыть все сообщения →",
+  card_title_default: "SMS",
   nothing_found: "Ничего не найдено",
   messages_count: (n) => `${n} сообщ.`,
   collecting: "Получение SMS…",
@@ -101,6 +103,7 @@ export default {
   back: "Назад",
   modem_btn: "Статус модема",
 };
+
 
 
 
