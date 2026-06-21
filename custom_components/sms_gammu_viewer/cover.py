@@ -76,10 +76,18 @@ class CallCoverEntity(CoverEntity):
         }
 
     async def async_open_cover(self, **kwargs) -> None:
-        """Сразу переходит в open и дозванивается на номер в фоне."""
+        """Сразу переходит в open и возвращает управление — дозвон идёт
+        в фоновой задаче. Это важно для внешних интеграций умного дома
+        (Алиса/Yandex Smart Home, Google Home) — если бы метод ждал
+        результата звонка (может занимать десятки секунд), они видели бы
+        состояние как "в процессе выполнения команды", а не мгновенный
+        переход в открытое состояние.
+        """
         self._is_closed = False
         self.async_write_ha_state()
+        self.hass.async_create_task(self._dial_in_background())
 
+    async def _dial_in_background(self) -> None:
         try:
             reason = await dial_number(
                 self._device_path,
@@ -102,5 +110,6 @@ class CallCoverEntity(CoverEntity):
         """Просто переводит сущность в закрытое состояние (визуально)."""
         self._is_closed = True
         self.async_write_ha_state()
+
 
 
