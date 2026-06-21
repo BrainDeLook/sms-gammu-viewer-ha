@@ -330,10 +330,16 @@ class SmsStore:
 
     def get_all_contacts(self) -> list[dict[str, Any]]:
         with self._conn() as conn:
-            rows = conn.execute(
-                "SELECT * FROM phonebook ORDER BY name COLLATE NOCASE"
-            ).fetchall()
-        return [dict(r) for r in rows]
+            rows = conn.execute("""
+                SELECT pb.*, (SELECT 1 FROM muted_numbers mn WHERE mn.number = pb.number) as is_muted
+                FROM phonebook pb
+                ORDER BY pb.name COLLATE NOCASE
+            """).fetchall()
+        result = [dict(r) for r in rows]
+        for r in result:
+            r["is_muted"] = bool(r["is_muted"])
+        return result
+
 
 
 
