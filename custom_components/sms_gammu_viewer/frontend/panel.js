@@ -701,9 +701,27 @@ const CSS = `
   }
   .pb-action-btn:hover { background: rgba(0,0,0,.06); color: var(--text); }
   .pb-action-btn.danger:hover { background: rgba(229,57,53,.1); color: var(--danger); }
+  .pb-action-btn.muted-active { color: #ff9800; }
   .pb-empty {
     padding: 30px 14px; text-align: center;
     color: var(--sub); font-size: 13px;
+  }
+  .pb-search {
+    margin-bottom: 12px;
+  }
+  .pb-search input {
+    width: 100%;
+    padding: 9px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: var(--card);
+    color: var(--text);
+    font-size: 13px;
+    box-sizing: border-box;
+  }
+  .pb-search input:focus {
+    outline: none;
+    border-color: var(--accent);
   }
 
   @media (max-width: 580px) {
@@ -1133,6 +1151,27 @@ class SmsGammuPanel extends HTMLElement {
     }
   }
 
+  async _togglePhonebookMute(number) {
+    const pbContact = this._phonebook.find((c) => c.number === number);
+    const currentlyMuted = pbContact?.is_muted || false;
+    try {
+      const action = currentlyMuted ? "unmute" : "mute";
+      await this._api(`${action}/${encodeURIComponent(number)}`, "POST");
+      if (pbContact) pbContact.is_muted = !currentlyMuted;
+      // Синхронизируем со списком диалогов и шапкой открытого чата,
+      // если этот же номер там тоже представлен
+      const listContact = this._contacts.find((c) => c.number === number);
+      if (listContact) listContact.is_muted = !currentlyMuted;
+      if (this._activeNumber === number) {
+        this._updateMuteBtn(!currentlyMuted);
+      }
+      this._renderPhonebook();
+      this._renderContacts();
+    } catch (e) {
+      this._showToast(this._t("send_error") + ": " + e.message);
+    }
+  }
+
   _updateMuteBtn(isMuted) {
     const btn = this.shadowRoot.getElementById("mute-contact-btn");
     if (!btn) return;
@@ -1531,7 +1570,15 @@ class SmsGammuPanel extends HTMLElement {
     const page = this.shadowRoot.getElementById("status-main");
     if (!page || this._activeTab !== "phonebook") return;
 
-    const items = this._phonebook || [];
+    const all = this._phonebook || [];
+    const q = (this._phonebookFilter || "").trim().toLowerCase();
+    const items = q
+      ? all.filter((c) =>
+          (c.name || "").toLowerCase().includes(q) ||
+          (c.number || "").toLowerCase().includes(q) ||
+          (c.label || "").toLowerCase().includes(q)
+        )
+      : all;
 
     const rows = items.length
       ? items.map((c) => `
@@ -1548,6 +1595,13 @@ class SmsGammuPanel extends HTMLElement {
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
               </svg>
             </button>
+            <button class="pb-action-btn ${c.is_muted ? "muted-active" : ""}" data-action="mute" data-number="${this._esc(c.number)}" title="${c.is_muted ? this._t("unmute_chat") : this._t("mute_chat")}">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                ${c.is_muted
+                  ? '<path d="M11 5 6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/>'
+                  : '<path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>'}
+              </svg>
+            </button>
             <button class="pb-action-btn" data-action="edit" data-number="${this._esc(c.number)}" title="${this._t("edit")}">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
@@ -1562,16 +1616,36 @@ class SmsGammuPanel extends HTMLElement {
             </button>
           </div>
         `).join("")
-      : `<div class="pb-empty">${this._t("no_contacts")}</div>`;
+      : `<div class="pb-empty">${all.length ? this._t("no_search_results") : this._t("no_contacts")}</div>`;
 
     page.innerHTML = `
       <div class="pb-page">
         <button class="pb-add-btn" id="pb-add-btn">+ ${this._t("add_contact")}</button>
+        ${all.length ? `
+          <div class="pb-search">
+            <input type="text" id="pb-search-input" placeholder="${this._t("search_contacts")}" value="${this._esc(this._phonebookFilter || "")}" />
+          </div>
+        ` : ""}
         <div class="pb-list">${rows}</div>
       </div>
     `;
 
     page.querySelector("#pb-add-btn")?.addEventListener("click", () => this._openContactEditor());
+
+    const searchInput = page.querySelector("#pb-search-input");
+    if (searchInput) {
+      searchInput.addEventListener("input", (e) => {
+        this._phonebookFilter = e.target.value;
+        const cursorPos = e.target.selectionStart;
+        this._renderPhonebook();
+        // Восстанавливаем фокус и позицию курсора после перерисовки списка
+        const newInput = page.querySelector("#pb-search-input");
+        if (newInput) {
+          newInput.focus();
+          newInput.setSelectionRange(cursorPos, cursorPos);
+        }
+      });
+    }
 
     page.querySelectorAll(".pb-action-btn").forEach((btn) => {
       btn.addEventListener("click", (e) => {
@@ -1587,6 +1661,8 @@ class SmsGammuPanel extends HTMLElement {
         } else if (action === "edit") {
           const contact = this._phonebook.find((c) => c.number === number);
           this._openContactEditor(contact);
+        } else if (action === "mute") {
+          this._togglePhonebookMute(number);
         } else if (action === "delete") {
           this._deleteContactFromBook(number);
         }
@@ -2317,6 +2393,7 @@ class SmsGammuPanel extends HTMLElement {
 }
 
 customElements.define("sms-gammu-panel", SmsGammuPanel);
+
 
 
 
