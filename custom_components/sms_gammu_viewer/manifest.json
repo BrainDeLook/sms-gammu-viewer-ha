@@ -10,5 +10,5 @@
   "issue_tracker": "https://github.com/BrainDeLook/sms-gammu-viewer-ha/issues",
   "requirements": ["pyserial-asyncio-fast>=0.13"],
   "single_config_entry": true,
-  "version": "3.5.0"
+  "version": "3.6.0"
 }
