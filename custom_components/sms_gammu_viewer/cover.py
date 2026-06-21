@@ -16,6 +16,7 @@ from .const import (
     CALL_ENTITY_TYPE_COVER,
     CONF_CALL_DEVICE,
     CONF_CALL_ENTITIES,
+    DOMAIN,
 )
 from .dialer import CallEndedReason, dial_number
 
@@ -88,6 +89,9 @@ class CallCoverEntity(CoverEntity):
         self.hass.async_create_task(self._dial_in_background())
 
     async def _dial_in_background(self) -> None:
+        coord = self.hass.data.get(DOMAIN, {}).get(self._entry.entry_id)
+        if coord:
+            coord.call_in_progress = True
         try:
             reason = await dial_number(
                 self._device_path,
@@ -102,6 +106,8 @@ class CallCoverEntity(CoverEntity):
         except Exception as e:
             _LOGGER.error("Call cover '%s' dial error: %s", self._attr_name, e)
         finally:
+            if coord:
+                coord.call_in_progress = False
             if self._cfg.get("auto_close", True):
                 self._is_closed = True
             self.async_write_ha_state()
@@ -110,6 +116,7 @@ class CallCoverEntity(CoverEntity):
         """Просто переводит сущность в закрытое состояние (визуально)."""
         self._is_closed = True
         self.async_write_ha_state()
+
 
 
 
