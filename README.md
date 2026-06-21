@@ -283,11 +283,26 @@ The panel UI text (not just config flow) is fully translatable, independent of H
 
 ---
 
-## Optional: Dashboard Card
+## Dashboard Card
 
-Want recent conversations visible right on your dashboard, not just in the sidebar panel? There's a separate Lovelace card for that: **[sms-gammu-viewer-card](https://github.com/BrainDeLook/sms-gammu-viewer-card)**.
+Want recent conversations visible right on your dashboard, not just in the sidebar panel? A compact Lovelace card is **built directly into this integration** — no separate install needed.
 
-It's a separate HACS repository (Lovelace cards can't ship from the same repo as an integration) — install it the same way, as a custom repository with category **Dashboard**.
+```yaml
+type: custom:sms-gammu-viewer-card
+title: SMS
+max_items: 5
+show_unread_only: false
+```
+
+Add it via **Edit Dashboard → Add Card → Manual** with the YAML above, or search for "SMS Gammu Viewer Card" in the card picker. The card becomes available automatically once the integration is set up — Home Assistant loads its JS the same way it loads the sidebar panel's assets.
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `title` | string | `SMS` | Card header text |
+| `max_items` | number | `5` | Number of conversations to show |
+| `show_unread_only` | boolean | `false` | Only show conversations with unread messages |
+
+> Older installs may still have the standalone [sms-gammu-viewer-card](https://github.com/BrainDeLook/sms-gammu-viewer-card) repository added via HACS — it's no longer needed and can be removed; this integration now provides the same card under the same name.
 
 ---
 
@@ -298,10 +313,14 @@ This project builds on the work of several open-source projects:
 - **[pajikos/sms-gammu-gateway](https://github.com/pajikos/sms-gammu-gateway)** and **[PavelVe/home-assistant-addons](https://github.com/PavelVe/home-assistant-addons)** — the underlying SMS gateway add-on this integration connects to via REST API.
 - **[Daring-Designs/meshtastic-ui-ha](https://github.com/Daring-Designs/meshtastic-ui-ha)** — the native HA sidebar panel architecture (custom panel registration via `async_register_built_in_panel`, static path serving) was modeled after this project.
 - **[black-roland/homeassistant-gsm-call](https://github.com/black-roland/homeassistant-gsm-call)** — the original voice call dialing logic (AT command sequences, `AT+CLCC` polling for call state, serial connection parameters) that this integration's call feature is closely based on. All credit for figuring out the working AT dialing approach for GSM modems goes to this project.
+- **[frenck/home-assistant-doom](https://github.com/frenck/home-assistant-doom)** — the technique for bundling a Lovelace dashboard card directly inside an integration (registering frontend JS globally via `add_extra_js_url`, the same way static assets are served for the sidebar panel) is based on this project's approach.
 
 ---
 
 ## Changelog
+
+### v3.1.0 — Dashboard card bundled in
+- 📊 The Lovelace dashboard card is now built directly into the integration — no separate HACS install needed. Automatically available in the card picker once the integration is set up.
 
 ### v3.0.0 — Call entities, phonebook, language settings
 - 🚪 New call entities feature: create `cover`/`button` entities that dial a fixed number — for gates, garage doors, and intercoms. Configure via Settings → SMS Gammu Viewer → Configure → Call entities. **Restart Home Assistant after adding/editing/deleting an entity for changes to take effect.**
@@ -370,6 +389,7 @@ This project builds on the work of several open-source projects:
 ## License
 
 MIT
+
 
 
 
