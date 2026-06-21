@@ -125,10 +125,14 @@ async def _register_services(hass: HomeAssistant) -> None:
         call_duration = coord.entry.data.get(CONF_CALL_DURATION, DEFAULT_CALL_DURATION)
 
         _LOGGER.info("Calling +%s via call service...", number)
-        reason = await dial_number(
-            call_device, number,
-            dial_timeout_sec=dial_timeout, call_duration_sec=call_duration,
-        )
+        coord.call_in_progress = True
+        try:
+            reason = await dial_number(
+                call_device, number,
+                dial_timeout_sec=dial_timeout, call_duration_sec=call_duration,
+            )
+        finally:
+            coord.call_in_progress = False
         hass.bus.async_fire(EVENT_CALL_ENDED, {"phone_number": number, "reason": reason.value})
         await hass.async_add_executor_job(coord.store.add_call, number, reason.value)
         coord.push_event("call_ended", {"number": number, "reason": reason.value})
@@ -307,6 +311,11 @@ class SmsCoordinator:
         self._last_reset_at: float = 0.0
         self._modem_ok: bool = True
         self._sensor_listeners: list = []
+        # Многие модемы делят один процессор между голосовым и SMS-каналом —
+        # во время активного звонка опрос /sms может временно не отвечать.
+        # call/cover/button сущности выставляют этот флаг перед дозвоном и
+        # снимают по завершении, чтобы не тратить циклы опроса впустую.
+        self.call_in_progress: bool = False
 
     @property
     def _interval(self) -> int:
@@ -373,6 +382,9 @@ class SmsCoordinator:
         while True:
             try:
                 await asyncio.sleep(self._interval)
+                if self.call_in_progress:
+                    _LOGGER.debug("Skipping SMS poll — call in progress")
+                    continue
                 messages = await self._safe_get_all()
                 if messages:
                     self._error_streak = 0
@@ -724,10 +736,14 @@ class SmsApiView(HomeAssistantView):
             call_duration = coord.entry.data.get(CONF_CALL_DURATION, DEFAULT_CALL_DURATION)
 
             async def _do_call():
-                reason = await dial_number(
-                    call_device, number,
-                    dial_timeout_sec=dial_timeout, call_duration_sec=call_duration,
-                )
+                coord.call_in_progress = True
+                try:
+                    reason = await dial_number(
+                        call_device, number,
+                        dial_timeout_sec=dial_timeout, call_duration_sec=call_duration,
+                    )
+                finally:
+                    coord.call_in_progress = False
                 await self.hass.async_add_executor_job(
                     coord.store.add_call, number, reason.value
                 )
@@ -843,6 +859,7 @@ class SmsApiView(HomeAssistantView):
             status=status,
             content_type="application/json",
         )
+
 
 
 
