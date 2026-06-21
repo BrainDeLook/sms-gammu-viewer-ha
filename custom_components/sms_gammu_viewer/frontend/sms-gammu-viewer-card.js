@@ -83,13 +83,46 @@ class SmsGammuViewerCard extends HTMLElement {
     }
   }
 
+  _token() {
+    return this._hass?.auth?.data?.access_token || "";
+  }
+
+  async _refreshToken() {
+    try {
+      await this._hass.auth.refreshAccessToken();
+    } catch (_) {}
+  }
+
+  async _ensureFreshToken() {
+    // Превентивно обновляем токен за 2 минуты до истечения — иначе карточка
+    // тихо перестаёт получать новые данные после ~30 минут простоя (401
+    // ловится в catch и просто откладывается как ошибка), а в логе HA
+    // копится спам "Login attempt ... invalid authentication".
+    try {
+      const auth = this._hass?.auth?.data;
+      if (!auth?.expires) return;
+      const msLeft = auth.expires - Date.now();
+      if (msLeft < 120000) {
+        await this._refreshToken();
+      }
+    } catch (_) {}
+  }
+
   async _load() {
     if (!this._hass) return;
+    await this._ensureFreshToken();
     try {
-      const token = this._hass.auth?.data?.access_token || "";
-      const r = await fetch("/api/sms_gammu_viewer/contacts", {
-        headers: { Authorization: `Bearer ${token}` },
+      let r = await fetch("/api/sms_gammu_viewer/contacts", {
+        headers: { Authorization: `Bearer ${this._token()}` },
       });
+      if (r.status === 401) {
+        // Токен мог истечь между _ensureFreshToken() и самим запросом —
+        // обновляем и пробуем ещё раз перед тем как сдаться
+        await this._refreshToken();
+        r = await fetch("/api/sms_gammu_viewer/contacts", {
+          headers: { Authorization: `Bearer ${this._token()}` },
+        });
+      }
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       this._contacts = await r.json();
       this._error = null;
