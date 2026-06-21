@@ -129,7 +129,13 @@ class SmsGammuOptionsFlow(OptionsFlow):
                     CONF_LANGUAGE: user_input.get(CONF_LANGUAGE, DEFAULT_LANGUAGE),
                 },
             )
-            return self.async_create_entry(title="", data={})
+            # ВАЖНО: async_create_entry(data=...) для OptionsFlow ПОЛНОСТЬЮ
+            # заменяет entry.options, а не дополняет. Нужно явно сохранить
+            # уже существующие call_entities, иначе они стираются.
+            return self.async_create_entry(
+                title="",
+                data={CONF_CALL_ENTITIES: self._entry.options.get(CONF_CALL_ENTITIES, [])},
+            )
 
         notify_options = self._get_notify_options()
         current_targets = self._entry.data.get(CONF_NOTIFY_TARGETS, [])
@@ -247,7 +253,10 @@ class SmsGammuOptionsFlow(OptionsFlow):
                 )
                 return await self.async_step_call_entities()
             if action == "done":
-                return self.async_create_entry(title="", data={})
+                return self.async_create_entry(
+                    title="",
+                    data={CONF_CALL_ENTITIES: entities},
+                )
 
         options_list = [{"value": "add", "label": "➕ Добавить сущность"}]
         for e in entities:
@@ -382,6 +391,7 @@ class SmsGammuOptionsFlow(OptionsFlow):
             return result
         except Exception:
             return []
+
 
 
 
