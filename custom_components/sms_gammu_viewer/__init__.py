@@ -67,7 +67,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     hass.http.register_view(SmsApiView(hass))
     await coordinator.start()
-    await hass.config_entries.async_forward_entry_setups(entry, ["sensor"])
+    await hass.config_entries.async_forward_entry_setups(entry, ["sensor", "cover", "button"])
     entry.async_on_unload(entry.add_update_listener(_options_updated))
 
     _LOGGER.info("SMS Gammu Viewer started: %s", entry.title)
@@ -158,13 +158,14 @@ async def _register_services(hass: HomeAssistant) -> None:
 
 
 async def _options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    coord = hass.data[DOMAIN].get(entry.entry_id)
-    if coord:
-        await coord.restart()
+    # Полная перезагрузка entry — нужна потому что cover/button сущности
+    # создаются динамически из entry.options[CONF_CALL_ENTITIES] при старте
+    # платформы, и просто restart() координатора их не пересоздаст.
+    await hass.config_entries.async_reload(entry.entry_id)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    await hass.config_entries.async_unload_platforms(entry, ["sensor"])
+    await hass.config_entries.async_unload_platforms(entry, ["sensor", "cover", "button"])
     coord = hass.data[DOMAIN].pop(entry.entry_id, None)
     if coord:
         await coord.stop()
@@ -812,6 +813,7 @@ class SmsApiView(HomeAssistantView):
             status=status,
             content_type="application/json",
         )
+
 
 
 
