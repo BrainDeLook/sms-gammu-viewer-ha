@@ -319,78 +319,10 @@ This project builds on the work of several open-source projects:
 
 ---
 
-## Changelog
-
-### v3.1.0 — Dashboard card bundled in
-- 📊 The Lovelace dashboard card is now built directly into the integration — no separate HACS install needed. Automatically available in the card picker once the integration is set up.
-
-### v3.0.0 — Call entities, phonebook, language settings
-- 🚪 New call entities feature: create `cover`/`button` entities that dial a fixed number — for gates, garage doors, and intercoms. Configure via Settings → SMS Gammu Viewer → Configure → Call entities. **Restart Home Assistant after adding/editing/deleting an entity for changes to take effect.**
-- 📇 Phonebook — save contact names, shown in the conversation list, call history, and chat headers
-- 🌐 Language setting moved into integration options (the in-panel 🌐 picker was removed)
-- 🐛 Fixed a critical bug where saving settings could silently wipe out configured call entities
-- 🐛 Fixed third-party smart home integrations (Alexa, Google Home, Yandex Alice) showing a stuck "opening" state on call-triggered covers
-- 🐛 Fixed a long-standing translation error traced to a stale, forgotten `translations/en.json` file
-
-### v2.8.0 — Major multipart SMS fix
-- 🎯 Fixed the root cause of long SMS getting truncated: Gammu returns the **same SMS record growing over time** rather than separate parts to concatenate. The assembly logic now tracks the longest text seen per sender instead of joining snapshots together.
-- ⚙️ Multipart assembly polling interval and empty-poll threshold are now configurable (Settings → Configure)
-- 🔧 Calls and SMS-sending consolidated under dedicated services: `sms_gammu_viewer.send_sms`, `sms_gammu_viewer.call`, `sms_gammu_viewer.hangup` — replacing the old `notify.sms_gammu_call` entity
-- 📎 WAP Push / MMS notifications now shown as a friendly placeholder instead of raw binary
-- 🐛 Fixed a 400 error when a sender's alphanumeric name contained a stray newline character
-- 🐛 Fixed the call history dropdown showing too many items — capped at ~4 visible with scroll
-- 🐛 Fixed the call button jumping out of position on the modem status page
-
-### v2.7.0
-- 🩺 Voice port diagnostics card on the modem status page — checks if the configured voice serial interface responds, with manual recheck button
-- 📱 Editable SIM phone number field (not auto-detected — most carriers don't store it on the SIM; enter it once manually)
-- 🐛 Fixed 400 error when a sender's alphanumeric name (e.g. some Beeline service messages) contained a stray newline character, which broke opening that conversation
-- 🐛 Fixed the call FAB jumping out of place when switching to the modem status page
-
-### v2.6.0
-- 📋 Call history dropdown — tap the call button to see your last 30 calls with outcome icons (answered / not answered / declined / error), redial with one tap, delete individual entries or clear all
-- 🐛 Fixed stale call result toasts reappearing on page reload
-
-### v2.5.0
-- 📞 Outgoing voice calls (dial-only) via a separate voice AT interface, independent of the SMS gateway
-- New `notify.sms_gammu_call` entity and `sms_gammu_viewer_call_ended` event for automations
-
-### v2.4.0
-- 🔇 Per-conversation mute button
-- 📨 New sensors: `sensor.sms_last_sms_number` and `sensor.sms_last_sms_text`
-- 📋 Copy-on-click now works over plain HTTP
-- 💾 Open chat is restored after a full page reload
-
-### v2.3.1
-- ✍️ "New message" button moved to a full-width button at the bottom of the contacts sidebar — visible on mobile
-- 🔧 Fixed hamburger menu button not appearing on mobile
-
-### v2.3.0
-- 🌐 i18n: English/Russian UI with in-panel language switcher, locale files for community contributions
-- ✍️ Send SMS — reply in chat and start new conversations
-- 📋 Copy message text on click
-- 🩺 Automatic modem reset on repeated failures, with cooldown and status bar warning
-- 🔔 Fixed 401 errors — automatic token refresh
-
-### v2.2.0
-- 🔄 Auto-refresh chat via event polling every 4 seconds
-- 📶 Modem status page with signal, network, IMEI, SIM capacity and reset button
-- 📱 Hamburger menu button on mobile for HA sidebar navigation
-- 🗓 Date dividers in chat (Today, Yesterday, full date)
-- 🧩 Improved multipart SMS: merge waves from same number within 2-minute window
-- 🔔 Fixed iOS push notification tap — opens SMS panel directly
-
-### v2.1.0
-- 🔢 Unread SMS counter sensor (`sensor.sms_unread_count`) with sidebar badge
-
-### v2.0.0
-- Initial release: chat view, SQLite storage, config flow, smart SMS assembly, push notifications
-
----
-
 ## License
 
 MIT
+
 
 
 
