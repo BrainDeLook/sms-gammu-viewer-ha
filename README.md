@@ -23,6 +23,8 @@ After installation, an **SMS** tab appears in the sidebar. Messages are stored i
 - 💬 Chat-style view — all SMS from one sender in one thread
 - ✍️ **Send SMS** — reply from inside a chat, or start a brand-new conversation via the compact `+` button
 - 📞 **Outgoing voice calls** (dial-only) — via a separate voice AT interface on modems that expose multiple serial ports (e.g. Huawei). Standalone call FAB or call button in a chat, plus dedicated `sms_gammu_viewer.call` / `sms_gammu_viewer.hangup` services for automations
+- 🚪 **Call entities** — create dedicated `cover`/`button` entities that dial a fixed number, for gates/intercoms that open via a phone call. Works with dashboards, automations, and voice assistants
+- 📇 **Phonebook** — save names for your contacts, shown across the conversation list, call history, and chat headers
 - 🔇 **Per-conversation mute** — silence push notifications for a specific number while still saving and showing its messages normally
 - 🔢 Unread SMS counter badge on the sidebar icon (`sensor.sms_unread_count`)
 - 📨 Sensors for the last received SMS — `sensor.sms_last_sms_number` and `sensor.sms_last_sms_text`, updated instantly on arrival (handy for automations)
@@ -210,6 +212,26 @@ Requires a modem with hardware flow control support on its voice AT interface (`
 
 ---
 
+## Call Entities (Cover / Button)
+
+Beyond the panel's call button, you can create dedicated Home Assistant entities that dial a fixed phone number when triggered — useful for a gate, garage door, or intercom that opens via an incoming call. These behave like any other `cover`/`button` entity, so they work with dashboards, automations, and voice assistants (Alexa, Google Home, Yandex Alice) out of the box.
+
+### Setup
+
+1. **Settings → SMS Gammu Viewer → Configure** — opens a menu now, choose **Call entities**
+2. **➕ Add entity**
+3. Choose type:
+   - **Cover** — `open_cover` dials the number immediately; the entity shows as "open" right away (no stuck "opening" state) while the call happens in the background. If **Auto-close** is enabled, it returns to "closed" once the call ends, regardless of outcome
+   - **Button** — a simple one-tap dial button, no state
+4. Set name, phone number, dial timeout, and max call duration
+5. Save
+
+> ⚠️ **Restart Home Assistant after adding, editing, or deleting a call entity.** These entities are created when the integration starts up, so changes made through the config flow won't appear (or disappear) until the next restart — saving the form alone is not enough.
+
+Cover entities use the `gate` device class by default; you can change the displayed icon/type (garage door, door, gate, etc.) per-entity from the entity's own settings in Home Assistant. Requires a voice call device to be configured (see Voice Calls above) — entities won't be created without one.
+
+---
+
 ## How It Works
 
 ```
@@ -281,6 +303,14 @@ This project builds on the work of several open-source projects:
 
 ## Changelog
 
+### v3.0.0 — Call entities, phonebook, language settings
+- 🚪 New call entities feature: create `cover`/`button` entities that dial a fixed number — for gates, garage doors, and intercoms. Configure via Settings → SMS Gammu Viewer → Configure → Call entities. **Restart Home Assistant after adding/editing/deleting an entity for changes to take effect.**
+- 📇 Phonebook — save contact names, shown in the conversation list, call history, and chat headers
+- 🌐 Language setting moved into integration options (the in-panel 🌐 picker was removed)
+- 🐛 Fixed a critical bug where saving settings could silently wipe out configured call entities
+- 🐛 Fixed third-party smart home integrations (Alexa, Google Home, Yandex Alice) showing a stuck "opening" state on call-triggered covers
+- 🐛 Fixed a long-standing translation error traced to a stale, forgotten `translations/en.json` file
+
 ### v2.8.0 — Major multipart SMS fix
 - 🎯 Fixed the root cause of long SMS getting truncated: Gammu returns the **same SMS record growing over time** rather than separate parts to concatenate. The assembly logic now tracks the longest text seen per sender instead of joining snapshots together.
 - ⚙️ Multipart assembly polling interval and empty-poll threshold are now configurable (Settings → Configure)
@@ -340,6 +370,7 @@ This project builds on the work of several open-source projects:
 ## License
 
 MIT
+
 
 
 
