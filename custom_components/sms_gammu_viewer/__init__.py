@@ -165,13 +165,23 @@ async def _options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
     # и не переживает полную перезагрузку entry чисто), вызывая бесконечный
     # цикл "Removing unknown panel" + постоянные рестарты poll loop.
     #
-    # Вместо этого просто перезапускаем координатор (подхватывает poll
-    # interval, notify targets и т.д.), а cover/button сущности из
-    # call_entities заберут актуальный список при следующем обычном
-    # перезапуске Home Assistant.
+    # Вместо этого перезапускаем координатор (подхватывает poll interval,
+    # notify targets и т.д.) И отдельно перегружаем ТОЛЬКО платформы
+    # cover/button — это даёт им заново вызвать async_setup_entry с
+    # актуальным списком call_entities, без затрагивания панели/сенсора.
     coord = hass.data[DOMAIN].get(entry.entry_id)
     if coord:
         await coord.restart()
+
+    try:
+        await hass.config_entries.async_unload_platforms(entry, ["cover", "button"])
+        await hass.config_entries.async_forward_entry_setups(entry, ["cover", "button"])
+    except Exception as e:
+        _LOGGER.warning(
+            "Failed to reload cover/button platforms after options change: %s. "
+            "Restart Home Assistant manually to pick up call entity changes.",
+            e,
+        )
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -833,6 +843,7 @@ class SmsApiView(HomeAssistantView):
             status=status,
             content_type="application/json",
         )
+
 
 
 
