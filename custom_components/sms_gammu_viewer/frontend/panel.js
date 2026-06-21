@@ -986,7 +986,13 @@ class SmsGammuPanel extends HTMLElement {
           this._locale = await loadLocale(code);
           this._updateLocaleUI();
           this._renderContacts();
-          this._renderMessages();
+          if (this._activeTab === "phonebook") {
+            this._renderPhonebook();
+          } else if (this._activeTab === "status") {
+            this._renderStatusPage();
+          } else {
+            this._renderMessages();
+          }
         }
       }
     }
@@ -2407,6 +2413,7 @@ class SmsGammuPanel extends HTMLElement {
 }
 
 customElements.define("sms-gammu-panel", SmsGammuPanel);
+
 
 
 
