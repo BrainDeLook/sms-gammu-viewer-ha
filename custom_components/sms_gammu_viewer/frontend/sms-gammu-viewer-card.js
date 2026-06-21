@@ -308,11 +308,11 @@ class SmsGammuViewerCard extends HTMLElement {
       .map(
         (c) => `
       <div class="sgv-item ${c.unread > 0 ? "unread" : ""}" data-number="${this._esc(c.number)}">
-        <div class="sgv-avatar ${this._isAlphaTag(c.number) ? "alpha" : ""}">${this._esc(this._avatar(c.number))}</div>
+        <div class="sgv-avatar ${this._isAlphaTag(c.number) ? "alpha" : ""}">${this._esc(c.contact_name ? c.contact_name.slice(0, 1).toUpperCase() : this._avatar(c.number))}</div>
         <div class="sgv-info">
           <div class="sgv-row1">
             <span class="sgv-number">
-              ${c.unread > 0 ? '<span class="sgv-unread-dot"></span> ' : ""}${this._esc(c.number)}
+              ${c.unread > 0 ? '<span class="sgv-unread-dot"></span> ' : ""}${this._esc(c.contact_name || c.number)}
             </span>
             <span class="sgv-date">${this._fmtDate(c.last_date)}</span>
           </div>
@@ -354,7 +354,7 @@ class SmsGammuViewerCardEditor extends HTMLElement {
       <div style="padding: 16px; color: var(--secondary-text-color); font-size: 14px;">
         Визуальный редактор не поддерживается.<br>
         Настрой карточку через YAML — полный список параметров и примеры см. в
-        <a href="https://github.com/BrainDeLook/sms-gammu-viewer-ha/blob/main/CARD_RU.md" target="_blank" rel="noopener">CARD_RU.md</a>.
+        <a href="https://github.com/BrainDeLook/sms-gammu-viewer-ha/blob/main/CARD.md" target="_blank" rel="noopener">CARD.md</a>.
       </div>
     `;
   }
@@ -371,6 +371,7 @@ window.customCards.push({
   description: "Shows recent SMS conversations from SMS Gammu Viewer integration",
   preview: true,
 });
+
 
 
 
