@@ -340,7 +340,21 @@ class SmsGammuViewerCard extends HTMLElement {
 class SmsGammuViewerCardEditor extends HTMLElement {
   setConfig(config) {
     this._config = config;
-    this._render();
+    const form = this.querySelector("ha-form");
+    if (form) {
+      // ha-form уже построен — просто обновляем данные на месте.
+      // Пересоздание через innerHTML на каждый setConfig() (а HA вызывает
+      // его повторно после каждого нашего же value-changed) уничтожало бы
+      // DOM-узел поля и сбрасывало фокус/курсор после каждого введённого
+      // символа.
+      form.data = {
+        title: config.title ?? "SMS",
+        max_items: config.max_items ?? 5,
+        show_unread_only: config.show_unread_only ?? false,
+      };
+    } else {
+      this._render();
+    }
   }
 
   set hass(hass) {
@@ -371,10 +385,6 @@ class SmsGammuViewerCardEditor extends HTMLElement {
 
   _render() {
     if (!this._config) return;
-    // ha-form — встроенный компонент HA, сам управляет фокусом и
-    // дебаунсом ввода. DOM строится один раз через innerHTML; повторные
-    // обновления hass идут через сеттер form.hass выше, без пересоздания
-    // самого элемента — поэтому набор текста не сбрасывается.
     this.innerHTML = `<ha-form></ha-form>`;
     const form = this.querySelector("ha-form");
     form.hass = this._hass;
@@ -410,6 +420,7 @@ window.customCards.push({
   description: "Shows recent SMS conversations from SMS Gammu Viewer integration",
   preview: true,
 });
+
 
 
 
