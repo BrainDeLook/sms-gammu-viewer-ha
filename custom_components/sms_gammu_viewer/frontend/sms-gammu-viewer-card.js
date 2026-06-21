@@ -6,7 +6,21 @@
  * https://github.com/BrainDeLook/sms-gammu-viewer-ha
  */
 
-const CARD_VERSION = "1.0.0";
+const CARD_VERSION = "1.1.0";
+
+const AVAILABLE_LOCALES = ["ru", "en"];
+const CARD_BASE = new URL(import.meta.url).pathname.replace(/\/sms-gammu-viewer-card\.js$/, "");
+
+async function loadCardLocale(code) {
+  const safe = AVAILABLE_LOCALES.includes(code) ? code : "en";
+  try {
+    const mod = await import(`${CARD_BASE}/locales/${safe}.js`);
+    return mod.default;
+  } catch {
+    const mod = await import(`${CARD_BASE}/locales/en.js`);
+    return mod.default;
+  }
+}
 
 console.info(
   `%c SMS-GAMMU-VIEWER-CARD %c v${CARD_VERSION} `,
@@ -32,8 +46,11 @@ class SmsGammuViewerCard extends HTMLElement {
     this._hass = hass;
     if (!this._initialized) {
       this._initialized = true;
-      this._load();
-      this._startTimer();
+      this._initLocale().then(() => {
+        this._render();
+        this._load();
+        if (!this._editMode) this._startTimer();
+      });
     }
   }
 
@@ -61,8 +78,11 @@ class SmsGammuViewerCard extends HTMLElement {
   connectedCallback() {
     if (this._hass && !this._initialized) {
       this._initialized = true;
-      this._load();
-      if (!this._editMode) this._startTimer();
+      this._initLocale().then(() => {
+        this._render();
+        this._load();
+        if (!this._editMode) this._startTimer();
+      });
     }
   }
 
@@ -81,6 +101,30 @@ class SmsGammuViewerCard extends HTMLElement {
       clearInterval(this._timer);
       this._timer = null;
     }
+  }
+
+  async _initLocale() {
+    let lang = "en";
+    try {
+      const token = this._hass.auth?.data?.access_token || "";
+      const r = await fetch("/api/sms_gammu_viewer/status", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (r.ok) {
+        const status = await r.json();
+        if (status.language) lang = status.language;
+      }
+    } catch (_) {
+      lang = this._hass?.language || "en";
+    }
+    const code = AVAILABLE_LOCALES.includes(lang) ? lang
+      : AVAILABLE_LOCALES.includes(lang.split("-")[0]) ? lang.split("-")[0]
+      : "en";
+    this._locale = await loadCardLocale(code);
+  }
+
+  _t(key) {
+    return this._locale?.[key] ?? key;
   }
 
   async _load() {
@@ -281,7 +325,7 @@ class SmsGammuViewerCard extends HTMLElement {
         </div>
         <div class="sgv-list" id="sgv-list"></div>
         <div class="sgv-footer">
-          <a id="sgv-open-panel">Открыть все сообщения →</a>
+          <a id="sgv-open-panel">${this._t("open_all_messages")}</a>
         </div>
       </ha-card>
     `;
@@ -318,7 +362,7 @@ class SmsGammuViewerCard extends HTMLElement {
     }
 
     if (!items.length) {
-      list.innerHTML = `<div class="sgv-empty">Нет сообщений</div>`;
+      list.innerHTML = `<div class="sgv-empty">${this._t("no_messages")}</div>`;
       return;
     }
 
@@ -438,6 +482,7 @@ window.customCards.push({
   description: "Shows recent SMS conversations from SMS Gammu Viewer integration",
   preview: true,
 });
+
 
 
 
