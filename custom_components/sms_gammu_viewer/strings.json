@@ -23,6 +23,12 @@
   "options": {
     "step": {
       "init": {
+        "menu_options": {
+          "settings": "General settings",
+          "call_entities": "Call entities (cover/button per phone number)"
+        }
+      },
+      "settings": {
         "title": "SMS Gammu Viewer Settings",
         "description": "Configure polling interval and notification targets.\n\nFound {notify_count} notify service(s) available.",
         "data": {
@@ -35,10 +41,35 @@
           "collect_empty_max": "Number of empty scans before considering the SMS complete",
           "language": "Panel interface language"
         }
+      },
+      "call_entities": {
+        "title": "Call entities",
+        "description": "Each entity dials a fixed phone number when triggered — useful for things like an intercom or gate that opens on an incoming call.",
+        "data": {
+          "action": "Choose an action"
+        }
+      },
+      "call_entity_form": {
+        "title": "Call entity",
+        "description": "Cover entities open when called and can auto-close once the call ends. Button entities just dial the number.",
+        "data": {
+          "entity_type": "Entity type",
+          "name": "Entity name",
+          "number": "Phone number to call",
+          "dial_timeout": "Dial timeout (seconds)",
+          "call_duration": "Max call duration after answer (seconds)",
+          "auto_close": "Auto-close the cover once the call ends",
+          "_delete": "Delete this entity"
+        }
       }
+    },
+    "error": {
+      "name_required": "Name is required.",
+      "number_required": "Phone number is required."
     }
   }
 }
+
 
 
 
