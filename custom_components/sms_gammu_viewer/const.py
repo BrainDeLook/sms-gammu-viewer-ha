@@ -47,5 +47,15 @@ DEFAULT_COLLECT_EMPTY_MAX = 5
 CONF_LANGUAGE = "language"
 DEFAULT_LANGUAGE = "ru"
 
+# Виртуальные сущности для звонков (cover/button), создаваемые через config flow.
+# Хранятся списком словарей в entry.options[CONF_CALL_ENTITIES]:
+#   {id, entity_type, name, number, dial_timeout, call_duration,
+#    auto_close (только для cover)}
+CONF_CALL_ENTITIES = "call_entities"
+
+CALL_ENTITY_TYPE_COVER = "cover"
+CALL_ENTITY_TYPE_BUTTON = "button"
+
+
 
 
