@@ -10,8 +10,10 @@ import aiohttp
 from aiohttp import web
 
 from homeassistant.components.frontend import (
+    add_extra_js_url,
     async_register_built_in_panel,
     async_remove_panel,
+    remove_extra_js_url,
 )
 from homeassistant.components.http import HomeAssistantView, StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
@@ -182,6 +184,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             async_remove_panel(hass, PANEL_URL)
         except KeyError:
             pass
+        try:
+            remove_extra_js_url(hass, f"/{PANEL_URL}/{FRONTEND_PATH}/sms-gammu-viewer-card.js")
+        except (KeyError, ValueError):
+            pass
     return True
 
 
@@ -212,6 +218,12 @@ async def _register_panel(hass: HomeAssistant) -> None:
         },
         require_admin=False,
     )
+
+    # Регистрируем Lovelace-карточку для всех пользователей автоматически —
+    # тот же приём что у frenck/home-assistant-doom: статика уже раздаётся
+    # из той же папки frontend/, просто подключаем JS глобально, без
+    # необходимости вручную прописывать ресурс в Settings → Dashboards.
+    add_extra_js_url(hass, f"/{PANEL_URL}/{FRONTEND_PATH}/sms-gammu-viewer-card.js")
 
 
 WAP_PUSH_MARKERS = (
@@ -821,6 +833,7 @@ class SmsApiView(HomeAssistantView):
             status=status,
             content_type="application/json",
         )
+
 
 
 
