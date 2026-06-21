@@ -340,23 +340,62 @@ class SmsGammuViewerCard extends HTMLElement {
 class SmsGammuViewerCardEditor extends HTMLElement {
   setConfig(config) {
     this._config = config;
+    this._render();
   }
 
   set hass(hass) {
     this._hass = hass;
+    const form = this.querySelector("ha-form");
+    if (form) form.hass = hass;
   }
 
-  connectedCallback() {
-    // Визуальный редактор сознательно не реализован — он конфликтовал
-    // с частыми обновлениями hass и сбрасывал фокус во время набора
-    // текста. Карточка настраивается через YAML, см. CARD.md.
-    this.innerHTML = `
-      <div style="padding: 16px; color: var(--secondary-text-color); font-size: 14px;">
-        Визуальный редактор не поддерживается.<br>
-        Настрой карточку через YAML — полный список параметров и примеры см. в
-        <a href="https://github.com/BrainDeLook/sms-gammu-viewer-ha/blob/main/CARD.md" target="_blank" rel="noopener">CARD.md</a>.
-      </div>
-    `;
+  static get _schema() {
+    return [
+      { name: "title", selector: { text: {} } },
+      {
+        name: "max_items",
+        selector: { number: { mode: "box", min: 1, max: 50, step: 1 } },
+      },
+      { name: "show_unread_only", selector: { boolean: {} } },
+    ];
+  }
+
+  _computeLabel(schema) {
+    const labels = {
+      title: "Заголовок карточки",
+      max_items: "Количество диалогов",
+      show_unread_only: "Показывать только непрочитанные",
+    };
+    return labels[schema.name] || schema.name;
+  }
+
+  _render() {
+    if (!this._config) return;
+    // ha-form — встроенный компонент HA, сам управляет фокусом и
+    // дебаунсом ввода. DOM строится один раз через innerHTML; повторные
+    // обновления hass идут через сеттер form.hass выше, без пересоздания
+    // самого элемента — поэтому набор текста не сбрасывается.
+    this.innerHTML = `<ha-form></ha-form>`;
+    const form = this.querySelector("ha-form");
+    form.hass = this._hass;
+    form.data = {
+      title: this._config.title ?? "SMS",
+      max_items: this._config.max_items ?? 5,
+      show_unread_only: this._config.show_unread_only ?? false,
+    };
+    form.schema = SmsGammuViewerCardEditor._schema;
+    form.computeLabel = this._computeLabel;
+    form.addEventListener("value-changed", (ev) => {
+      ev.stopPropagation();
+      this._config = { ...this._config, ...ev.detail.value };
+      this.dispatchEvent(
+        new CustomEvent("config-changed", {
+          detail: { config: this._config },
+          bubbles: true,
+          composed: true,
+        })
+      );
+    });
   }
 }
 
@@ -371,6 +410,7 @@ window.customCards.push({
   description: "Shows recent SMS conversations from SMS Gammu Viewer integration",
   preview: true,
 });
+
 
 
 
