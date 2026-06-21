@@ -1530,8 +1530,12 @@ class SmsGammuPanel extends HTMLElement {
       const subEl   = this.shadowRoot.getElementById("chat-subtitle");
       if (titleEl) titleEl.textContent = isStatus ? this._t("modem_status") : this._t("phonebook_title");
       if (subEl)   subEl.textContent = "";
-      const delBtn = this.shadowRoot.getElementById("del-contact-btn");
+      const delBtn = this.shadowRoot.getElementById("delete-contact-btn");
       if (delBtn) delBtn.style.display = "none";
+      const callBtn = this.shadowRoot.getElementById("call-contact-btn");
+      if (callBtn) callBtn.style.display = "none";
+      const muteBtn = this.shadowRoot.getElementById("mute-contact-btn");
+      if (muteBtn) muteBtn.style.display = "none";
       // На мобилке показываем правую область
       root?.classList.add("chat-open");
       if (isStatus) {
@@ -2393,6 +2397,7 @@ class SmsGammuPanel extends HTMLElement {
 }
 
 customElements.define("sms-gammu-panel", SmsGammuPanel);
+
 
 
 
