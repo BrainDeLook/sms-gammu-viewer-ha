@@ -30,7 +30,7 @@
       },
       "settings": {
         "title": "SMS Gammu Viewer Settings",
-        "description": "Configure polling interval and notification targets.\n\nFound {notify_count} notify service(s) available.",
+        "description": "Configure polling interval and notification targets.",
         "data": {
           "poll_interval": "Polling interval (seconds, min 5)",
           "notify_targets": "Devices to notify on new SMS",
@@ -69,6 +69,7 @@
     }
   }
 }
+
 
 
 
