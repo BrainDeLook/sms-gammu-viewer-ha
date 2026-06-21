@@ -48,7 +48,7 @@
 
 ## Требования
 
-- Home Assistant 2023.1+
+- Home Assistant 2024.3+
 - Запущенный аддон [sms-gammu-gateway](https://github.com/PavelVe/home-assistant-addons/tree/main/sms-gammu-gateway) с REST API на порту 5000
 - Для push-уведомлений: приложение [Home Assistant Companion](https://companion.home-assistant.io/) на телефоне
 
@@ -326,6 +326,7 @@ show_unread_only: false
 ## Лицензия
 
 MIT
+
 
 
 
