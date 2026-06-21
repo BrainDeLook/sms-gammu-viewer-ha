@@ -103,10 +103,20 @@ class SmsGammuOptionsFlow(OptionsFlow):
     async def async_step_init(
         self, user_input: dict | None = None
     ) -> ConfigFlowResult:
-        """Главное меню Options flow: общие настройки или управление сущностями звонков."""
+        """Главное меню Options flow: общие настройки или управление сущностями звонков.
+
+        Используем словарь {step_id: label} вместо списка с переводом через
+        strings.json — у HA frontend есть известный баг с переводом
+        menu_options именно для Options Flow (списочный вариант), при
+        котором подписи пунктов остаются пустыми. Захардкоженный словарь
+        — официально поддерживаемый способ обойти это.
+        """
         return self.async_show_menu(
             step_id="init",
-            menu_options=["settings", "call_entities"],
+            menu_options={
+                "settings": "General settings",
+                "call_entities": "Call entities (cover/button per phone number)",
+            },
         )
 
     async def async_step_settings(
@@ -391,6 +401,7 @@ class SmsGammuOptionsFlow(OptionsFlow):
             return result
         except Exception:
             return []
+
 
 
 
