@@ -109,14 +109,22 @@ class SmsGammuOptionsFlow(OptionsFlow):
         strings.json — у HA frontend есть известный баг с переводом
         menu_options именно для Options Flow (списочный вариант), при
         котором подписи пунктов остаются пустыми. Захардкоженный словарь
-        — официально поддерживаемый способ обойти это.
+        — официально поддерживаемый способ обойти это, поэтому язык
+        выбираем вручную из настройки "Язык интерфейса панели".
         """
+        lang = self._entry.data.get(CONF_LANGUAGE, DEFAULT_LANGUAGE)
+        labels = {
+            "ru": {
+                "settings": "Общие настройки",
+                "call_entities": "Сущности звонков (cover/button на номер телефона)",
+            },
+        }.get(lang, {
+            "settings": "General settings",
+            "call_entities": "Call entities (cover/button per phone number)",
+        })
         return self.async_show_menu(
             step_id="init",
-            menu_options={
-                "settings": "General settings",
-                "call_entities": "Call entities (cover/button per phone number)",
-            },
+            menu_options=labels,
         )
 
     async def async_step_settings(
@@ -268,7 +276,12 @@ class SmsGammuOptionsFlow(OptionsFlow):
                     data={CONF_CALL_ENTITIES: entities},
                 )
 
-        options_list = [{"value": "add", "label": "➕ Add entity"}]
+        lang = self._entry.data.get(CONF_LANGUAGE, DEFAULT_LANGUAGE)
+        texts = {
+            "ru": {"add": "➕ Добавить сущность", "done": "✅ Готово"},
+        }.get(lang, {"add": "➕ Add entity", "done": "✅ Done"})
+
+        options_list = [{"value": "add", "label": texts["add"]}]
         for e in entities:
             kind = "🚪 Cover" if e["entity_type"] == CALL_ENTITY_TYPE_COVER else "🔘 Button"
             options_list.append({
@@ -276,7 +289,7 @@ class SmsGammuOptionsFlow(OptionsFlow):
                 "label": f"{kind} — {e['name']} ({e['number']})",
             })
         if entities:
-            options_list.append({"value": "done", "label": "✅ Done"})
+            options_list.append({"value": "done", "label": texts["done"]})
 
         return self.async_show_form(
             step_id="call_entities",
@@ -401,6 +414,7 @@ class SmsGammuOptionsFlow(OptionsFlow):
             return result
         except Exception:
             return []
+
 
 
 
