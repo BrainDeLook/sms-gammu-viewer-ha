@@ -1005,7 +1005,10 @@ class SmsGammuPanel extends HTMLElement {
 
     if (this._activeTab === "status") {
       this._renderStatusPage();
-    } else if (this._activeNumber) {
+    } else if (this._activeTab === "phonebook") {
+      // Ничего не делаем — телефонная книга не зависит от call_enabled,
+      // и не должна перезатираться сюда же зашедшим _renderMessages()
+    } else if (this._activeTab === "chats" && this._activeNumber) {
       // Обновляем шапку чата — там зависит call_enabled от статуса
       this._renderMessages();
     }
@@ -1070,7 +1073,7 @@ class SmsGammuPanel extends HTMLElement {
         this._renderContacts();
         this._updateBadge();
       }
-      if (needMessages && this._activeNumber && this._activeTab !== "status") {
+      if (needMessages && this._activeNumber && this._activeTab === "chats") {
         this._messages = await this._api(`messages/${encodeURIComponent(this._activeNumber)}`);
         this._renderMessages();
       }
@@ -2397,6 +2400,7 @@ class SmsGammuPanel extends HTMLElement {
 }
 
 customElements.define("sms-gammu-panel", SmsGammuPanel);
+
 
 
 
