@@ -2309,6 +2309,13 @@ class SmsGammuPanel extends HTMLElement {
   }
 
   _renderMessages() {
+    // Защита от гонки: пока показан оверлей (статус модема/телефонная
+    // книга), эта функция не должна трогать шапку/send-bar вообще —
+    // не важно откуда её вызвали (таймер статуса, event-поллинг, прямой
+    // вызов). Раньше каждое место вызова проверялось отдельно, и было
+    // легко забыть какой-то один — теперь проверка тут, в одном месте.
+    if (this._activeTab === "status" || this._activeTab === "phonebook") return;
+
     const area = this.shadowRoot.getElementById("messages-area");
     const titleEl = this.shadowRoot.getElementById("chat-title");
     const subEl = this.shadowRoot.getElementById("chat-subtitle");
@@ -2400,6 +2407,7 @@ class SmsGammuPanel extends HTMLElement {
 }
 
 customElements.define("sms-gammu-panel", SmsGammuPanel);
+
 
 
 
