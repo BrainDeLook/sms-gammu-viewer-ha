@@ -53,7 +53,7 @@ class CallCoverEntity(CoverEntity):
 
     _attr_has_entity_name = True
     _attr_supported_features = CoverEntityFeature.OPEN | CoverEntityFeature.CLOSE
-    _attr_device_class = "garage"
+    _attr_device_class = "gate"
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry, device_path: str, cfg: dict) -> None:
         self.hass = hass
@@ -102,4 +102,5 @@ class CallCoverEntity(CoverEntity):
         """Просто переводит сущность в закрытое состояние (визуально)."""
         self._is_closed = True
         self.async_write_ha_state()
+
 
