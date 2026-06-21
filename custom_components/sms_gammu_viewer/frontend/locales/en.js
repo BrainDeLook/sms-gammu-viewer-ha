@@ -6,6 +6,8 @@ export default {
   select_dialog: "Select a conversation",
   select_dialog_left: "Select a conversation on the left",
   no_messages: "No messages",
+  open_all_messages: "Open all messages →",
+  card_title_default: "SMS",
   nothing_found: "Nothing found",
   messages_count: (n) => `${n} msg`,
   collecting: "Receiving SMS…",
@@ -101,6 +103,7 @@ export default {
   back: "Back",
   modem_btn: "Modem status",
 };
+
 
 
 
