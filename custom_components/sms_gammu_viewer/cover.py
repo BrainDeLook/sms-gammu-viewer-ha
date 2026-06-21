@@ -45,10 +45,10 @@ async def async_setup_entry(
 class CallCoverEntity(CoverEntity):
     """Cover, который "открывается" совершая звонок на заданный номер.
 
-    Состояние open/closed чисто условное — реального датчика положения нет,
-    просто визуальный индикатор "идёт звонок / звонок завершён". Если
-    auto_close включён, сущность сама переходит в closed после завершения
-    звонка вне зависимости от результата (отвечен/не отвечен).
+    Состояние open/closed чисто условное — реального датчика положения нет.
+    Сразу при нажатии "открыть" сущность переходит в open (без промежуточного
+    "opening"), и если auto_close включён — возвращается в closed сразу
+    после завершения звонка, вне зависимости от результата.
     """
 
     _attr_has_entity_name = True
@@ -63,19 +63,10 @@ class CallCoverEntity(CoverEntity):
         self._attr_name = cfg["name"]
         self._attr_unique_id = f"{entry.entry_id}_call_cover_{cfg['id']}"
         self._is_closed = True
-        self._is_calling = False
 
     @property
     def is_closed(self) -> bool:
         return self._is_closed
-
-    @property
-    def is_closing(self) -> bool:
-        return False
-
-    @property
-    def is_opening(self) -> bool:
-        return self._is_calling
 
     @property
     def extra_state_attributes(self) -> dict:
@@ -85,11 +76,7 @@ class CallCoverEntity(CoverEntity):
         }
 
     async def async_open_cover(self, **kwargs) -> None:
-        """Дозванивается на номер; считается "открытым" пока идёт звонок."""
-        if self._is_calling:
-            return
-
-        self._is_calling = True
+        """Сразу переходит в open и дозванивается на номер в фоне."""
         self._is_closed = False
         self.async_write_ha_state()
 
@@ -107,7 +94,6 @@ class CallCoverEntity(CoverEntity):
         except Exception as e:
             _LOGGER.error("Call cover '%s' dial error: %s", self._attr_name, e)
         finally:
-            self._is_calling = False
             if self._cfg.get("auto_close", True):
                 self._is_closed = True
             self.async_write_ha_state()
@@ -115,5 +101,5 @@ class CallCoverEntity(CoverEntity):
     async def async_close_cover(self, **kwargs) -> None:
         """Просто переводит сущность в закрытое состояние (визуально)."""
         self._is_closed = True
-        self._is_calling = False
         self.async_write_ha_state()
+
