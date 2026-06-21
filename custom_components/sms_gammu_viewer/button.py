@@ -14,6 +14,7 @@ from .const import (
     CALL_ENTITY_TYPE_BUTTON,
     CONF_CALL_DEVICE,
     CONF_CALL_ENTITIES,
+    DOMAIN,
 )
 from .dialer import dial_number
 
@@ -58,6 +59,9 @@ class CallButtonEntity(ButtonEntity):
         return {"phone_number": self._cfg["number"]}
 
     async def async_press(self) -> None:
+        coord = self.hass.data.get(DOMAIN, {}).get(self._entry.entry_id)
+        if coord:
+            coord.call_in_progress = True
         try:
             reason = await dial_number(
                 self._device_path,
@@ -71,3 +75,7 @@ class CallButtonEntity(ButtonEntity):
             )
         except Exception as e:
             _LOGGER.error("Call button '%s' dial error: %s", self._attr_name, e)
+        finally:
+            if coord:
+                coord.call_in_progress = False
+
