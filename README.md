@@ -52,7 +52,11 @@ After installation, an **SMS** tab appears in the sidebar. Messages are stored i
 - Running [sms-gammu-gateway](https://github.com/PavelVe/home-assistant-addons/tree/main/sms-gammu-gateway) add-on with REST API on port 5000
 - For push notifications: [Home Assistant Companion](https://companion.home-assistant.io/) app on your phone
 
-> ⚠️ **Important:** In the sms-gammu-gateway add-on configuration, **disable automatic SMS polling** (`SMS_CHECK_INTERVAL` or equivalent). Otherwise the add-on and this integration will simultaneously read and delete messages from the SIM, causing message loss. SMS Gammu Viewer takes over all polling logic.
+> ⚠️ **Important — disable these in the sms-gammu-gateway add-on configuration before using this integration:**
+> - **SMS monitoring / automatic SMS polling** (`SMS_CHECK_INTERVAL` or equivalent) — otherwise the add-on and this integration will simultaneously read and delete messages from the SIM, causing message loss. SMS Gammu Viewer takes over all polling logic.
+> - **Auto-delete read SMS** — let the integration handle deletion from the SIM itself; the add-on deleting messages independently will interfere with multipart SMS assembly.
+> - **Call monitoring / voice call handling** — if the add-on has its own call-related polling, turn it off; this integration manages voice calls separately through the modem's AT interface.
+> - **MQTT** — disable it too if enabled, just to be safe; this integration doesn't use or expect MQTT and an active MQTT publisher in the add-on can add unnecessary load.
 
 ### Tested Hardware
 
@@ -322,6 +326,7 @@ This project builds on the work of several open-source projects:
 ## License
 
 MIT
+
 
 
 
