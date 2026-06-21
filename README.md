@@ -302,6 +302,8 @@ Add it via **Edit Dashboard → Add Card → Manual** with the YAML above, or se
 | `max_items` | number | `5` | Number of conversations to show |
 | `show_unread_only` | boolean | `false` | Only show conversations with unread messages |
 
+📄 See **[CARD.md](CARD.md)** for the full configuration reference — every key explained, with full and minimal examples plus common configurations (compact unread-only widget, full overview, etc).
+
 > Older installs may still have the standalone [sms-gammu-viewer-card](https://github.com/BrainDeLook/sms-gammu-viewer-card) repository added via HACS — it's no longer needed and can be removed; this integration now provides the same card under the same name.
 
 ---
@@ -389,6 +391,7 @@ This project builds on the work of several open-source projects:
 ## License
 
 MIT
+
 
 
 
