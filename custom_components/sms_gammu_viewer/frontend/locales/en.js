@@ -92,6 +92,8 @@ export default {
   phonebook_title: "Phonebook",
   loading_phonebook: "Loading contacts…",
   no_contacts: "No contacts yet",
+  no_search_results: "No results found",
+  search_contacts: "Search by name, number, or label",
   add_contact: "Add contact",
   open_chat: "Open chat",
   contact_name_prompt: "Contact name:",
@@ -103,6 +105,7 @@ export default {
   back: "Back",
   modem_btn: "Modem status",
 };
+
 
 
 
