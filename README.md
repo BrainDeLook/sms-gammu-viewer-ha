@@ -48,7 +48,7 @@ After installation, an **SMS** tab appears in the sidebar. Messages are stored i
 
 ## Requirements
 
-- Home Assistant 2023.1+
+- Home Assistant 2024.3+
 - Running [sms-gammu-gateway](https://github.com/PavelVe/home-assistant-addons/tree/main/sms-gammu-gateway) add-on with REST API on port 5000
 - For push notifications: [Home Assistant Companion](https://companion.home-assistant.io/) app on your phone
 
@@ -326,6 +326,7 @@ This project builds on the work of several open-source projects:
 ## License
 
 MIT
+
 
 
 
