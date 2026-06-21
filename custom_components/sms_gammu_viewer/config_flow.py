@@ -258,21 +258,15 @@ class SmsGammuOptionsFlow(OptionsFlow):
                     data={CONF_CALL_ENTITIES: entities},
                 )
 
-        lang = self._entry.data.get(CONF_LANGUAGE, DEFAULT_LANGUAGE)
-        texts = {
-            "ru": {"add": "➕ Добавить сущность", "done": "✅ Готово", "cover": "🚪 Cover", "button": "🔘 Button"},
-            "en": {"add": "➕ Add entity", "done": "✅ Done", "cover": "🚪 Cover", "button": "🔘 Button"},
-        }.get(lang, {"add": "➕ Add entity", "done": "✅ Done", "cover": "🚪 Cover", "button": "🔘 Button"})
-
-        options_list = [{"value": "add", "label": texts["add"]}]
+        options_list = [{"value": "add", "label": "➕ Add entity"}]
         for e in entities:
-            kind = texts["cover"] if e["entity_type"] == CALL_ENTITY_TYPE_COVER else texts["button"]
+            kind = "🚪 Cover" if e["entity_type"] == CALL_ENTITY_TYPE_COVER else "🔘 Button"
             options_list.append({
                 "value": f"edit:{e['id']}",
                 "label": f"{kind} — {e['name']} ({e['number']})",
             })
         if entities:
-            options_list.append({"value": "done", "label": texts["done"]})
+            options_list.append({"value": "done", "label": "✅ Done"})
 
         return self.async_show_form(
             step_id="call_entities",
@@ -397,6 +391,7 @@ class SmsGammuOptionsFlow(OptionsFlow):
             return result
         except Exception:
             return []
+
 
 
 
