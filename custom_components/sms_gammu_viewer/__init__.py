@@ -158,10 +158,18 @@ async def _register_services(hass: HomeAssistant) -> None:
 
 
 async def _options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    # Полная перезагрузка entry — нужна потому что cover/button сущности
-    # создаются динамически из entry.options[CONF_CALL_ENTITIES] при старте
-    # платформы, и просто restart() координатора их не пересоздаст.
-    await hass.config_entries.async_reload(entry.entry_id)
+    # ВАЖНО: НЕ делаем async_reload(entry.entry_id) здесь — это ломает
+    # регистрацию sidebar-панели (она привязана к первому запуску setup
+    # и не переживает полную перезагрузку entry чисто), вызывая бесконечный
+    # цикл "Removing unknown panel" + постоянные рестарты poll loop.
+    #
+    # Вместо этого просто перезапускаем координатор (подхватывает poll
+    # interval, notify targets и т.д.), а cover/button сущности из
+    # call_entities заберут актуальный список при следующем обычном
+    # перезапуске Home Assistant.
+    coord = hass.data[DOMAIN].get(entry.entry_id)
+    if coord:
+        await coord.restart()
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -813,6 +821,7 @@ class SmsApiView(HomeAssistantView):
             status=status,
             content_type="application/json",
         )
+
 
 
 
