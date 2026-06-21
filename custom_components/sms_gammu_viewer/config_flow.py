@@ -1,6 +1,8 @@
 """Config flow и Options flow для SMS Gammu Viewer."""
 from __future__ import annotations
 
+import uuid
+
 import voluptuous as vol
 
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
@@ -18,9 +20,12 @@ from homeassistant.helpers.selector import (
 )
 
 from .const import (
+    CALL_ENTITY_TYPE_BUTTON,
+    CALL_ENTITY_TYPE_COVER,
     CONF_CALL_DEVICE,
     CONF_CALL_DIAL_TIMEOUT,
     CONF_CALL_DURATION,
+    CONF_CALL_ENTITIES,
     CONF_COLLECT_EMPTY_MAX,
     CONF_COLLECT_INTERVAL,
     CONF_HOST,
@@ -93,8 +98,18 @@ class SmsGammuConfigFlow(ConfigFlow, domain=DOMAIN):
 class SmsGammuOptionsFlow(OptionsFlow):
     def __init__(self, entry: ConfigEntry) -> None:
         self._entry = entry
+        self._editing_entity_id: str | None = None  # id редактируемой call-сущности
 
     async def async_step_init(
+        self, user_input: dict | None = None
+    ) -> ConfigFlowResult:
+        """Главное меню Options flow: общие настройки или управление сущностями звонков."""
+        return self.async_show_menu(
+            step_id="init",
+            menu_options=["settings", "call_entities"],
+        )
+
+    async def async_step_settings(
         self, user_input: dict | None = None
     ) -> ConfigFlowResult:
         if user_input is not None:
@@ -203,11 +218,152 @@ class SmsGammuOptionsFlow(OptionsFlow):
         )
 
         return self.async_show_form(
-            step_id="init",
+            step_id="settings",
             data_schema=vol.Schema(schema_fields),
             description_placeholders={
                 "notify_count": str(len(notify_options)),
             },
+        )
+
+    # ─── Управление call-сущностями (cover/button для звонков) ────────
+
+    async def async_step_call_entities(
+        self, user_input: dict | None = None
+    ) -> ConfigFlowResult:
+        """Список существующих call-сущностей + кнопка добавить новую."""
+        entities = self._entry.options.get(CONF_CALL_ENTITIES, [])
+
+        if user_input is not None:
+            action = user_input.get("action")
+            if action == "add":
+                self._editing_entity_id = None
+                return await self.async_step_call_entity_form()
+            if action and action.startswith("edit:"):
+                self._editing_entity_id = action[len("edit:"):]
+                return await self.async_step_call_entity_form()
+            if action and action.startswith("delete:"):
+                entity_id = action[len("delete:"):]
+                new_entities = [e for e in entities if e["id"] != entity_id]
+                self.hass.config_entries.async_update_entry(
+                    self._entry,
+                    options={**self._entry.options, CONF_CALL_ENTITIES: new_entities},
+                )
+                return await self.async_step_call_entities()
+            if action == "done":
+                return self.async_create_entry(title="", data={})
+
+        options_list = [{"value": "add", "label": "➕ Добавить сущность"}]
+        for e in entities:
+            kind = "🚪 Cover" if e["entity_type"] == CALL_ENTITY_TYPE_COVER else "🔘 Button"
+            options_list.append({
+                "value": f"edit:{e['id']}",
+                "label": f"{kind} — {e['name']} ({e['number']})",
+            })
+        if entities:
+            options_list.append({"value": "done", "label": "✅ Готово"})
+
+        return self.async_show_form(
+            step_id="call_entities",
+            data_schema=vol.Schema({
+                vol.Required("action"): SelectSelector(
+                    SelectSelectorConfig(
+                        options=options_list,
+                        mode=SelectSelectorMode.LIST,
+                    )
+                ),
+            }),
+        )
+
+    async def async_step_call_entity_form(
+        self, user_input: dict | None = None
+    ) -> ConfigFlowResult:
+        """Форма добавления/редактирования одной call-сущности."""
+        entities = self._entry.options.get(CONF_CALL_ENTITIES, [])
+        editing = None
+        if self._editing_entity_id:
+            editing = next((e for e in entities if e["id"] == self._editing_entity_id), None)
+
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            if user_input.get("_delete"):
+                new_entities = [e for e in entities if e["id"] != self._editing_entity_id]
+                self.hass.config_entries.async_update_entry(
+                    self._entry,
+                    options={**self._entry.options, CONF_CALL_ENTITIES: new_entities},
+                )
+                return await self.async_step_call_entities()
+
+            name = user_input.get("name", "").strip()
+            number = user_input.get("number", "").strip()
+            if not name:
+                errors["name"] = "name_required"
+            if not number:
+                errors["number"] = "number_required"
+
+            if not errors:
+                entity_data = {
+                    "id": editing["id"] if editing else str(uuid.uuid4())[:8],
+                    "entity_type": user_input["entity_type"],
+                    "name": name,
+                    "number": number,
+                    "dial_timeout": int(user_input.get("dial_timeout", DEFAULT_CALL_DIAL_TIMEOUT)),
+                    "call_duration": int(user_input.get("call_duration", DEFAULT_CALL_DURATION)),
+                    "auto_close": user_input.get("auto_close", True),
+                }
+                if editing:
+                    new_entities = [
+                        entity_data if e["id"] == editing["id"] else e
+                        for e in entities
+                    ]
+                else:
+                    new_entities = entities + [entity_data]
+
+                self.hass.config_entries.async_update_entry(
+                    self._entry,
+                    options={**self._entry.options, CONF_CALL_ENTITIES: new_entities},
+                )
+                return await self.async_step_call_entities()
+
+        schema_fields = {
+            vol.Required(
+                "entity_type",
+                default=editing["entity_type"] if editing else CALL_ENTITY_TYPE_COVER,
+            ): SelectSelector(
+                SelectSelectorConfig(
+                    options=[
+                        {"value": CALL_ENTITY_TYPE_COVER, "label": "Cover (открыть/закрыть, например шлагбаум/ворота)"},
+                        {"value": CALL_ENTITY_TYPE_BUTTON, "label": "Button (просто кнопка «Позвонить»)"},
+                    ],
+                    mode=SelectSelectorMode.DROPDOWN,
+                )
+            ),
+            vol.Required("name", default=editing["name"] if editing else ""): str,
+            vol.Required("number", default=editing["number"] if editing else ""): str,
+            vol.Optional(
+                "dial_timeout",
+                default=editing.get("dial_timeout", DEFAULT_CALL_DIAL_TIMEOUT) if editing else DEFAULT_CALL_DIAL_TIMEOUT,
+            ): NumberSelector(
+                NumberSelectorConfig(min=5, max=120, step=1, mode=NumberSelectorMode.BOX, unit_of_measurement="сек")
+            ),
+            vol.Optional(
+                "call_duration",
+                default=editing.get("call_duration", DEFAULT_CALL_DURATION) if editing else DEFAULT_CALL_DURATION,
+            ): NumberSelector(
+                NumberSelectorConfig(min=5, max=300, step=1, mode=NumberSelectorMode.BOX, unit_of_measurement="сек")
+            ),
+            vol.Optional(
+                "auto_close",
+                default=editing.get("auto_close", True) if editing else True,
+            ): bool,
+        }
+        if editing:
+            schema_fields[vol.Optional("_delete", default=False)] = bool
+
+        return self.async_show_form(
+            step_id="call_entity_form",
+            data_schema=vol.Schema(schema_fields),
+            errors=errors,
         )
 
     def _get_notify_options(self) -> list[dict]:
@@ -229,6 +385,7 @@ class SmsGammuOptionsFlow(OptionsFlow):
             return result
         except Exception:
             return []
+
 
 
 
