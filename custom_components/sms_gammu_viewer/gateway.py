@@ -26,7 +26,6 @@ class GatewayClient:
         ).decode()
         self._headers = {
             "Authorization": f"Basic {creds}",
-            "Content-Type": "application/json",
         }
 
     async def _request(self, method: str, path: str, timeout: int = 10, **kwargs) -> Any:
@@ -110,12 +109,24 @@ class GatewayClient:
             raise
 
     async def send_sms(self, number: str, text: str) -> bool:
-        """Отправляет SMS. При таймауте делает один повтор через 3 секунды."""
+        """Отправляет SMS. При таймауте делает один повтор через 3 секунды.
+
+        Gateway принимает form-data (не JSON). Параметр unicode=true обязателен
+        для кириллицы — без него GSM7 кодировка заменяет нелатинские символы на '?'.
+        """
+        # Определяем нужен ли Unicode режим (кириллица, emoji, и т.д.)
+        needs_unicode = any(ord(c) > 127 for c in text)
         for attempt in range(2):
+            # FormData нельзя переиспользовать — создаём заново на каждую попытку
+            form_data = aiohttp.FormData()
+            form_data.add_field("number", number)
+            form_data.add_field("text", text)
+            if needs_unicode:
+                form_data.add_field("unicode", "true")
             try:
                 await self._request(
                     "POST", "/sms",
-                    json={"number": number, "text": text},
+                    data=form_data,
                     timeout=SEND_TIMEOUT,
                 )
                 if attempt > 0:
