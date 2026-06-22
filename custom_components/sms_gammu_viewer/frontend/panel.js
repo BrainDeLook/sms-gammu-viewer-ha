@@ -1110,6 +1110,16 @@ class SmsGammuPanel extends HTMLElement {
     this._activeNumber = number;
     try { localStorage.setItem("sms_gammu_active_number", number); } catch {}
     this.shadowRoot.querySelector(".root")?.classList.add("chat-open");
+
+    // Сбрасываем поле ввода при смене контакта — иначе текст "прилипает"
+    // и пользователь может случайно отправить его не тому абоненту
+    this._sendText = "";
+    const ta = this.shadowRoot.getElementById("send-input");
+    if (ta) { ta.value = ""; ta.style.height = "auto"; }
+    const sendBtn = this.shadowRoot.getElementById("send-btn");
+    if (sendBtn) sendBtn.disabled = true;
+    const counter = this.shadowRoot.getElementById("char-counter");
+    if (counter) counter.style.display = "none";
     try {
       this._messages = await this._api(
         `messages/${encodeURIComponent(number)}`
@@ -1459,25 +1469,37 @@ class SmsGammuPanel extends HTMLElement {
     this._sending = true;
     const btn = this.shadowRoot.getElementById("send-btn");
     const ta  = this.shadowRoot.getElementById("send-input");
-    if (btn) btn.disabled = true;
+    const counter = this.shadowRoot.getElementById("char-counter");
+    if (btn) { btn.disabled = true; btn.style.opacity = "0.5"; }
+
+    // Оптимистично очищаем поле сразу — не ждём ответа сервера
+    const savedText = text;
+    this._sendText = "";
+    if (ta) { ta.value = ""; ta.style.height = "auto"; }
+    if (counter) counter.style.display = "none";
 
     try {
-      const res = await this._api("send", "POST", { number, text });
+      const res = await this._api("send", "POST", { number, text: savedText });
       if (res.ok) {
-        this._sendText = "";
-        if (ta) { ta.value = ""; ta.style.height = "auto"; }
-        // Обновляем чат
+        // Сообщение уже должно появиться через push_event от сервера,
+        // но на всякий случай перезагружаем историю
         this._messages = await this._api(`messages/${encodeURIComponent(number)}`);
         this._renderMessages();
         await this._refreshContacts();
       } else {
+        // Возвращаем текст обратно если не отправился
+        this._sendText = savedText;
+        if (ta) { ta.value = savedText; }
         this._showToast(this._t("send_error"));
       }
     } catch (e) {
-      this._showToast(this._t("reset_error") + e.message);
+      // Возвращаем текст если сеть упала
+      this._sendText = savedText;
+      if (ta) { ta.value = savedText; }
+      this._showToast(this._t("send_error") + ": " + e.message);
     } finally {
       this._sending = false;
-      if (btn) btn.disabled = false;
+      if (btn) { btn.disabled = !this._sendText.trim(); btn.style.opacity = ""; }
     }
   }
 
