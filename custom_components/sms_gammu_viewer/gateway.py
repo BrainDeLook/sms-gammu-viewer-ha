@@ -42,10 +42,13 @@ class GatewayClient:
                 return data
             return []
         except aiohttp.ClientResponseError as e:
-            _LOGGER.debug("get_all_sms HTTP %s", e.status)
+            _LOGGER.debug("get_all_sms HTTP %s: %s", e.status, e.message)
+            return []
+        except aiohttp.ClientConnectorError as e:
+            _LOGGER.debug("get_all_sms connection error: %s", e)
             return []
         except Exception as e:
-            _LOGGER.debug("get_all_sms error: %s", e)
+            _LOGGER.debug("get_all_sms error: %s: %s", type(e).__name__, e)
             return []
 
     async def delete_sms(self, sms_id: int) -> bool:
@@ -103,11 +106,26 @@ class GatewayClient:
             raise
 
     async def send_sms(self, number: str, text: str) -> bool:
+        """Отправляет SMS. При ошибке логирует HTTP статус и тело ответа."""
         try:
             await self._request("POST", "/sms", json={"number": number, "text": text}, timeout=15)
             return True
+        except aiohttp.ClientResponseError as e:
+            # Читаем тело ответа для диагностики (e.message содержит reason phrase,
+            # но не тело — поэтому логируем статус + message отдельно)
+            _LOGGER.error(
+                "send_sms failed: HTTP %s %s (number=%s, text_len=%d)",
+                e.status, e.message, number, len(text),
+            )
+            return False
+        except aiohttp.ClientConnectorError as e:
+            _LOGGER.error("send_sms connection error (gateway unreachable?): %s", e)
+            return False
+        except aiohttp.ServerTimeoutError:
+            _LOGGER.error("send_sms timeout after 15s (number=%s)", number)
+            return False
         except Exception as e:
-            _LOGGER.error("send_sms error: %s", e)
+            _LOGGER.error("send_sms unexpected error: %s: %s", type(e).__name__, e)
             return False
 
     async def test_connection(self) -> str | None:
@@ -120,4 +138,3 @@ class GatewayClient:
             return "cannot_connect"
         except Exception:
             return "cannot_connect"
-
