@@ -30,6 +30,8 @@ DEFAULT_CALL_DIAL_TIMEOUT = 25
 DEFAULT_CALL_DURATION = 30
 
 EVENT_CALL_ENDED = f"{DOMAIN}_call_ended"
+EVENT_SMS_RECEIVED = f"{DOMAIN}_sms_received"
+EVENT_SMS_SENT = f"{DOMAIN}_sms_sent"
 
 # Номер телефона самой SIM-карты — оператор не всегда хранит его на симке,
 # поэтому вводится вручную, не определяется автоматически
@@ -55,7 +57,3 @@ CONF_CALL_ENTITIES = "call_entities"
 
 CALL_ENTITY_TYPE_COVER = "cover"
 CALL_ENTITY_TYPE_BUTTON = "button"
-
-
-
-
