@@ -16,6 +16,9 @@ class SmsStore:
 
     def init(self) -> None:
         with self._conn() as conn:
+            # WAL — быстрее при параллельных чтениях (фронтенд + координатор)
+            conn.execute("PRAGMA journal_mode=WAL")
+
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS messages (
                     id        INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -24,6 +27,7 @@ class SmsStore:
                     date      TEXT NOT NULL,
                     received  TEXT NOT NULL,
                     is_read   INTEGER NOT NULL DEFAULT 0,
+                    direction TEXT NOT NULL DEFAULT 'in',
                     UNIQUE(number, date, text)
                 )
             """)
@@ -35,6 +39,14 @@ class SmsStore:
                 )
             except Exception:
                 pass
+
+            # Миграция: добавляем колонку direction если её ещё нет (обновление с старой версии)
+            try:
+                conn.execute("ALTER TABLE messages ADD COLUMN direction TEXT NOT NULL DEFAULT 'in'")
+                _LOGGER.info("Migrated messages table: added direction column")
+            except Exception:
+                pass  # Колонка уже существует
+
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS muted_numbers (
                     number TEXT PRIMARY KEY,
@@ -67,8 +79,7 @@ class SmsStore:
             """)
             conn.execute("CREATE INDEX IF NOT EXISTS idx_phonebook_name ON phonebook(name)")
 
-            # Миграция: чистим номера с переводами строк/лишними пробелами,
-            # которые могли попасть в базу до добавления санитизации
+            # Миграция: чистим номера с переводами строк/лишними пробелами
             try:
                 self._migrate_clean_numbers(conn)
             except Exception as e:
@@ -85,7 +96,6 @@ class SmsStore:
             if new_number == old_number:
                 continue
             _LOGGER.info("Cleaning up number: %r -> %r", old_number, new_number)
-            # Переносим записи на чистый номер, избегая конфликта UNIQUE
             existing_ids = conn.execute(
                 "SELECT id, date, text FROM messages WHERE number=?", (old_number,)
             ).fetchall()
@@ -96,7 +106,6 @@ class SmsStore:
                         (new_number, r[0]),
                     )
                 except sqlite3.IntegrityError:
-                    # Уже есть такая же запись с чистым номером — удаляем дубликат
                     conn.execute("DELETE FROM messages WHERE id=?", (r[0],))
 
     def _conn(self) -> sqlite3.Connection:
@@ -106,12 +115,7 @@ class SmsStore:
 
     @staticmethod
     def _sanitize_number(number: str) -> str:
-        """Убирает переводы строк и лишние пробелы из номера/имени отправителя.
-
-        Некоторые операторы (например Beeline) иногда присылают alphaTag
-        отправителя с мусорными символами вроде \\n, что ломает дальнейшую
-        работу с этим значением как частью URL-пути в API.
-        """
+        """Убирает переводы строк и лишние пробелы из номера/имени отправителя."""
         if not number:
             return number
         cleaned = number.replace("\r", " ").replace("\n", " ")
@@ -119,29 +123,26 @@ class SmsStore:
         return cleaned
 
     def add(self, number: str, text: str, date: str) -> int | None:
-        """Возвращает id только если SMS реально новый, None если дубликат."""
+        """Добавляет входящее SMS. Возвращает id только если реально новый, None если дубликат."""
         number = self._sanitize_number(number)
         received = datetime.now().isoformat(timespec="seconds")
         try:
             with self._conn() as conn:
-                # Точный дубликат
                 cur = conn.execute(
-                    "INSERT OR IGNORE INTO messages (number, text, date, received, is_read) VALUES (?,?,?,?,0)",
+                    "INSERT OR IGNORE INTO messages (number, text, date, received, is_read, direction) VALUES (?,?,?,?,0,'in')",
                     (number, text, date, received),
                 )
                 if cur.rowcount > 0:
                     return cur.lastrowid
 
-                # Частичный дубликат: новый текст является началом или концом уже сохранённого
-                # (промежуточная версия multipart SMS которая уже обновилась до полной)
+                # Частичный дубликат: новый текст является началом уже сохранённого
                 existing = conn.execute(
-                    "SELECT id, text FROM messages WHERE number=? AND date=?",
+                    "SELECT id, text FROM messages WHERE number=? AND date=? AND direction='in'",
                     (number, date),
                 ).fetchall()
                 for row in existing:
                     saved_text = row[1]
                     if saved_text.startswith(text) or text.startswith(saved_text):
-                        # Если новый текст длиннее — обновляем
                         if len(text) > len(saved_text):
                             conn.execute(
                                 "UPDATE messages SET text=? WHERE id=?",
@@ -152,6 +153,21 @@ class SmsStore:
                 return None
         except Exception as e:
             _LOGGER.error("SmsStore.add error: %s", e)
+            return None
+
+    def add_outgoing(self, number: str, text: str) -> int | None:
+        """Сохраняет исходящее SMS в историю чата."""
+        number = self._sanitize_number(number)
+        now = datetime.now().isoformat(timespec="seconds")
+        try:
+            with self._conn() as conn:
+                cur = conn.execute(
+                    "INSERT INTO messages (number, text, date, received, is_read, direction) VALUES (?,?,?,?,1,'out')",
+                    (number, text, now, now),
+                )
+                return cur.lastrowid
+        except Exception as e:
+            _LOGGER.error("SmsStore.add_outgoing error: %s", e)
             return None
 
     def mark_read(self, msg_id: int) -> None:
@@ -167,12 +183,12 @@ class SmsStore:
             conn.execute("DELETE FROM messages WHERE number=?", (number,))
 
     def find_recent(self, number: str, within_seconds: int = 120) -> dict | None:
-        """Ищет последнее сообщение от номера за последние N секунд."""
+        """Ищет последнее входящее сообщение от номера за последние N секунд."""
         from datetime import datetime, timedelta
         cutoff = (datetime.now() - timedelta(seconds=within_seconds)).isoformat(timespec="seconds")
         with self._conn() as conn:
             row = conn.execute(
-                "SELECT * FROM messages WHERE number=? AND received >= ? ORDER BY id DESC LIMIT 1",
+                "SELECT * FROM messages WHERE number=? AND received >= ? AND direction='in' ORDER BY id DESC LIMIT 1",
                 (number, cutoff),
             ).fetchone()
         return dict(row) if row else None
@@ -201,17 +217,23 @@ class SmsStore:
         return [dict(r) for r in rows]
 
     def get_contacts(self) -> list[dict[str, Any]]:
-        """Список уникальных номеров с последним SMS, непрочитанными, mute-статусом и именем из книги."""
+        """Список уникальных номеров с последним SMS, непрочитанными, mute-статусом и именем из книги.
+        
+        unread считает только входящие непрочитанные (direction='in').
+        """
         with self._conn() as conn:
             rows = conn.execute("""
                 SELECT
                     m.number as number,
                     COUNT(*) as total,
-                    SUM(CASE WHEN is_read=0 THEN 1 ELSE 0 END) as unread,
+                    SUM(CASE WHEN is_read=0 AND direction='in' THEN 1 ELSE 0 END) as unread,
                     MAX(date) as last_date,
                     (SELECT text FROM messages m2
                      WHERE m2.number = m.number
                      ORDER BY date DESC, id DESC LIMIT 1) as last_text,
+                    (SELECT direction FROM messages m3
+                     WHERE m3.number = m.number
+                     ORDER BY date DESC, id DESC LIMIT 1) as last_direction,
                     (SELECT 1 FROM muted_numbers mn WHERE mn.number = m.number) as is_muted,
                     pb.name as contact_name,
                     pb.label as contact_label
@@ -228,7 +250,7 @@ class SmsStore:
     def unread_count(self) -> int:
         with self._conn() as conn:
             row = conn.execute(
-                "SELECT COUNT(*) FROM messages WHERE is_read=0"
+                "SELECT COUNT(*) FROM messages WHERE is_read=0 AND direction='in'"
             ).fetchone()
         return row[0] if row else 0
 
@@ -339,8 +361,3 @@ class SmsStore:
         for r in result:
             r["is_muted"] = bool(r["is_muted"])
         return result
-
-
-
-
-
