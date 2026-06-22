@@ -804,6 +804,7 @@ class SmsGammuPanel extends HTMLElement {
     this._eventsInitialized = false;
     this._activeTab = 'chats';
     this._sendText = '';
+    this._drafts = {};  // черновики по номеру — сохраняются в памяти до перезагрузки
     this._sending = false;
     this._modemError = null;
     this._narrow = false;
@@ -1107,19 +1108,41 @@ class SmsGammuPanel extends HTMLElement {
   }
 
   async _selectContact(number) {
+    // Сохраняем черновик текущего чата перед переключением
+    if (this._activeNumber && this._activeNumber !== number) {
+      const ta = this.shadowRoot.getElementById("send-input");
+      if (ta) this._drafts[this._activeNumber] = ta.value;
+    }
+
     this._activeNumber = number;
     try { localStorage.setItem("sms_gammu_active_number", number); } catch {}
     this.shadowRoot.querySelector(".root")?.classList.add("chat-open");
 
-    // Сбрасываем поле ввода при смене контакта — иначе текст "прилипает"
-    // и пользователь может случайно отправить его не тому абоненту
-    this._sendText = "";
+    // Восстанавливаем черновик для нового чата (или пустое поле)
+    const draft = this._drafts[number] || "";
+    this._sendText = draft;
     const ta = this.shadowRoot.getElementById("send-input");
-    if (ta) { ta.value = ""; ta.style.height = "auto"; }
+    if (ta) {
+      ta.value = draft;
+      ta.style.height = "auto";
+      if (draft) ta.style.height = Math.min(ta.scrollHeight, 120) + "px";
+    }
     const sendBtn = this.shadowRoot.getElementById("send-btn");
-    if (sendBtn) sendBtn.disabled = true;
+    if (sendBtn) sendBtn.disabled = !draft.trim();
+    // Счётчик символов
     const counter = this.shadowRoot.getElementById("char-counter");
-    if (counter) counter.style.display = "none";
+    if (counter) counter.style.display = draft ? "" : "none";
+    if (counter && draft) {
+      const hasCyrillic = /[а-яёА-ЯЁ]/.test(draft);
+      const singleSize = hasCyrillic ? 70 : 160;
+      const partSize = hasCyrillic ? 67 : 153;
+      const isMulti = draft.length > singleSize;
+      const parts = isMulti ? Math.ceil(draft.length / partSize) : 1;
+      const limit = isMulti ? parts * partSize : singleSize;
+      const left = limit - draft.length;
+      counter.textContent = isMulti ? `${draft.length} / ${limit} · ${parts} SMS` : `${left}`;
+      counter.className = "char-counter" + (left < 10 ? " over" : left < 30 ? " warn" : "");
+    }
     try {
       this._messages = await this._api(
         `messages/${encodeURIComponent(number)}`
@@ -1481,11 +1504,13 @@ class SmsGammuPanel extends HTMLElement {
     try {
       const res = await this._api("send", "POST", { number, text: savedText });
       if (res.ok) {
+        // Удаляем черновик — сообщение отправлено
+        delete this._drafts[number];
         // Перезагружаем историю и контакты
         this._messages = await this._api(`messages/${encodeURIComponent(number)}`);
         this._renderMessages();
         await this._refreshContacts();
-        // Финальная очистка поля — на случай если рендер что-то сбросил
+        // Финальная очистка поля
         const taFresh = this.shadowRoot.getElementById("send-input");
         const counterFresh = this.shadowRoot.getElementById("char-counter");
         if (taFresh) { taFresh.value = ""; taFresh.style.height = "auto"; }
@@ -2225,6 +2250,14 @@ class SmsGammuPanel extends HTMLElement {
     const ta = this.shadowRoot.getElementById("send-input");
     ta.addEventListener("input", () => {
       this._sendText = ta.value;
+      // Сохраняем черновик в памяти на лету
+      if (this._activeNumber) {
+        if (ta.value) {
+          this._drafts[this._activeNumber] = ta.value;
+        } else {
+          delete this._drafts[this._activeNumber];
+        }
+      }
       const btn = this.shadowRoot.getElementById("send-btn");
       if (btn) btn.disabled = !this._sendText.trim() || this._sending;
       ta.style.height = "auto";
