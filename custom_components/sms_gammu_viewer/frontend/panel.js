@@ -1481,11 +1481,15 @@ class SmsGammuPanel extends HTMLElement {
     try {
       const res = await this._api("send", "POST", { number, text: savedText });
       if (res.ok) {
-        // Сообщение уже должно появиться через push_event от сервера,
-        // но на всякий случай перезагружаем историю
+        // Перезагружаем историю и контакты
         this._messages = await this._api(`messages/${encodeURIComponent(number)}`);
         this._renderMessages();
         await this._refreshContacts();
+        // Финальная очистка поля — на случай если рендер что-то сбросил
+        const taFresh = this.shadowRoot.getElementById("send-input");
+        const counterFresh = this.shadowRoot.getElementById("char-counter");
+        if (taFresh) { taFresh.value = ""; taFresh.style.height = "auto"; }
+        if (counterFresh) counterFresh.style.display = "none";
       } else {
         // Возвращаем текст обратно если не отправился
         this._sendText = savedText;
@@ -1501,6 +1505,14 @@ class SmsGammuPanel extends HTMLElement {
       this._sending = false;
       if (btn) { btn.disabled = !this._sendText.trim(); btn.style.opacity = ""; }
     }
+  }
+
+  async _refreshContacts() {
+    try {
+      this._contacts = await this._api("contacts");
+      this._renderContacts();
+      this._updateBadge();
+    } catch (_) {}
   }
 
   async _copyToClipboard(text) {
