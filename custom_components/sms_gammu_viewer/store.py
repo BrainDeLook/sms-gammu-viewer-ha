@@ -201,6 +201,14 @@ class SmsStore:
                 (extra_text, msg_id),
             )
 
+    def update_text(self, msg_id: int, new_text: str) -> None:
+        """Заменяет текст сообщения целиком — для multipart где новая версия длиннее."""
+        with self._conn() as conn:
+            conn.execute(
+                "UPDATE messages SET text = ? WHERE id = ?",
+                (new_text, msg_id),
+            )
+
     def get_all(self) -> list[dict[str, Any]]:
         with self._conn() as conn:
             rows = conn.execute(
