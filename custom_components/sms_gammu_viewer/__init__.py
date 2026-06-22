@@ -475,19 +475,23 @@ class SmsCoordinator:
     async def _save_one(self, number: str, text: str, date: str) -> None:
         # Проверяем есть ли недавнее сообщение от этого номера (в рамках 2 минут)
         # Если да — это продолжение того же SMS, дописываем к нему
+        # Ищем недавнее сообщение только если текст новый ДЛИННЕЕ сохранённого —
+        # это настоящее продолжение multipart SMS, а не новое отдельное сообщение.
+        # Окно 30 секунд — достаточно для сборки частей, но не склеивает
+        # отдельные SMS от одного отправителя (банки, сервисы).
         recent = await self.hass.async_add_executor_job(
-            self.store.find_recent, number, 120
+            self.store.find_recent, number, 30
         )
-        if recent:
+        if recent and len(text) > len(recent["text"]) and recent["text"] and text.startswith(recent["text"]):
+            # Только если новый текст реально является продолжением предыдущего
             _LOGGER.info(
                 "Appending to recent SMS id=%s from %s (%d chars + %d chars)",
                 recent["id"], number, len(recent["text"]), len(text)
             )
             await self.hass.async_add_executor_job(
-                self.store.append_text, recent["id"], text
+                self.store.append_text, recent["id"], text[len(recent["text"]):],
             )
-            # Обновляем полный текст для уведомления
-            full_text = recent["text"] + text
+            full_text = text
             self.push_event("new_message", {
                 "id": recent["id"], "number": number,
                 "text": full_text, "date": date, "is_read": 0
@@ -569,17 +573,18 @@ class SmsCoordinator:
         except Exception as e:
             _LOGGER.debug("is_muted check failed: %s", e)
         preview = text if len(text) <= 150 else text[:150] + "…"
-        # Имя контакта из телефонной книги если есть
+        # Имя из телефонной книги если есть, иначе сам номер/alphaTag
         try:
             contact = await self.hass.async_add_executor_job(self.store.get_contact, number)
             display_name = contact["name"] if contact else number
         except Exception:
             display_name = number
-        title = f"SMS от {display_name}" if display_name != number else "Новое SMS"
+        title = f"SMS: {display_name}"
         message = preview
-        # Уникальный тег по номеру — уведомления от разных номеров не заменяют друг друга,
-        # но от одного номера — заменяют (показывается только последнее)
-        notif_tag = f"sms_gammu_{number.replace('+', '').replace(' ', '')}"
+        # Уникальный тег по номеру — уведомления от разных номеров стакаются,
+        # от одного — заменяют друг друга (последнее сообщение)
+        safe_number = number.replace("+", "").replace(" ", "").replace("-", "")
+        notif_tag = f"sms_gammu_{safe_number}"
         for target in targets:
             parts = target.split(".", 1)
             if len(parts) != 2:
