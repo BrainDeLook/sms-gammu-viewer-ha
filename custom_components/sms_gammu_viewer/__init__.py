@@ -474,22 +474,41 @@ class SmsCoordinator:
 
         self.collecting = False
 
-        async def _save_one(self, number: str, text: str, date: str) -> str:
-        """Сохраняет SMS в БД. Возвращает текст для уведомления.
+            async def _save_one(self, number: str, text: str, date: str) -> str:
+        """Сохраняет SMS в БД. Возвращает финальный текст для уведомления.
 
-        Намеренно НЕ использует find_recent/append — склейка частей происходит
-        только внутри NumberBuffer в рамках одного цикла _collect. Это исключает
-        случайное склеивание двух разных SMS от одного отправителя.
+        Логика склейки multipart:
+        - Если за последние 120 сек от этого номера уже есть SMS И новый текст
+          ДЛИННЕЕ сохранённого — это продолжение той же записи, обновляем.
+        - Если новый текст короче или равен — это другое SMS, сохраняем отдельно.
+        Это исключает склейку двух разных коротких SMS от одного отправителя.
         """
-        msg_id = await self.hass.async_add_executor_job(
-            self.store.add, number, text, date
+        recent = await self.hass.async_add_executor_job(
+            self.store.find_recent, number, 120
         )
-        if msg_id:
+        if recent and len(text) > len(recent["text"]):
+            _LOGGER.info(
+                "Extending recent SMS id=%s from %s (%d→%d chars)",
+                recent["id"], number, len(recent["text"]), len(text)
+            )
+            await self.hass.async_add_executor_job(
+                self.store.update_text, recent["id"], text
+            )
             self.push_event("new_message", {
-                "id": msg_id, "number": number,
+                "id": recent["id"], "number": number,
                 "text": text, "date": date, "is_read": 0
             })
-        return text
+            return text
+        else:
+            msg_id = await self.hass.async_add_executor_job(
+                self.store.add, number, text, date
+            )
+            if msg_id:
+                self.push_event("new_message", {
+                    "id": msg_id, "number": number,
+                    "text": text, "date": date, "is_read": 0
+                })
+            return text
 
     def _add_to_buffers(self, buffers: dict[tuple, NumberBuffer], messages: list[dict]) -> bool:
         got_new = False
