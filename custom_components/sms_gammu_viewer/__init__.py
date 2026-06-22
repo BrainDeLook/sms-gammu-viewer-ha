@@ -474,39 +474,22 @@ class SmsCoordinator:
 
         self.collecting = False
 
-    async def _save_one(self, number: str, text: str, date: str) -> str:
-        """Сохраняет SMS в БД. Возвращает финальный полный текст.
+        async def _save_one(self, number: str, text: str, date: str) -> str:
+        """Сохраняет SMS в БД. Возвращает текст для уведомления.
 
-        _notify НЕ вызывается здесь — только в _collect после полной сборки всех частей,
-        чтобы уведомление содержало полный текст а не первую часть.
+        Намеренно НЕ использует find_recent/append — склейка частей происходит
+        только внутри NumberBuffer в рамках одного цикла _collect. Это исключает
+        случайное склеивание двух разных SMS от одного отправителя.
         """
-        recent = await self.hass.async_add_executor_job(
-            self.store.find_recent, number, 120
+        msg_id = await self.hass.async_add_executor_job(
+            self.store.add, number, text, date
         )
-        if recent:
-            _LOGGER.info(
-                "Appending to recent SMS id=%s from %s (%d chars + %d chars)",
-                recent["id"], number, len(recent["text"]), len(text)
-            )
-            await self.hass.async_add_executor_job(
-                self.store.append_text, recent["id"], text
-            )
-            full_text = recent["text"] + text
+        if msg_id:
             self.push_event("new_message", {
-                "id": recent["id"], "number": number,
-                "text": full_text, "date": date, "is_read": 0
+                "id": msg_id, "number": number,
+                "text": text, "date": date, "is_read": 0
             })
-            return full_text
-        else:
-            msg_id = await self.hass.async_add_executor_job(
-                self.store.add, number, text, date
-            )
-            if msg_id:
-                self.push_event("new_message", {
-                    "id": msg_id, "number": number,
-                    "text": text, "date": date, "is_read": 0
-                })
-            return text
+        return text
 
     def _add_to_buffers(self, buffers: dict[tuple, NumberBuffer], messages: list[dict]) -> bool:
         got_new = False
