@@ -468,47 +468,38 @@ class SmsCoordinator:
         for (number, _date), buf in buffers.items():
             full_text = buf.full_text
             _LOGGER.info("SMS assembled from %s: %d updates seen, %d chars", number, buf.seen_count, len(full_text))
-            final_text = await self._save_one(number, full_text, buf.first_date)
-            # Уведомление отправляем ЗДЕСЬ — после полной сборки всех частей
-            await self._notify(number, final_text)
+            await self._save_one(number, full_text, buf.first_date)
 
         self.collecting = False
 
-            async def _save_one(self, number: str, text: str, date: str) -> str:
-        """Сохраняет SMS в БД. Возвращает финальный текст для уведомления.
-
-        Логика склейки multipart:
-        - Если за последние 120 сек от этого номера уже есть SMS И новый текст
-          ДЛИННЕЕ сохранённого — это продолжение той же записи, обновляем.
-        - Если новый текст короче или равен — это другое SMS, сохраняем отдельно.
-        Это исключает склейку двух разных коротких SMS от одного отправителя.
-        """
+    async def _save_one(self, number: str, text: str, date: str) -> None:
+        # Проверяем есть ли недавнее сообщение от этого номера (в рамках 2 минут)
+        # Если да — это продолжение того же SMS, дописываем к нему
         recent = await self.hass.async_add_executor_job(
             self.store.find_recent, number, 120
         )
-        if recent and len(text) > len(recent["text"]):
+        if recent:
             _LOGGER.info(
-                "Extending recent SMS id=%s from %s (%d→%d chars)",
+                "Appending to recent SMS id=%s from %s (%d chars + %d chars)",
                 recent["id"], number, len(recent["text"]), len(text)
             )
             await self.hass.async_add_executor_job(
-                self.store.update_text, recent["id"], text
+                self.store.append_text, recent["id"], text
             )
+            # Обновляем полный текст для уведомления
+            full_text = recent["text"] + text
             self.push_event("new_message", {
                 "id": recent["id"], "number": number,
-                "text": text, "date": date, "is_read": 0
+                "text": full_text, "date": date, "is_read": 0
             })
-            return text
+            await self._notify(number, full_text)
         else:
             msg_id = await self.hass.async_add_executor_job(
                 self.store.add, number, text, date
             )
             if msg_id:
-                self.push_event("new_message", {
-                    "id": msg_id, "number": number,
-                    "text": text, "date": date, "is_read": 0
-                })
-            return text
+                self.push_event("new_message", {"id": msg_id, "number": number, "text": text, "date": date, "is_read": 0})
+                await self._notify(number, text)
 
     def _add_to_buffers(self, buffers: dict[tuple, NumberBuffer], messages: list[dict]) -> bool:
         got_new = False
@@ -578,18 +569,7 @@ class SmsCoordinator:
         except Exception as e:
             _LOGGER.debug("is_muted check failed: %s", e)
         preview = text if len(text) <= 150 else text[:150] + "…"
-        # Имя из телефонной книги если есть, иначе сам номер/alphaTag
-        try:
-            contact = await self.hass.async_add_executor_job(self.store.get_contact, number)
-            display_name = contact["name"] if contact else number
-        except Exception:
-            display_name = number
-        title = f"SMS: {display_name}"
-        message = preview
-        # Уникальный тег по номеру — уведомления от разных номеров стакаются,
-        # от одного — заменяют друг друга (последнее сообщение)
-        safe_number = number.replace("+", "").replace(" ", "").replace("-", "")
-        notif_tag = f"sms_gammu_{safe_number}"
+        message = f"От: {number}\nТекст: {preview}"
         for target in targets:
             parts = target.split(".", 1)
             if len(parts) != 2:
@@ -598,11 +578,11 @@ class SmsCoordinator:
                 await self.hass.services.async_call(
                     parts[0], parts[1],
                     {
-                        "title": title,
+                        "title": "Новое SMS",
                         "message": message,
                         "data": {
                             "url": "/sms-viewer",
-                            "tag": notif_tag,
+                            "tag": "sms_gammu_viewer",
                             "group": "sms_gammu_viewer",
                             "actions": [
                                 {
