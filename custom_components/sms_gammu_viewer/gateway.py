@@ -1,6 +1,7 @@
 """Клиент для REST API sms-gammu-gateway."""
 from __future__ import annotations
 
+import asyncio
 import base64
 import logging
 from typing import Any
@@ -10,6 +11,11 @@ import aiohttp
 from .const import CONF_HOST, CONF_PASSWORD, CONF_PORT, CONF_USERNAME
 
 _LOGGER = logging.getLogger(__name__)
+
+# Gammu-gateway иногда зависает на команде при занятом модеме.
+# 30 секунд — разумный максимум для отправки SMS.
+SEND_TIMEOUT = 30
+SEND_RETRY_DELAY = 3  # секунд перед повтором
 
 
 class GatewayClient:
@@ -35,7 +41,7 @@ class GatewayClient:
                 return await r.json()
 
     async def get_all_sms(self) -> list[dict]:
-        """GET /sms — возвращает все SMS целиком (multipart уже склеены)."""
+        """GET /sms — возвращает все SMS целиком."""
         try:
             data = await self._request("GET", "/sms")
             if isinstance(data, list):
@@ -52,7 +58,6 @@ class GatewayClient:
             return []
 
     async def delete_sms(self, sms_id: int) -> bool:
-        """DELETE /sms/{id} — удаляет конкретное SMS с симки."""
         try:
             await self._request("DELETE", f"/sms/{sms_id}")
             return True
@@ -61,7 +66,6 @@ class GatewayClient:
             return False
 
     async def delete_all_sms(self) -> bool:
-        """DELETE /sms/deleteall — удаляет все SMS с симки."""
         try:
             await self._request("DELETE", "/sms/deleteall")
             return True
@@ -106,27 +110,48 @@ class GatewayClient:
             raise
 
     async def send_sms(self, number: str, text: str) -> bool:
-        """Отправляет SMS. При ошибке логирует HTTP статус и тело ответа."""
-        try:
-            await self._request("POST", "/sms", json={"number": number, "text": text}, timeout=15)
-            return True
-        except aiohttp.ClientResponseError as e:
-            # Читаем тело ответа для диагностики (e.message содержит reason phrase,
-            # но не тело — поэтому логируем статус + message отдельно)
-            _LOGGER.error(
-                "send_sms failed: HTTP %s %s (number=%s, text_len=%d)",
-                e.status, e.message, number, len(text),
-            )
-            return False
-        except aiohttp.ClientConnectorError as e:
-            _LOGGER.error("send_sms connection error (gateway unreachable?): %s", e)
-            return False
-        except aiohttp.ServerTimeoutError:
-            _LOGGER.error("send_sms timeout after 15s (number=%s)", number)
-            return False
-        except Exception as e:
-            _LOGGER.error("send_sms unexpected error: %s: %s", type(e).__name__, e)
-            return False
+        """Отправляет SMS. При таймауте делает один повтор через 3 секунды."""
+        for attempt in range(2):
+            try:
+                await self._request(
+                    "POST", "/sms",
+                    json={"number": number, "text": text},
+                    timeout=SEND_TIMEOUT,
+                )
+                if attempt > 0:
+                    _LOGGER.info("send_sms succeeded on retry (attempt %d)", attempt + 1)
+                return True
+
+            except aiohttp.ClientResponseError as e:
+                _LOGGER.error(
+                    "send_sms failed: HTTP %s %s (number=%s, text_len=%d)",
+                    e.status, e.message, number, len(text),
+                )
+                return False  # HTTP ошибка — повтор не поможет
+
+            except aiohttp.ClientConnectorError as e:
+                _LOGGER.error("send_sms connection error (gateway unreachable?): %s", e)
+                return False  # Нет связи — повтор не поможет
+
+            except (asyncio.TimeoutError, aiohttp.ServerTimeoutError):
+                if attempt == 0:
+                    _LOGGER.warning(
+                        "send_sms timeout after %ds (number=%s), retrying in %ds…",
+                        SEND_TIMEOUT, number, SEND_RETRY_DELAY,
+                    )
+                    await asyncio.sleep(SEND_RETRY_DELAY)
+                else:
+                    _LOGGER.error(
+                        "send_sms timeout after %ds on retry, giving up (number=%s)",
+                        SEND_TIMEOUT, number,
+                    )
+                    return False
+
+            except Exception as e:
+                _LOGGER.error("send_sms unexpected error: %s: %s", type(e).__name__, e)
+                return False
+
+        return False
 
     async def test_connection(self) -> str | None:
         try:
