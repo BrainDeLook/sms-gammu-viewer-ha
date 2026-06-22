@@ -101,7 +101,11 @@ async def _register_services(hass: HomeAssistant) -> None:
             raise ValueError("Поле message обязательно")
 
         coord = _get_coord()
-        ok = await coord.client.send_sms(number, message)
+        coord.send_in_progress = True
+        try:
+            ok = await coord.client.send_sms(number, message)
+        finally:
+            coord.send_in_progress = False
         if not ok:
             raise ValueError(f"Не удалось отправить SMS на {number}")
         # Сохраняем исходящее в историю чата
@@ -326,6 +330,9 @@ class SmsCoordinator:
         # call/cover/button сущности выставляют этот флаг перед дозвоном и
         # снимают по завершении, чтобы не тратить циклы опроса впустую.
         self.call_in_progress: bool = False
+        # Пока идёт отправка SMS — приостанавливаем опрос модема,
+        # чтобы gateway не был занят двумя запросами одновременно
+        self.send_in_progress: bool = False
 
     @property
     def _interval(self) -> int:
@@ -394,6 +401,9 @@ class SmsCoordinator:
                 await asyncio.sleep(self._interval)
                 if self.call_in_progress:
                     _LOGGER.debug("Skipping SMS poll — call in progress")
+                    continue
+                if self.send_in_progress:
+                    _LOGGER.debug("Skipping SMS poll — send in progress")
                     continue
                 messages = await self._safe_get_all()
                 if messages:
@@ -724,7 +734,11 @@ class SmsApiView(HomeAssistantView):
             text   = body.get("text", "").strip()
             if not number or not text:
                 return self._error("number and text required", 400)
-            ok = await coord.client.send_sms(number, text)
+            coord.send_in_progress = True
+            try:
+                ok = await coord.client.send_sms(number, text)
+            finally:
+                coord.send_in_progress = False
             if ok:
                 # Сохраняем исходящее в историю чата
                 import datetime as _dt
