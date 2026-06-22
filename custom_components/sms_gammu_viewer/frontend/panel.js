@@ -362,6 +362,32 @@ const CSS = `
   }
   .msg-delete:hover { color: var(--danger) !important; }
 
+  /* ─── Исходящие сообщения ─── */
+  .msg-bubble.outgoing {
+    align-self: flex-end;
+    background: var(--accent);
+    border-radius: 16px 4px 16px 16px;
+    color: #fff;
+  }
+  .msg-bubble.outgoing .msg-text { color: #fff; }
+  .msg-bubble.outgoing .msg-date { color: rgba(255,255,255,.7); }
+  .msg-bubble.outgoing .msg-delete { color: transparent; }
+  .msg-bubble.outgoing:hover .msg-delete { color: rgba(255,255,255,.6); }
+  .msg-bubble.outgoing .msg-delete:hover { color: #fff !important; }
+  .msg-bubble.outgoing .msg-unread-dot { background: #fff; }
+
+  /* ─── Счётчик символов ─── */
+  .char-counter {
+    font-size: 11px;
+    color: var(--sub);
+    text-align: right;
+    padding: 0 14px 4px;
+    flex-shrink: 0;
+    transition: color .2s;
+  }
+  .char-counter.warn { color: #ff9800; }
+  .char-counter.over { color: var(--danger); font-weight: 600; }
+
   /* ─── Empty / loading states ─── */
   .empty {
     flex: 1;
@@ -2036,7 +2062,8 @@ class SmsGammuPanel extends HTMLElement {
             </div>
           </div>
           <div class="status-main" id="status-main" style="display:none"></div>
-          <div class="send-bar" id="send-bar" style="display:none">
+          <div class="send-bar" id="send-bar" style="display:none; flex-wrap:wrap">
+            <div class="char-counter" id="char-counter" style="width:100%; display:none"></div>
             <textarea class="send-input" id="send-input" rows="1" placeholder="Написать сообщение…"></textarea>
             <button class="send-btn" id="send-btn" disabled title="Отправить">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -2168,6 +2195,28 @@ class SmsGammuPanel extends HTMLElement {
       if (btn) btn.disabled = !this._sendText.trim() || this._sending;
       ta.style.height = "auto";
       ta.style.height = Math.min(ta.scrollHeight, 120) + "px";
+      // Счётчик символов — GSM лимиты
+      const counter = this.shadowRoot.getElementById("char-counter");
+      if (counter) {
+        const len = ta.value.length;
+        if (len === 0) {
+          counter.style.display = "none";
+        } else {
+          // Определяем кириллица или нет (кириллица = 70 символов на часть)
+          const hasCyrillic = /[а-яёА-ЯЁ]/.test(ta.value);
+          const partSize = hasCyrillic ? 67 : 153; // multipart лимиты
+          const singleSize = hasCyrillic ? 70 : 160;
+          const isMulti = len > singleSize;
+          const parts = isMulti ? Math.ceil(len / partSize) : 1;
+          const limit = isMulti ? parts * partSize : singleSize;
+          const left = limit - len;
+          counter.style.display = "";
+          counter.textContent = isMulti
+            ? `${len} / ${limit} · ${parts} SMS`
+            : `${left}`;
+          counter.className = "char-counter" + (left < 10 ? " over" : left < 30 ? " warn" : "");
+        }
+      }
     });
     ta.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) {
@@ -2368,12 +2417,14 @@ class SmsGammuPanel extends HTMLElement {
         html += `<div class="date-divider"><span>${this._esc(label)}</span></div>`;
         lastLabel = label;
       }
+      const isOut = m.direction === "out";
       html += `
-        <div class="msg-bubble ${!m.is_read ? "unread" : ""}">
+        <div class="msg-bubble ${isOut ? "outgoing" : (!m.is_read ? "unread" : "")}">
           <div class="msg-text">${this._esc(m.text)}</div>
           <div class="msg-meta">
-            ${!m.is_read ? '<span class="msg-unread-dot"></span>' : ""}
+            ${!isOut && !m.is_read ? '<span class="msg-unread-dot"></span>' : ""}
             <span class="msg-date">${this._formatFull(m.date)}</span>
+            ${isOut ? '<span style="font-size:11px;color:rgba(255,255,255,.7)">✓</span>' : ""}
             <button class="msg-delete" data-id="${m.id}" title="Удалить">🗑</button>
           </div>
         </div>`;
@@ -2407,6 +2458,7 @@ class SmsGammuPanel extends HTMLElement {
 }
 
 customElements.define("sms-gammu-panel", SmsGammuPanel);
+
 
 
 
