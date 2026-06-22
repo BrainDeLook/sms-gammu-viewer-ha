@@ -227,20 +227,23 @@ class SmsStore:
                     m.number as number,
                     COUNT(*) as total,
                     SUM(CASE WHEN is_read=0 AND direction='in' THEN 1 ELSE 0 END) as unread,
-                    MAX(date) as last_date,
+                    MAX(m.received) as last_activity,
+                    (SELECT date FROM messages m2
+                     WHERE m2.number = m.number
+                     ORDER BY id DESC LIMIT 1) as last_date,
                     (SELECT text FROM messages m2
                      WHERE m2.number = m.number
-                     ORDER BY date DESC, id DESC LIMIT 1) as last_text,
+                     ORDER BY id DESC LIMIT 1) as last_text,
                     (SELECT direction FROM messages m3
                      WHERE m3.number = m.number
-                     ORDER BY date DESC, id DESC LIMIT 1) as last_direction,
+                     ORDER BY id DESC LIMIT 1) as last_direction,
                     (SELECT 1 FROM muted_numbers mn WHERE mn.number = m.number) as is_muted,
                     pb.name as contact_name,
                     pb.label as contact_label
                 FROM messages m
                 LEFT JOIN phonebook pb ON pb.number = m.number
                 GROUP BY m.number
-                ORDER BY last_date DESC
+                ORDER BY last_activity DESC
             """).fetchall()
         result = [dict(r) for r in rows]
         for r in result:
