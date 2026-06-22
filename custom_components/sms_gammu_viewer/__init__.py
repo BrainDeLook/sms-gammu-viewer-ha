@@ -475,23 +475,20 @@ class SmsCoordinator:
     async def _save_one(self, number: str, text: str, date: str) -> None:
         # Проверяем есть ли недавнее сообщение от этого номера (в рамках 2 минут)
         # Если да — это продолжение того же SMS, дописываем к нему
-        # Ищем недавнее сообщение только если текст новый ДЛИННЕЕ сохранённого —
-        # это настоящее продолжение multipart SMS, а не новое отдельное сообщение.
-        # Окно 30 секунд — достаточно для сборки частей, но не склеивает
-        # отдельные SMS от одного отправителя (банки, сервисы).
+        # Ищем недавнее сообщение в окне 120 секунд —
+        # если есть, это может быть продолжение multipart SMS от того же отправителя
         recent = await self.hass.async_add_executor_job(
-            self.store.find_recent, number, 30
+            self.store.find_recent, number, 120
         )
-        if recent and len(text) > len(recent["text"]) and recent["text"] and text.startswith(recent["text"]):
-            # Только если новый текст реально является продолжением предыдущего
+        if recent:
             _LOGGER.info(
                 "Appending to recent SMS id=%s from %s (%d chars + %d chars)",
                 recent["id"], number, len(recent["text"]), len(text)
             )
             await self.hass.async_add_executor_job(
-                self.store.append_text, recent["id"], text[len(recent["text"]):],
+                self.store.append_text, recent["id"], text
             )
-            full_text = text
+            full_text = recent["text"] + text
             self.push_event("new_message", {
                 "id": recent["id"], "number": number,
                 "text": full_text, "date": date, "is_read": 0
