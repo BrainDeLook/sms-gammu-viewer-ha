@@ -104,6 +104,16 @@ async def _register_services(hass: HomeAssistant) -> None:
         ok = await coord.client.send_sms(number, message)
         if not ok:
             raise ValueError(f"Не удалось отправить SMS на {number}")
+        # Сохраняем исходящее в историю чата
+        msg_id = await hass.async_add_executor_job(coord.store.add_outgoing, number, message)
+        if msg_id:
+            coord.push_event("new_message", {
+                "id": msg_id, "number": number, "text": message,
+                "date": __import__("datetime").datetime.now().isoformat(timespec="seconds"),
+                "is_read": 1, "direction": "out",
+            })
+        # Событие в шину HA для автоматизаций
+        hass.bus.async_fire(f"{DOMAIN}_sms_sent", {"number": number, "message": message})
         _LOGGER.info("SMS sent to %s via send_sms service", number)
 
     async def _handle_call(call) -> None:
@@ -715,6 +725,17 @@ class SmsApiView(HomeAssistantView):
             if not number or not text:
                 return self._error("number and text required", 400)
             ok = await coord.client.send_sms(number, text)
+            if ok:
+                # Сохраняем исходящее в историю чата
+                import datetime as _dt
+                msg_id = await self.hass.async_add_executor_job(store.add_outgoing, number, text)
+                if msg_id:
+                    coord.push_event("new_message", {
+                        "id": msg_id, "number": number, "text": text,
+                        "date": _dt.datetime.now().isoformat(timespec="seconds"),
+                        "is_read": 1, "direction": "out",
+                    })
+                self.hass.bus.async_fire(f"{DOMAIN}_sms_sent", {"number": number, "message": text})
             return self._json({"ok": ok})
 
         if action.startswith("call/"):
@@ -859,6 +880,7 @@ class SmsApiView(HomeAssistantView):
             status=status,
             content_type="application/json",
         )
+
 
 
 
