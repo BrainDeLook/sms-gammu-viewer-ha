@@ -804,7 +804,12 @@ class SmsGammuPanel extends HTMLElement {
     this._eventsInitialized = false;
     this._activeTab = 'chats';
     this._sendText = '';
-    this._drafts = {};  // черновики по номеру — сохраняются в памяти до перезагрузки
+    // Черновики — грузим из localStorage, переживают перезагрузку браузера
+    try {
+      this._drafts = JSON.parse(localStorage.getItem("sms_gammu_drafts") || "{}");
+    } catch {
+      this._drafts = {};
+    }
     this._sending = false;
     this._modemError = null;
     this._narrow = false;
@@ -1111,7 +1116,7 @@ class SmsGammuPanel extends HTMLElement {
     // Сохраняем черновик текущего чата перед переключением
     if (this._activeNumber && this._activeNumber !== number) {
       const ta = this.shadowRoot.getElementById("send-input");
-      if (ta) this._drafts[this._activeNumber] = ta.value;
+      if (ta) this._saveDraft(this._activeNumber, ta.value);
     }
 
     this._activeNumber = number;
@@ -1505,7 +1510,7 @@ class SmsGammuPanel extends HTMLElement {
       const res = await this._api("send", "POST", { number, text: savedText });
       if (res.ok) {
         // Удаляем черновик — сообщение отправлено
-        delete this._drafts[number];
+        this._saveDraft(number, "");
         // Перезагружаем историю и контакты
         this._messages = await this._api(`messages/${encodeURIComponent(number)}`);
         this._renderMessages();
@@ -1530,6 +1535,15 @@ class SmsGammuPanel extends HTMLElement {
       this._sending = false;
       if (btn) { btn.disabled = !this._sendText.trim(); btn.style.opacity = ""; }
     }
+  }
+
+  _saveDraft(number, text) {
+    if (text) {
+      this._drafts[number] = text;
+    } else {
+      delete this._drafts[number];
+    }
+    try { localStorage.setItem("sms_gammu_drafts", JSON.stringify(this._drafts)); } catch {}
   }
 
   async _refreshContacts() {
@@ -2250,14 +2264,8 @@ class SmsGammuPanel extends HTMLElement {
     const ta = this.shadowRoot.getElementById("send-input");
     ta.addEventListener("input", () => {
       this._sendText = ta.value;
-      // Сохраняем черновик в памяти на лету
-      if (this._activeNumber) {
-        if (ta.value) {
-          this._drafts[this._activeNumber] = ta.value;
-        } else {
-          delete this._drafts[this._activeNumber];
-        }
-      }
+      // Сохраняем черновик на лету
+      if (this._activeNumber) this._saveDraft(this._activeNumber, ta.value);
       const btn = this.shadowRoot.getElementById("send-btn");
       if (btn) btn.disabled = !this._sendText.trim() || this._sending;
       ta.style.height = "auto";
@@ -2410,7 +2418,9 @@ class SmsGammuPanel extends HTMLElement {
             <span class="contact-date">${this._formatShort(c.last_date)}</span>
           </div>
           <div class="contact-preview">
-            ${this._esc((c.last_text || "").slice(0, 60))}
+            ${this._drafts[c.number]
+              ? '<span style="color:var(--accent);font-weight:500">' + this._t("draft") + ':</span> ' + this._esc(this._drafts[c.number].slice(0, 50))
+              : this._esc((c.last_text || "").slice(0, 60))}
           </div>
         </div>
         ${c.unread > 0 ? `<span class="contact-unread-cnt">${c.unread}</span>` : ""}
