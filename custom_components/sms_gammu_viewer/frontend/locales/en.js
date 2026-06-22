@@ -104,7 +104,9 @@ export default {
   delete_contact_confirm: "Delete this contact from the phonebook?",
   back: "Back",
   modem_btn: "Modem status",
+  draft: "Draft",
 };
+
 
 
 
