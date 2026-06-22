@@ -468,15 +468,18 @@ class SmsCoordinator:
         for (number, _date), buf in buffers.items():
             full_text = buf.full_text
             _LOGGER.info("SMS assembled from %s: %d updates seen, %d chars", number, buf.seen_count, len(full_text))
-            await self._save_one(number, full_text, buf.first_date)
+            final_text = await self._save_one(number, full_text, buf.first_date)
+            # Уведомление отправляем ЗДЕСЬ — после полной сборки всех частей
+            await self._notify(number, final_text)
 
         self.collecting = False
 
-    async def _save_one(self, number: str, text: str, date: str) -> None:
-        # Проверяем есть ли недавнее сообщение от этого номера (в рамках 2 минут)
-        # Если да — это продолжение того же SMS, дописываем к нему
-        # Ищем недавнее сообщение в окне 120 секунд —
-        # если есть, это может быть продолжение multipart SMS от того же отправителя
+    async def _save_one(self, number: str, text: str, date: str) -> str:
+        """Сохраняет SMS в БД. Возвращает финальный полный текст.
+
+        _notify НЕ вызывается здесь — только в _collect после полной сборки всех частей,
+        чтобы уведомление содержало полный текст а не первую часть.
+        """
         recent = await self.hass.async_add_executor_job(
             self.store.find_recent, number, 120
         )
@@ -493,14 +496,17 @@ class SmsCoordinator:
                 "id": recent["id"], "number": number,
                 "text": full_text, "date": date, "is_read": 0
             })
-            await self._notify(number, full_text)
+            return full_text
         else:
             msg_id = await self.hass.async_add_executor_job(
                 self.store.add, number, text, date
             )
             if msg_id:
-                self.push_event("new_message", {"id": msg_id, "number": number, "text": text, "date": date, "is_read": 0})
-                await self._notify(number, text)
+                self.push_event("new_message", {
+                    "id": msg_id, "number": number,
+                    "text": text, "date": date, "is_read": 0
+                })
+            return text
 
     def _add_to_buffers(self, buffers: dict[tuple, NumberBuffer], messages: list[dict]) -> bool:
         got_new = False
