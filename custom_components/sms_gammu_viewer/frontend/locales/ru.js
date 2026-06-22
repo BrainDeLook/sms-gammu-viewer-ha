@@ -104,7 +104,9 @@ export default {
   delete_contact_confirm: "Удалить этот контакт из телефонной книги?",
   back: "Назад",
   modem_btn: "Статус модема",
+  draft: "Черновик",
 };
+
 
 
 
