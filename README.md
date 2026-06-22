@@ -21,7 +21,8 @@ After installation, an **SMS** tab appears in the sidebar. Messages are stored i
 ## Features
 
 - 💬 Chat-style view — all SMS from one sender in one thread
-- ✍️ **Send SMS** — reply from inside a chat, or start a brand-new conversation via the compact `+` button
+- ✍️ **Send SMS** — reply from inside a chat, or start a brand-new conversation via the compact `+` button. Sent messages appear in the chat thread (right-aligned blue bubbles) and are saved to history
+- 🔢 **SMS character counter** — shows remaining characters while typing, accounting for GSM limits (160 Latin / 70 Cyrillic); displays part count for long messages
 - 📞 **Outgoing voice calls** (dial-only) — via a separate voice AT interface on modems that expose multiple serial ports (e.g. Huawei). Standalone call FAB or call button in a chat, plus dedicated `sms_gammu_viewer.call` / `sms_gammu_viewer.hangup` services for automations
 - 🚪 **Call entities** — create dedicated `cover`/`button` entities that dial a fixed number, for gates/intercoms that open via a phone call. Works with dashboards, automations, and voice assistants
 - 📇 **Phonebook** — save names for your contacts, shown across the conversation list, call history, and chat headers
@@ -131,6 +132,13 @@ All available under **Developer Tools → Services**, under the `sms_gammu_viewe
 | `sms_gammu_viewer.send_sms` | `number`, `message` | Sends an SMS |
 | `sms_gammu_viewer.call` | `number` | Dials a number (requires voice port configured) |
 | `sms_gammu_viewer.hangup` | — | Force-ends the current call |
+
+### Events fired on the HA event bus
+
+| Event | Data | Description |
+|---|---|---|
+| `sms_gammu_viewer_sms_sent` | `number`, `message` | Fired after every outgoing SMS |
+| `sms_gammu_viewer_call_ended` | `phone_number`, `reason` | Fired when a call ends (`answered` / `not_answered` / `declined` / `error`) |
 
 Example:
 ```yaml
@@ -326,6 +334,7 @@ This project builds on the work of several open-source projects:
 ## License
 
 MIT
+
 
 
 
