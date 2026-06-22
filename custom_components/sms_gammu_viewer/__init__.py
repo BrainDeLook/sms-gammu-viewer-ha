@@ -568,8 +568,21 @@ class SmsCoordinator:
                 return
         except Exception as e:
             _LOGGER.debug("is_muted check failed: %s", e)
+
+        # Имя из телефонной книги если есть, иначе сам номер/alphaTag
+        try:
+            contact = await self.hass.async_add_executor_job(self.store.get_contact, number)
+            display_name = contact["name"] if contact else number
+        except Exception:
+            display_name = number
+
         preview = text if len(text) <= 150 else text[:150] + "…"
-        message = f"От: {number}\nТекст: {preview}"
+
+        # Уникальный тег по отправителю — SMS от разных номеров не заменяют друг друга,
+        # от одного — заменяются (показывается только последнее)
+        safe_tag = "".join(c for c in number if c.isalnum())
+        notif_tag = f"sms_gammu_{safe_tag}"
+
         for target in targets:
             parts = target.split(".", 1)
             if len(parts) != 2:
@@ -578,11 +591,11 @@ class SmsCoordinator:
                 await self.hass.services.async_call(
                     parts[0], parts[1],
                     {
-                        "title": "Новое SMS",
-                        "message": message,
+                        "title": f"SMS: {display_name}",
+                        "message": preview,
                         "data": {
                             "url": "/sms-viewer",
-                            "tag": "sms_gammu_viewer",
+                            "tag": notif_tag,
                             "group": "sms_gammu_viewer",
                             "actions": [
                                 {
@@ -894,6 +907,7 @@ class SmsApiView(HomeAssistantView):
             status=status,
             content_type="application/json",
         )
+
 
 
 
