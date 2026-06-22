@@ -1123,31 +1123,9 @@ class SmsGammuPanel extends HTMLElement {
     try { localStorage.setItem("sms_gammu_active_number", number); } catch {}
     this.shadowRoot.querySelector(".root")?.classList.add("chat-open");
 
-    // Восстанавливаем черновик для нового чата (или пустое поле)
-    const draft = this._drafts[number] || "";
-    this._sendText = draft;
-    const ta = this.shadowRoot.getElementById("send-input");
-    if (ta) {
-      ta.value = draft;
-      ta.style.height = "auto";
-      if (draft) ta.style.height = Math.min(ta.scrollHeight, 120) + "px";
-    }
-    const sendBtn = this.shadowRoot.getElementById("send-btn");
-    if (sendBtn) sendBtn.disabled = !draft.trim();
-    // Счётчик символов
-    const counter = this.shadowRoot.getElementById("char-counter");
-    if (counter) counter.style.display = draft ? "" : "none";
-    if (counter && draft) {
-      const hasCyrillic = /[а-яёА-ЯЁ]/.test(draft);
-      const singleSize = hasCyrillic ? 70 : 160;
-      const partSize = hasCyrillic ? 67 : 153;
-      const isMulti = draft.length > singleSize;
-      const parts = isMulti ? Math.ceil(draft.length / partSize) : 1;
-      const limit = isMulti ? parts * partSize : singleSize;
-      const left = limit - draft.length;
-      counter.textContent = isMulti ? `${draft.length} / ${limit} · ${parts} SMS` : `${left}`;
-      counter.className = "char-counter" + (left < 10 ? " over" : left < 30 ? " warn" : "");
-    }
+    // Черновик восстанавливается в _restoreDraftUI — вызывается из _renderMessages
+    // когда send-bar уже видим в DOM
+    this._sendText = this._drafts[number] || "";
     try {
       this._messages = await this._api(
         `messages/${encodeURIComponent(number)}`
@@ -1534,6 +1512,39 @@ class SmsGammuPanel extends HTMLElement {
     } finally {
       this._sending = false;
       if (btn) { btn.disabled = !this._sendText.trim(); btn.style.opacity = ""; }
+    }
+  }
+
+  _restoreDraftUI() {
+    // Восстанавливает черновик в поле ввода для текущего активного чата.
+    // Вызывается из _renderMessages после того как send-bar уже отображён.
+    const number = this._activeNumber;
+    if (!number) return;
+    const draft = this._drafts[number] || "";
+    const ta = this.shadowRoot.getElementById("send-input");
+    const sendBtn = this.shadowRoot.getElementById("send-btn");
+    const counter = this.shadowRoot.getElementById("char-counter");
+    if (ta && ta.value !== draft) {
+      ta.value = draft;
+      ta.style.height = "auto";
+      if (draft) ta.style.height = Math.min(ta.scrollHeight, 120) + "px";
+    }
+    if (sendBtn) sendBtn.disabled = !draft.trim();
+    if (counter) {
+      if (!draft) {
+        counter.style.display = "none";
+      } else {
+        const hasCyrillic = /[а-яёА-ЯЁ]/.test(draft);
+        const singleSize = hasCyrillic ? 70 : 160;
+        const partSize = hasCyrillic ? 67 : 153;
+        const isMulti = draft.length > singleSize;
+        const parts = isMulti ? Math.ceil(draft.length / partSize) : 1;
+        const limit = isMulti ? parts * partSize : singleSize;
+        const left = limit - draft.length;
+        counter.style.display = "";
+        counter.textContent = isMulti ? `${draft.length} / ${limit} · ${parts} SMS` : `${left}`;
+        counter.className = "char-counter" + (left < 10 ? " over" : left < 30 ? " warn" : "");
+      }
     }
   }
 
@@ -2470,6 +2481,7 @@ class SmsGammuPanel extends HTMLElement {
     }
 
     sendBar && (sendBar.style.display = "");
+    this._restoreDraftUI();
     const contact = this._contacts.find((c) => c.number === this._activeNumber);
     const count = contact?.total ?? this._messages.length;
     titleEl && (titleEl.textContent = contact?.contact_name || this._activeNumber);
