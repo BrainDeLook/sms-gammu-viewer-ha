@@ -2226,46 +2226,6 @@ class SmsGammuPanel extends HTMLElement {
             </div>
           </div>
 
-          <!-- Bottom sheet: действия над контактом в телефонной книге -->
-          <div class="pb-sheet-overlay" id="pb-sheet-overlay">
-            <div class="pb-sheet" id="pb-sheet">
-              <div class="pb-sheet-handle"></div>
-              <div class="pb-sheet-header">
-                <div class="pb-sheet-name" id="pb-sheet-name"></div>
-                <div class="pb-sheet-number" id="pb-sheet-number"></div>
-              </div>
-              <div class="pb-sheet-actions">
-                <button class="pb-sheet-action" id="pb-sheet-open">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                  </svg>
-                  <span id="pb-sheet-open-label"></span>
-                </button>
-                <button class="pb-sheet-action" id="pb-sheet-mute">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M11 5 6 9H2v6h4l5 4V5z"/>
-                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
-                  </svg>
-                  <span id="pb-sheet-mute-label"></span>
-                </button>
-                <button class="pb-sheet-action" id="pb-sheet-edit">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                  </svg>
-                  <span></span><span>${this._t ? this._t("edit") : "Изменить"}</span>
-                </button>
-                <button class="pb-sheet-action danger" id="pb-sheet-delete">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="3 6 5 6 21 6"/>
-                    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-                  </svg>
-                  <span id="pb-sheet-delete-label"></span>
-                </button>
-              </div>
-            </div>
-          </div>
-
           <!-- Modal: новый чат -->
           <div class="new-chat-overlay" id="new-chat-overlay">
             <div class="new-chat-sheet">
@@ -2336,6 +2296,51 @@ class SmsGammuPanel extends HTMLElement {
         </div>
       </div>
     `;
+
+    // Добавляем pb-sheet-overlay в shadowRoot напрямую — вне .root,
+    // чтобы position:fixed работал правильно и клики не перехватывались
+    const pbSheetEl = document.createElement("div");
+    pbSheetEl.className = "pb-sheet-overlay";
+    pbSheetEl.id = "pb-sheet-overlay";
+    pbSheetEl.innerHTML = `
+      <div class="pb-sheet" id="pb-sheet">
+        <div class="pb-sheet-handle"></div>
+        <div class="pb-sheet-header">
+          <div class="pb-sheet-name" id="pb-sheet-name"></div>
+          <div class="pb-sheet-number" id="pb-sheet-number"></div>
+        </div>
+        <div class="pb-sheet-actions">
+          <button class="pb-sheet-action" id="pb-sheet-open">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+            <span id="pb-sheet-open-label"></span>
+          </button>
+          <button class="pb-sheet-action" id="pb-sheet-mute">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M11 5 6 9H2v6h4l5 4V5z"/>
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
+            </svg>
+            <span id="pb-sheet-mute-label"></span>
+          </button>
+          <button class="pb-sheet-action" id="pb-sheet-edit">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
+            <span id="pb-sheet-edit-label"></span>
+          </button>
+          <button class="pb-sheet-action danger" id="pb-sheet-delete">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+            </svg>
+            <span id="pb-sheet-delete-label"></span>
+          </button>
+        </div>
+      </div>
+    \`;
+    this.shadowRoot.appendChild(pbSheetEl);
 
     this.shadowRoot.getElementById("refresh-btn").addEventListener("click", () => {
       this._pollNow();
