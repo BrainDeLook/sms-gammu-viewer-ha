@@ -1,35 +1,35 @@
 send_sms:
   name: Send SMS
-  description: Отправляет SMS через sms-gammu-gateway. Номер и текст — отдельными полями.
+  description: Sends an SMS via sms-gammu-gateway.
   fields:
     number:
-      name: Номер телефона
-      description: "Номер получателя, например +79001234567"
+      name: Phone number
+      description: "Recipient number, e.g. +79001234567"
       required: true
       example: "+79001234567"
       selector:
         text:
     message:
-      name: Текст
-      description: Текст SMS-сообщения
+      name: Message text
+      description: SMS message body
       required: true
-      example: "Привет!"
+      example: "Hello!"
       selector:
         text:
           multiline: true
 
 call:
   name: Call
-  description: Звонит на номер через голосовой AT-интерфейс модема. Требует настроенный голосовой порт.
+  description: Dials a number via the modem voice AT interface. Requires voice port configured.
   fields:
     number:
-      name: Номер телефона
-      description: "Номер для звонка, например +79001234567"
+      name: Phone number
+      description: "Number to dial, e.g. +79001234567"
       required: true
       example: "+79001234567"
       selector:
         text:
 
 hangup:
-  name: Hangup
-  description: Принудительно завершает текущий звонок.
+  name: Hang up
+  description: Force-ends the current call.
