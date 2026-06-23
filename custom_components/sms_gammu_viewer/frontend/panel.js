@@ -588,7 +588,6 @@ const CSS = `
     z-index: 20;
     align-items: flex-end;
     justify-content: center;
-    flex-direction: column;
   }
   .call-history-dropdown.open { display: flex; }
   .ch-sheet {
@@ -596,6 +595,7 @@ const CSS = `
     border-radius: 18px 18px 0 0;
     padding: 20px 20px 28px;
     width: 100%;
+    max-width: 500px;
   }
   .ch-header {
     display: flex; align-items: center; justify-content: space-between;
