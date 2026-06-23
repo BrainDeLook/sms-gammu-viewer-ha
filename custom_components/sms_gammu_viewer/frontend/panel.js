@@ -1596,26 +1596,47 @@ class SmsGammuPanel extends HTMLElement {
   _initPbSheet() {
     const dialog = document.createElement("dialog");
     dialog.id = "pb-dialog";
-    dialog.style.cssText = "border:none;padding:0;background:transparent;width:100%;max-width:480px;position:fixed;bottom:0;left:50%;transform:translateX(-50%);margin:0;";
+    // Позиционируем через margin:auto auto 0 — прижимаем к низу экрана
+    dialog.style.cssText = [
+      "border:none; padding:0; background:transparent;",
+      "width:100%; max-width:480px;",
+      "margin: auto auto 0 auto;",   // bottom sheet — прижат к низу
+      "max-height: 90vh;",
+    ].join(" ");
 
     const style = document.createElement("style");
-    style.textContent = "dialog#pb-dialog::backdrop{background:rgba(0,0,0,.5)}" +
-      ".pb-d-sheet{background:#fff;border-radius:18px 18px 0 0;padding-bottom:max(env(safe-area-inset-bottom,0px),16px);font-family:var(--paper-font-body1_-_font-family,Roboto,sans-serif)}" +
-      ".pb-d-handle{width:36px;height:4px;border-radius:2px;background:#ddd;margin:12px auto 6px}" +
-      ".pb-d-header{padding:6px 20px 14px;border-bottom:1px solid #eee}" +
-      ".pb-d-name{font-size:16px;font-weight:600;color:#111}" +
-      ".pb-d-num{font-size:13px;color:#666;margin-top:2px}" +
-      ".pb-d-btn{display:flex;align-items:center;gap:16px;width:100%;padding:15px 24px;border:none;background:none;cursor:pointer;font-size:15px;color:#111;font-family:inherit;text-align:left}" +
-      ".pb-d-btn:active{background:rgba(0,0,0,.06)}" +
-      ".pb-d-btn.danger{color:#e53935}" +
-      "@media(prefers-color-scheme:dark){" +
-      ".pb-d-sheet{background:#1e1e1e}" +
-      ".pb-d-handle{background:#444}" +
-      ".pb-d-header{border-bottom-color:#333}" +
-      ".pb-d-name{color:#fff}" +
-      ".pb-d-num{color:#aaa}" +
-      ".pb-d-btn{color:#fff}" +
-      ".pb-d-btn:active{background:rgba(255,255,255,.08)}}";
+    // Берём цвета из CSS переменных HA которые доступны в document (не в shadow)
+    style.textContent = [
+      "dialog#pb-dialog { padding:0; }",
+      "dialog#pb-dialog::backdrop { background: rgba(0,0,0,.55); }",
+      ".pb-d-sheet {",
+      "  background: var(--card-background-color, #fff);",
+      "  border-radius: 18px 18px 0 0;",
+      "  padding-bottom: max(env(safe-area-inset-bottom,0px), 16px);",
+      "  font-family: var(--paper-font-body1_-_font-family, Roboto, sans-serif);",
+      "}",
+      ".pb-d-handle {",
+      "  width:36px; height:4px; border-radius:2px;",
+      "  background: var(--divider-color, #ddd);",
+      "  margin: 12px auto 6px;",
+      "}",
+      ".pb-d-header {",
+      "  padding: 6px 20px 14px;",
+      "  border-bottom: 1px solid var(--divider-color, #eee);",
+      "}",
+      ".pb-d-name { font-size:16px; font-weight:600; color: var(--primary-text-color, #111); }",
+      ".pb-d-num  { font-size:13px; color: var(--secondary-text-color, #666); margin-top:2px; }",
+      ".pb-d-btn {",
+      "  display:flex; align-items:center; gap:16px;",
+      "  width:100%; padding:15px 24px;",
+      "  border:none; background:none; cursor:pointer;",
+      "  font-size:15px; color: var(--primary-text-color, #111);",
+      "  font-family:inherit; text-align:left;",
+      "  transition: background .15s;",
+      "}",
+      ".pb-d-btn:active { background: rgba(0,0,0,.06); }",
+      ".pb-d-btn.danger { color: #e53935; }",
+    ].join(" ");
     document.head.appendChild(style);
 
     const svgChat = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
