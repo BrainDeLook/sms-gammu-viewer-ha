@@ -68,5 +68,35 @@
       "name_required": "Name is required.",
       "number_required": "Phone number is required."
     }
+  },
+  "services": {
+    "send_sms": {
+      "name": "Send SMS",
+      "description": "Sends an SMS via sms-gammu-gateway.",
+      "fields": {
+        "number": {
+          "name": "Phone number",
+          "description": "Recipient number, e.g. +79001234567"
+        },
+        "message": {
+          "name": "Message text",
+          "description": "SMS message body"
+        }
+      }
+    },
+    "call": {
+      "name": "Call",
+      "description": "Dials a number via the modem voice AT interface. Requires voice port configured.",
+      "fields": {
+        "number": {
+          "name": "Phone number",
+          "description": "Number to dial, e.g. +79001234567"
+        }
+      }
+    },
+    "hangup": {
+      "name": "Hang up",
+      "description": "Force-ends the current call."
+    }
   }
 }
