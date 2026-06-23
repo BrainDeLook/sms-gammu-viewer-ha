@@ -1617,92 +1617,124 @@ class SmsGammuPanel extends HTMLElement {
   }
 
   _openPbSheet(number, name, isMuted) {
-    const overlay = this.shadowRoot.getElementById("pb-sheet-overlay");
-    if (!overlay) return;
+    if (!this._pbDialog) return;
     this._pbSheetNumber = number;
-    overlay.querySelector(".pb-sheet-name").textContent = name;
-    overlay.querySelector(".pb-sheet-num").textContent = number;
-    overlay.querySelector(".pb-sheet-open-lbl").textContent = this._t("open_chat");
-    overlay.querySelector(".pb-sheet-mute-lbl").textContent = isMuted ? this._t("unmute_chat") : this._t("mute_chat");
-    overlay.querySelector(".pb-sheet-edit-lbl").textContent = this._t("edit");
-    overlay.querySelector(".pb-sheet-del-lbl").textContent = this._t("delete_msg");
-    overlay.classList.add("open");
+    this._pbDialog.querySelector("#pb-d-name").textContent = name;
+    this._pbDialog.querySelector("#pb-d-num").textContent = number;
+    this._pbDialog.querySelector("#pb-d-open-lbl").textContent = this._t("open_chat");
+    this._pbDialog.querySelector("#pb-d-mute-lbl").textContent = isMuted ? this._t("unmute_chat") : this._t("mute_chat");
+    this._pbDialog.querySelector("#pb-d-edit-lbl").textContent = this._t("edit");
+    this._pbDialog.querySelector("#pb-d-delete-lbl").textContent = this._t("delete_msg");
+    this._pbDialog.showModal();
   }
 
   _closePbSheet() {
-    this.shadowRoot.getElementById("pb-sheet-overlay")?.classList.remove("open");
+    this._pbDialog?.close();
     this._pbSheetNumber = null;
   }
 
   _initPbSheet() {
-    // Создаём overlay программно — без innerHTML в шаблоне, без проблем с backtick
-    const overlay = document.createElement("div");
-    overlay.className = "pb-sheet-overlay";
-    overlay.id = "pb-sheet-overlay";
+    // Используем <dialog> — он рендерится в top layer браузера,
+    // поверх Shadow DOM и любых других элементов без z-index трюков
+    const dialog = document.createElement("dialog");
+    dialog.id = "pb-dialog";
+    dialog.style.cssText = [
+      "border:none; padding:0; background:transparent;",
+      "width:100%; max-width:480px;",
+      "position:fixed; bottom:0; left:50%; transform:translateX(-50%);",
+      "margin:0;",
+    ].join("");
 
-    const sheet = document.createElement("div");
-    sheet.className = "pb-sheet";
-    sheet.innerHTML = [
-      '<div class="pb-sheet-handle"></div>',
-      '<div class="pb-sheet-header">',
-      '  <div class="pb-sheet-name"></div>',
-      '  <div class="pb-sheet-num"></div>',
-      '</div>',
-      '<div class="pb-sheet-actions">',
-      '  <button class="pb-sheet-action" id="pb-sa-open">',
+    // Стили для содержимого
+    const style = document.createElement("style");
+    style.textContent = [
+      "dialog#pb-dialog::backdrop { background: rgba(0,0,0,.5); }",
+      ".pb-d-sheet { background: #fff; border-radius: 18px 18px 0 0;",
+      "  padding-bottom: max(env(safe-area-inset-bottom,0px),16px);",
+      "  font-family: var(--paper-font-body1_-_font-family, Roboto, sans-serif); }",
+      ".pb-d-handle { width:36px; height:4px; border-radius:2px;",
+      "  background:#ddd; margin:12px auto 6px; }",
+      ".pb-d-header { padding:6px 20px 14px; border-bottom:1px solid #eee; }",
+      ".pb-d-name { font-size:16px; font-weight:600; color:#111; }",
+      ".pb-d-num { font-size:13px; color:#666; margin-top:2px; }",
+      ".pb-d-btn { display:flex; align-items:center; gap:16px;",
+      "  width:100%; padding:15px 24px; border:none; background:none;",
+      "  cursor:pointer; font-size:15px; color:#111;",
+      "  font-family:inherit; text-align:left; }",
+      ".pb-d-btn:active { background:rgba(0,0,0,.06); }",
+      ".pb-d-btn.danger { color:#e53935; }",
+      "@media (prefers-color-scheme: dark) {",
+      "  .pb-d-sheet { background:#1e1e1e; }",
+      "  .pb-d-handle { background:#444; }",
+      "  .pb-d-header { border-bottom-color:#333; }",
+      "  .pb-d-name { color:#fff; }",
+      "  .pb-d-num { color:#aaa; }",
+      "  .pb-d-btn { color:#fff; }",
+      "  .pb-d-btn:active { background:rgba(255,255,255,.08); }",
+      "}",
+    ].join(" ");
+    document.head.appendChild(style);
+
+    dialog.innerHTML = [
+      '<div class="pb-d-sheet">',
+      '  <div class="pb-d-handle"></div>',
+      '  <div class="pb-d-header">',
+      '    <div class="pb-d-name" id="pb-d-name"></div>',
+      '    <div class="pb-d-num"  id="pb-d-num"></div>',
+      '  </div>',
+      '  <button class="pb-d-btn" id="pb-d-open">',
       '    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
-      '    <span class="pb-sheet-open-lbl"></span>',
+      '    <span id="pb-d-open-lbl"></span>',
       '  </button>',
-      '  <button class="pb-sheet-action" id="pb-sa-mute">',
+      '  <button class="pb-d-btn" id="pb-d-mute">',
       '    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>',
-      '    <span class="pb-sheet-mute-lbl"></span>',
+      '    <span id="pb-d-mute-lbl"></span>',
       '  </button>',
-      '  <button class="pb-sheet-action" id="pb-sa-edit">',
+      '  <button class="pb-d-btn" id="pb-d-edit">',
       '    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>',
-      '    <span class="pb-sheet-edit-lbl"></span>',
+      '    <span id="pb-d-edit-lbl"></span>',
       '  </button>',
-      '  <button class="pb-sheet-action danger" id="pb-sa-delete">',
+      '  <button class="pb-d-btn danger" id="pb-d-delete">',
       '    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>',
-      '    <span class="pb-sheet-del-lbl"></span>',
+      '    <span id="pb-d-delete-lbl"></span>',
       '  </button>',
       '</div>',
     ].join("");
 
-    overlay.appendChild(sheet);
-    this.shadowRoot.appendChild(overlay);
+    document.body.appendChild(dialog);
 
-    // Закрытие по фону
-    overlay.addEventListener("click", (e) => {
-      if (e.target === overlay) this._closePbSheet();
+    // Закрытие по backdrop (клик вне sheet)
+    dialog.addEventListener("click", (e) => {
+      const rect = dialog.querySelector(".pb-d-sheet").getBoundingClientRect();
+      if (e.clientY < rect.top) dialog.close();
     });
 
-    sheet.querySelector("#pb-sa-open").addEventListener("click", () => {
+    dialog.querySelector("#pb-d-open").addEventListener("click", () => {
       const number = this._pbSheetNumber;
-      this._closePbSheet();
+      dialog.close();
       this._activeTab = "chats";
       this.shadowRoot.getElementById("phonebook-btn").style.color = "";
       this._switchTab();
       this._selectContact(number);
     });
-
-    sheet.querySelector("#pb-sa-mute").addEventListener("click", () => {
+    dialog.querySelector("#pb-d-mute").addEventListener("click", () => {
       const number = this._pbSheetNumber;
-      this._closePbSheet();
+      dialog.close();
       this._togglePhonebookMute(number);
     });
-
-    sheet.querySelector("#pb-sa-edit").addEventListener("click", () => {
+    dialog.querySelector("#pb-d-edit").addEventListener("click", () => {
       const number = this._pbSheetNumber;
-      this._closePbSheet();
+      dialog.close();
       const contact = this._phonebook.find((c) => c.number === number);
       this._openContactEditor(contact);
     });
-
-    sheet.querySelector("#pb-sa-delete").addEventListener("click", () => {
+    dialog.querySelector("#pb-d-delete").addEventListener("click", () => {
       const number = this._pbSheetNumber;
-      this._closePbSheet();
+      dialog.close();
       this._deleteContactFromBook(number);
     });
+
+    this._pbDialog = dialog;
   }
 
   async _copyToClipboard(text) {
