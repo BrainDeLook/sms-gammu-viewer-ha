@@ -580,74 +580,23 @@ const CSS = `
   .lang-option.active { color: var(--accent); font-weight: 500; }
 
   /* ─── Call history dropdown ─── */
-  .call-history-dropdown {
-    display: none;
-    position: absolute;
-    bottom: calc(100% + 10px);
-    right: 0;
-    background: var(--card);
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    box-shadow: 0 6px 24px rgba(0,0,0,.2);
-    overflow: hidden;
-    z-index: 100;
-    width: 280px;
-    flex-direction: column;
-  }
-  .call-history-dropdown.open { display: flex; }
-  .ch-header {
-    padding: 10px 14px;
-    border-bottom: 1px solid var(--line);
-    font-size: 13px; font-weight: 600;
-    color: var(--text);
-    display: flex; align-items: center; justify-content: space-between;
-  }
-  .ch-clear-btn {
-    background: none; border: none; cursor: pointer;
-    color: var(--sub); font-size: 11px;
-    padding: 2px 6px; border-radius: 4px;
-    transition: color .15s, background .15s;
-  }
-  .ch-clear-btn:hover { color: var(--danger); background: rgba(229,57,53,.08); }
-  .ch-new-input-row {
-    padding: 10px 14px;
-    display: flex; gap: 6px;
-    border-bottom: 1px solid var(--line);
-  }
-  .ch-new-input {
-    flex: 1; padding: 7px 10px;
-    border: 1px solid var(--line); border-radius: 8px;
-    background: var(--bg); color: var(--text);
-    font-size: 13px; outline: none;
-  }
-  .ch-new-input:focus { border-color: var(--accent); }
-  .ch-call-btn {
-    width: 32px; height: 32px; border-radius: 8px;
-    background: #4caf50; color: #fff; border: none;
-    cursor: pointer; display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0; transition: opacity .15s;
-  }
-  .ch-call-btn:disabled { opacity: .4; cursor: default; }
-  .ch-list {
-    overflow-y: auto;
-    max-height: 208px; /* ~4 записи по 52px каждая */
-  }
+  /* ─── Call history items (используются внутри dialog) ─── */
   .ch-empty {
     padding: 24px 14px; text-align: center;
-    color: var(--sub); font-size: 12px;
+    color: var(--sub); font-size: 13px;
   }
   .ch-item {
-    display: flex; align-items: center; gap: 10px;
-    padding: 9px 14px; cursor: pointer;
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 20px; cursor: pointer;
     transition: background .15s;
     border-bottom: 1px solid var(--line);
   }
   .ch-item:last-child { border-bottom: none; }
   .ch-item:hover { background: rgba(0,0,0,.04); }
   .ch-icon {
-    width: 28px; height: 28px; border-radius: 50%;
+    width: 36px; height: 36px; border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0; font-size: 13px;
+    flex-shrink: 0; font-size: 15px;
   }
   .ch-icon.answered { background: rgba(76,175,80,.15); color: #4caf50; }
   .ch-icon.not_answered { background: rgba(255,152,0,.15); color: #ff9800; }
@@ -655,17 +604,14 @@ const CSS = `
   .ch-icon.error { background: rgba(0,0,0,.08); color: var(--sub); }
   .ch-info { flex: 1; min-width: 0; }
   .ch-number {
-    font-size: 13px; color: var(--text); font-weight: 500;
+    font-size: 14px; color: var(--text); font-weight: 500;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  .ch-meta {
-    font-size: 11px; color: var(--sub);
-  }
+  .ch-meta { font-size: 12px; color: var(--sub); }
   .ch-del-btn {
     background: none; border: none; cursor: pointer;
-    color: var(--sub); padding: 4px; border-radius: 4px;
-    opacity: 0; transition: opacity .15s, color .15s;
-    flex-shrink: 0;
+    color: var(--sub); padding: 6px; border-radius: 6px;
+    opacity: 0; transition: opacity .15s, color .15s; flex-shrink: 0;
   }
   .ch-item:hover .ch-del-btn { opacity: 1; }
   .ch-del-btn:hover { color: var(--danger); }
@@ -1278,8 +1224,7 @@ class SmsGammuPanel extends HTMLElement {
     const text = reasonMap[data.reason] || data.reason;
     this._showToast(`${data.number}: ${text}`);
 
-    const dd = this.shadowRoot.getElementById("call-history-dropdown");
-    if (dd?.classList.contains("open")) {
+    if (this._callDialog?.open) {
       this._api("call_history").then((h) => {
         this._callHistory = h;
         this._renderCallHistory();
@@ -1402,80 +1347,172 @@ class SmsGammuPanel extends HTMLElement {
   }
 
   async _openCallHistory() {
-    const dd = this.shadowRoot.getElementById("call-history-dropdown");
-    if (!dd) return;
-    const isOpen = dd.classList.contains("open");
-    if (isOpen) {
-      dd.classList.remove("open");
-      return;
-    }
+    if (this._callDialog?.open) { this._callDialog.close(); return; }
+    if (!this._callDialog) this._initCallDialog();
 
-    const titleEl = this.shadowRoot.getElementById("ch-title");
-    const clearBtn = this.shadowRoot.getElementById("ch-clear-btn");
-    const numInput = this.shadowRoot.getElementById("ch-new-number");
-    if (titleEl) titleEl.textContent = this._t("call_history");
-    if (clearBtn) clearBtn.textContent = this._t("clear");
-    if (numInput) numInput.placeholder = this._t("number_placeholder");
-
-    dd.classList.add("open");
-    numInput.value = "";
-    this.shadowRoot.getElementById("ch-call-btn").disabled = true;
+    // Обновляем заголовки
+    this._callDialog.querySelector(".cd-title").textContent = this._t("call_history");
+    this._callDialog.querySelector(".cd-clear").textContent = this._t("clear");
+    const inp = this._callDialog.querySelector(".cd-input");
+    inp.placeholder = this._t("number_placeholder");
+    inp.value = "";
+    this._callDialog.querySelector(".cd-call-btn").disabled = true;
 
     try {
       this._callHistory = await this._api("call_history");
-    } catch (_) {
-      this._callHistory = [];
-    }
+    } catch (_) { this._callHistory = []; }
     this._renderCallHistory();
-    setTimeout(() => numInput.focus(), 50);
+    this._callDialog.showModal();
+    setTimeout(() => inp.focus(), 80);
   }
 
   _closeCallHistory() {
-    this.shadowRoot.getElementById("call-history-dropdown")?.classList.remove("open");
+    this._callDialog?.close();
+  }
+
+  _initCallDialog() {
+    const dialog = document.createElement("dialog");
+    dialog.id = "call-dialog";
+    dialog.style.cssText = "border:none;padding:0;background:transparent;width:100%;max-width:480px;margin:auto auto 0 auto;outline:none;";
+
+    const style = document.createElement("style");
+    style.textContent = [
+      "dialog#call-dialog::backdrop{background:rgba(0,0,0,.5)}",
+      ".cd-sheet{background:var(--card-background-color,#fff);border-radius:18px 18px 0 0;",
+      "padding-bottom:max(env(safe-area-inset-bottom,0px),16px);",
+      "font-family:var(--paper-font-body1_-_font-family,Roboto,sans-serif)}",
+      ".cd-handle{width:36px;height:4px;border-radius:2px;background:var(--divider-color,#ddd);margin:12px auto 0}",
+      ".cd-head{display:flex;align-items:center;justify-content:space-between;",
+      "padding:12px 20px 10px;border-bottom:1px solid var(--divider-color,#eee)}",
+      ".cd-title{font-size:16px;font-weight:600;color:var(--primary-text-color,#111)}",
+      ".cd-clear{background:none;border:none;cursor:pointer;font-size:12px;",
+      "color:var(--secondary-text-color,#666);padding:4px 8px;border-radius:6px}",
+      ".cd-clear:hover{color:#e53935;background:rgba(229,57,53,.08)}",
+      ".cd-input-row{display:flex;gap:8px;padding:12px 20px;",
+      "border-bottom:1px solid var(--divider-color,#eee)}",
+      ".cd-input{flex:1;padding:10px 14px;border:1px solid var(--divider-color,#eee);",
+      "border-radius:10px;background:var(--primary-background-color,#f5f5f5);",
+      "color:var(--primary-text-color,#111);font-size:15px;outline:none;font-family:inherit}",
+      ".cd-input:focus{border-color:#4caf50}",
+      ".cd-call-btn{width:44px;height:44px;border-radius:50%;background:#4caf50;",
+      "color:#fff;border:none;cursor:pointer;display:flex;align-items:center;",
+      "justify-content:center;flex-shrink:0;transition:opacity .15s}",
+      ".cd-call-btn:disabled{opacity:.35;cursor:default}",
+      ".cd-list{overflow-y:auto;max-height:260px}",
+      ".cd-empty{padding:28px 20px;text-align:center;color:var(--secondary-text-color,#666);font-size:13px}",
+      ".cd-item{display:flex;align-items:center;gap:12px;padding:12px 20px;",
+      "cursor:pointer;border-bottom:1px solid var(--divider-color,#eee);transition:background .15s}",
+      ".cd-item:last-child{border-bottom:none}",
+      ".cd-item:hover{background:rgba(0,0,0,.04)}",
+      ".cd-icon{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;",
+      "justify-content:center;flex-shrink:0;font-size:15px}",
+      ".cd-icon.answered{background:rgba(76,175,80,.15);color:#4caf50}",
+      ".cd-icon.not_answered{background:rgba(255,152,0,.15);color:#ff9800}",
+      ".cd-icon.declined{background:rgba(229,57,53,.15);color:#e53935}",
+      ".cd-icon.error{background:rgba(0,0,0,.08);color:#666}",
+      ".cd-info{flex:1;min-width:0}",
+      ".cd-number{font-size:14px;font-weight:500;color:var(--primary-text-color,#111);",
+      "white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
+      ".cd-meta{font-size:12px;color:var(--secondary-text-color,#666)}",
+      ".cd-del{background:none;border:none;cursor:pointer;color:var(--secondary-text-color,#666);",
+      "padding:6px;border-radius:6px;opacity:0;transition:opacity .15s}",
+      ".cd-item:hover .cd-del{opacity:1}",
+      ".cd-del:hover{color:#e53935}",
+    ].join(" ");
+    document.head.appendChild(style);
+
+    const svgPhone = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>';
+    const svgDel = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>';
+
+    dialog.innerHTML =
+      '<div class="cd-sheet">' +
+        '<div class="cd-handle"></div>' +
+        '<div class="cd-head">' +
+          '<span class="cd-title"></span>' +
+          '<button class="cd-clear"></button>' +
+        '</div>' +
+        '<div class="cd-input-row">' +
+          '<input class="cd-input" type="tel" />' +
+          '<button class="cd-call-btn" disabled>' + svgPhone + '</button>' +
+        '</div>' +
+        '<div class="cd-list" id="cd-list"></div>' +
+      '</div>';
+
+    document.body.appendChild(dialog);
+
+    // Закрытие по backdrop
+    dialog.addEventListener("click", (e) => {
+      const sheet = dialog.querySelector(".cd-sheet");
+      if (!sheet.contains(e.target)) dialog.close();
+    });
+
+    // Закрытие при навигации
+    window.addEventListener("location-changed", () => dialog.close());
+
+    const inp = dialog.querySelector(".cd-input");
+    const callBtn = dialog.querySelector(".cd-call-btn");
+    const clearBtn = dialog.querySelector(".cd-clear");
+
+    inp.addEventListener("input", () => { callBtn.disabled = !inp.value.trim(); });
+    inp.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && inp.value.trim()) { e.preventDefault(); callBtn.click(); }
+    });
+    callBtn.addEventListener("click", async () => {
+      const number = inp.value.trim();
+      if (!number) return;
+      dialog.close();
+      await this._callNumber(number);
+    });
+    clearBtn.addEventListener("click", async () => {
+      try {
+        await this._api("clear_call_history", "POST");
+        this._callHistory = [];
+        this._renderCallHistory();
+      } catch (_) {}
+    });
+
+    this._callDialog = dialog;
   }
 
   _renderCallHistory() {
-    const list = this.shadowRoot.getElementById("ch-list");
+    if (!this._callDialog) return;
+    const list = this._callDialog.querySelector("#cd-list");
     if (!list) return;
 
     const items = this._callHistory || [];
     if (!items.length) {
-      list.innerHTML = `<div class="ch-empty">${this._t("no_calls")}</div>`;
+      list.innerHTML = '<div class="cd-empty">' + this._t("no_calls") + '</div>';
       return;
     }
 
     const reasonIcon = { answered: "✓", not_answered: "—", declined: "✕", error: "!" };
+    const svgDel = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>';
 
-    list.innerHTML = items.map((c) => `
-      <div class="ch-item" data-number="${this._esc(c.number)}">
-        <div class="ch-icon ${c.reason}">${reasonIcon[c.reason] || "?"}</div>
-        <div class="ch-info">
-          <div class="ch-number">${this._esc(c.contact_name || c.number)}</div>
-          <div class="ch-meta">${this._t("call_reason_" + c.reason)} · ${this._formatShort(c.called_at)}</div>
-        </div>
-        <button class="ch-del-btn" data-id="${c.id}" title="${this._t("delete_msg")}">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="3 6 5 6 21 6"/>
-            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-          </svg>
-        </button>
-      </div>
-    `).join("");
+    list.innerHTML = items.map((c) =>
+      '<div class="cd-item" data-number="' + this._esc(c.number) + '">' +
+        '<div class="cd-icon ' + c.reason + '">' + (reasonIcon[c.reason] || "?") + '</div>' +
+        '<div class="cd-info">' +
+          '<div class="cd-number">' + this._esc(c.contact_name || c.number) + '</div>' +
+          '<div class="cd-meta">' + this._t("call_reason_" + c.reason) + ' · ' + this._formatShort(c.called_at) + '</div>' +
+        '</div>' +
+        '<button class="cd-del" data-id="' + c.id + '">' + svgDel + '</button>' +
+      '</div>'
+    ).join("");
 
-    list.querySelectorAll(".ch-item").forEach((el) => {
+    list.querySelectorAll(".cd-item").forEach((el) => {
       el.addEventListener("click", (e) => {
-        if (e.target.closest(".ch-del-btn")) return;
+        if (e.target.closest(".cd-del")) return;
         const number = el.dataset.number;
         this._closeCallHistory();
         this._callNumber(number);
       });
     });
-    list.querySelectorAll(".ch-del-btn").forEach((btn) => {
+    list.querySelectorAll(".cd-del").forEach((btn) => {
       btn.addEventListener("click", async (e) => {
         e.stopPropagation();
         const id = parseInt(btn.dataset.id);
         try {
-          await this._api(`delete_call/${id}`, "POST");
+          await this._api("delete_call/" + id, "POST");
           this._callHistory = this._callHistory.filter((c) => c.id !== id);
           this._renderCallHistory();
         } catch (_) {}
@@ -2214,21 +2251,7 @@ class SmsGammuPanel extends HTMLElement {
               </svg>
             </button>
 
-            <div class="call-history-dropdown" id="call-history-dropdown">
-              <div class="ch-header">
-                <span id="ch-title">История звонков</span>
-                <button class="ch-clear-btn" id="ch-clear-btn">Очистить</button>
-              </div>
-              <div class="ch-new-input-row">
-                <input class="ch-new-input" id="ch-new-number" type="tel" placeholder="+79001234567" />
-                <button class="ch-call-btn" id="ch-call-btn" disabled title="Позвонить">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
-                  </svg>
-                </button>
-              </div>
-              <div class="ch-list" id="ch-list"></div>
-            </div>
+
           </div>
 
           <!-- Modal: новый чат -->
@@ -2326,10 +2349,7 @@ class SmsGammuPanel extends HTMLElement {
       this.dispatchEvent(new Event("hass-toggle-menu", { bubbles: true, composed: true }));
     });
 
-    // Закрываем dropdown при клике вне
-    this.shadowRoot.addEventListener("click", () => {
-      this.shadowRoot.getElementById("call-history-dropdown")?.classList.remove("open");
-    });
+
 
     // FAB — новый чат
     this.shadowRoot.getElementById("fab-new-chat").addEventListener("click", (e) => {
@@ -2380,35 +2400,6 @@ class SmsGammuPanel extends HTMLElement {
     this.shadowRoot.getElementById("fab-call").addEventListener("click", (e) => {
       e.stopPropagation();
       this._openCallHistory();
-    });
-    this.shadowRoot.getElementById("call-history-dropdown").addEventListener("click", (e) => {
-      e.stopPropagation();
-    });
-    this.shadowRoot.getElementById("ch-clear-btn").addEventListener("click", async () => {
-      try {
-        await this._api("clear_call_history", "POST");
-        this._callHistory = [];
-        this._renderCallHistory();
-      } catch (_) {}
-    });
-
-    const chInput   = this.shadowRoot.getElementById("ch-new-number");
-    const chCallBtn = this.shadowRoot.getElementById("ch-call-btn");
-
-    chInput.addEventListener("input", () => {
-      chCallBtn.disabled = !chInput.value.trim();
-    });
-    chInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && chInput.value.trim()) {
-        e.preventDefault();
-        chCallBtn.click();
-      }
-    });
-    chCallBtn.addEventListener("click", async () => {
-      const number = chInput.value.trim();
-      if (!number) return;
-      this._closeCallHistory();
-      await this._callNumber(number);
     });
 
     // Применяем состояние narrow если уже знаем
