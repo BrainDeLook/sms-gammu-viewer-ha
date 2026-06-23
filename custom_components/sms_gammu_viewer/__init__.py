@@ -473,7 +473,9 @@ class SmsCoordinator:
                 _LOGGER.debug("Collect: pausing — call in progress")
                 while self.call_in_progress:
                     await asyncio.sleep(1)
-                _LOGGER.debug("Collect: resuming after call")
+                # Сбрасываем счётчик — за время звонка могли прийти новые части
+                empty_streak = 0
+                _LOGGER.debug("Collect: resuming after call, resetting empty counter")
                 continue
 
             messages = await self._safe_get_all()
