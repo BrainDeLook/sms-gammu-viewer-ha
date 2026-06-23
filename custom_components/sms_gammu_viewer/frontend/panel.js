@@ -580,7 +580,50 @@ const CSS = `
   .lang-option.active { color: var(--accent); font-weight: 500; }
 
   /* ─── Call history dropdown ─── */
-  /* ─── Call history items (используются внутри dialog) ─── */
+  /* ─── Call history overlay (внутри .contacts, как new-chat) ─── */
+  .call-history-overlay {
+    display: none; position: absolute; inset: 0;
+    background: rgba(0,0,0,.4); z-index: 20;
+    align-items: flex-end; justify-content: center;
+  }
+  .call-history-overlay.open { display: flex; }
+  .ch-overlay-sheet {
+    background: var(--card); border-radius: 18px 18px 0 0;
+    padding: 20px 20px 32px; width: 100%;
+  }
+  .ch-overlay-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .ch-overlay-title {
+    font-size: 16px; font-weight: 600; color: var(--text);
+  }
+  .ch-overlay-clear {
+    background: none; border: none; cursor: pointer;
+    font-size: 12px; color: var(--sub);
+    padding: 4px 8px; border-radius: 6px;
+  }
+  .ch-overlay-clear:hover { color: var(--danger); background: rgba(229,57,53,.08); }
+  .ch-overlay-input-row {
+    display: flex; gap: 8px; margin-bottom: 12px;
+  }
+  .ch-overlay-input {
+    flex: 1; padding: 10px 14px;
+    border: 1px solid var(--line); border-radius: 10px;
+    background: var(--bg); color: var(--text);
+    font-size: 14px; font-family: inherit; outline: none;
+  }
+  .ch-overlay-input:focus { border-color: #4caf50; }
+  .ch-overlay-call-btn {
+    width: 44px; height: 44px; border-radius: 50%;
+    background: #4caf50; color: #fff; border: none;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; transition: opacity .15s;
+  }
+  .ch-overlay-call-btn:disabled { opacity: .35; cursor: default; }
+  .ch-overlay-list { max-height: 220px; overflow-y: auto; border-radius: 10px; background: var(--bg); }
+
+  /* ─── Call history items (используются внутри overlay) ─── */
   .ch-empty {
     padding: 24px 14px; text-align: center;
     color: var(--sub); font-size: 13px;
@@ -1224,7 +1267,8 @@ class SmsGammuPanel extends HTMLElement {
     const text = reasonMap[data.reason] || data.reason;
     this._showToast(`${data.number}: ${text}`);
 
-    if (this._callDialog?.open) {
+    const chOverlay = this.shadowRoot.getElementById("call-history-overlay");
+    if (chOverlay?.classList.contains("open")) {
       this._api("call_history").then((h) => {
         this._callHistory = h;
         this._renderCallHistory();
@@ -1347,388 +1391,33 @@ class SmsGammuPanel extends HTMLElement {
   }
 
   async _openCallHistory() {
-    if (this._callDialog?.open) { this._callDialog.close(); return; }
-    if (!this._callDialog) this._initCallDialog();
+    const overlay = this.shadowRoot.getElementById("call-history-overlay");
+    if (!overlay) return;
+    if (overlay.classList.contains("open")) {
+      overlay.classList.remove("open");
+      return;
+    }
 
-    // Обновляем заголовки
-    this._callDialog.querySelector(".cd-title").textContent = this._t("call_history");
-    this._callDialog.querySelector(".cd-clear").textContent = this._t("clear");
-    const inp = this._callDialog.querySelector(".cd-input");
-    inp.placeholder = this._t("number_placeholder");
-    inp.value = "";
-    this._callDialog.querySelector(".cd-call-btn").disabled = true;
+    const titleEl = overlay.querySelector(".ch-overlay-title");
+    const clearBtn = overlay.querySelector(".ch-overlay-clear");
+    const inp = overlay.querySelector(".ch-overlay-input");
+    if (titleEl) titleEl.textContent = this._t("call_history");
+    if (clearBtn) clearBtn.textContent = this._t("clear");
+    if (inp) { inp.placeholder = this._t("number_placeholder"); inp.value = ""; }
+    overlay.querySelector(".ch-overlay-call-btn").disabled = true;
 
     try {
       this._callHistory = await this._api("call_history");
     } catch (_) { this._callHistory = []; }
     this._renderCallHistory();
-    this._callDialog.showModal();
-    setTimeout(() => inp.focus(), 80);
+    overlay.classList.add("open");
+    setTimeout(() => inp?.focus(), 50);
   }
 
   _closeCallHistory() {
-    this._callDialog?.close();
+    this.shadowRoot.getElementById("call-history-overlay")?.classList.remove("open");
   }
 
-  _initCallDialog() {
-    const dialog = document.createElement("dialog");
-    dialog.id = "call-dialog";
-    dialog.style.cssText = "border:none;padding:0;background:transparent;width:100%;max-width:480px;margin:auto auto 0 auto;outline:none;";
-
-    const style = document.createElement("style");
-    style.textContent = [
-      "dialog#call-dialog::backdrop{background:rgba(0,0,0,.5)}",
-      ".cd-sheet{background:var(--card-background-color,#fff);border-radius:18px 18px 0 0;",
-      "padding-bottom:max(env(safe-area-inset-bottom,0px),16px);",
-      "font-family:var(--paper-font-body1_-_font-family,Roboto,sans-serif)}",
-      ".cd-handle{width:36px;height:4px;border-radius:2px;background:var(--divider-color,#ddd);margin:12px auto 0}",
-      ".cd-head{display:flex;align-items:center;justify-content:space-between;",
-      "padding:12px 20px 10px;border-bottom:1px solid var(--divider-color,#eee)}",
-      ".cd-title{font-size:16px;font-weight:600;color:var(--primary-text-color,#111)}",
-      ".cd-clear{background:none;border:none;cursor:pointer;font-size:12px;",
-      "color:var(--secondary-text-color,#666);padding:4px 8px;border-radius:6px}",
-      ".cd-clear:hover{color:#e53935;background:rgba(229,57,53,.08)}",
-      ".cd-input-row{display:flex;gap:8px;padding:12px 20px;",
-      "border-bottom:1px solid var(--divider-color,#eee)}",
-      ".cd-input{flex:1;padding:10px 14px;border:1px solid var(--divider-color,#eee);",
-      "border-radius:10px;background:var(--primary-background-color,#f5f5f5);",
-      "color:var(--primary-text-color,#111);font-size:15px;outline:none;font-family:inherit}",
-      ".cd-input:focus{border-color:#4caf50}",
-      ".cd-call-btn{width:44px;height:44px;border-radius:50%;background:#4caf50;",
-      "color:#fff;border:none;cursor:pointer;display:flex;align-items:center;",
-      "justify-content:center;flex-shrink:0;transition:opacity .15s}",
-      ".cd-call-btn:disabled{opacity:.35;cursor:default}",
-      ".cd-list{overflow-y:auto;max-height:260px}",
-      ".cd-empty{padding:28px 20px;text-align:center;color:var(--secondary-text-color,#666);font-size:13px}",
-      ".cd-item{display:flex;align-items:center;gap:12px;padding:12px 20px;",
-      "cursor:pointer;border-bottom:1px solid var(--divider-color,#eee);transition:background .15s}",
-      ".cd-item:last-child{border-bottom:none}",
-      ".cd-item:hover{background:rgba(0,0,0,.04)}",
-      ".cd-icon{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;",
-      "justify-content:center;flex-shrink:0;font-size:15px}",
-      ".cd-icon.answered{background:rgba(76,175,80,.15);color:#4caf50}",
-      ".cd-icon.not_answered{background:rgba(255,152,0,.15);color:#ff9800}",
-      ".cd-icon.declined{background:rgba(229,57,53,.15);color:#e53935}",
-      ".cd-icon.error{background:rgba(0,0,0,.08);color:#666}",
-      ".cd-info{flex:1;min-width:0}",
-      ".cd-number{font-size:14px;font-weight:500;color:var(--primary-text-color,#111);",
-      "white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
-      ".cd-meta{font-size:12px;color:var(--secondary-text-color,#666)}",
-      ".cd-del{background:none;border:none;cursor:pointer;color:var(--secondary-text-color,#666);",
-      "padding:6px;border-radius:6px;opacity:0;transition:opacity .15s}",
-      ".cd-item:hover .cd-del{opacity:1}",
-      ".cd-del:hover{color:#e53935}",
-    ].join(" ");
-    document.head.appendChild(style);
-
-    const svgPhone = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>';
-    const svgDel = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>';
-
-    dialog.innerHTML =
-      '<div class="cd-sheet">' +
-        '<div class="cd-handle"></div>' +
-        '<div class="cd-head">' +
-          '<span class="cd-title"></span>' +
-          '<button class="cd-clear"></button>' +
-        '</div>' +
-        '<div class="cd-input-row">' +
-          '<input class="cd-input" type="tel" />' +
-          '<button class="cd-call-btn" disabled>' + svgPhone + '</button>' +
-        '</div>' +
-        '<div class="cd-list" id="cd-list"></div>' +
-      '</div>';
-
-    document.body.appendChild(dialog);
-
-    // Закрытие по backdrop
-    dialog.addEventListener("click", (e) => {
-      const sheet = dialog.querySelector(".cd-sheet");
-      if (!sheet.contains(e.target)) dialog.close();
-    });
-
-    // Закрытие при навигации
-    window.addEventListener("location-changed", () => dialog.close());
-
-    const inp = dialog.querySelector(".cd-input");
-    const callBtn = dialog.querySelector(".cd-call-btn");
-    const clearBtn = dialog.querySelector(".cd-clear");
-
-    inp.addEventListener("input", () => { callBtn.disabled = !inp.value.trim(); });
-    inp.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && inp.value.trim()) { e.preventDefault(); callBtn.click(); }
-    });
-    callBtn.addEventListener("click", async () => {
-      const number = inp.value.trim();
-      if (!number) return;
-      dialog.close();
-      await this._callNumber(number);
-    });
-    clearBtn.addEventListener("click", async () => {
-      try {
-        await this._api("clear_call_history", "POST");
-        this._callHistory = [];
-        this._renderCallHistory();
-      } catch (_) {}
-    });
-
-    this._callDialog = dialog;
-  }
-
-  _renderCallHistory() {
-    if (!this._callDialog) return;
-    const list = this._callDialog.querySelector("#cd-list");
-    if (!list) return;
-
-    const items = this._callHistory || [];
-    if (!items.length) {
-      list.innerHTML = '<div class="cd-empty">' + this._t("no_calls") + '</div>';
-      return;
-    }
-
-    const reasonIcon = { answered: "✓", not_answered: "—", declined: "✕", error: "!" };
-    const svgDel = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>';
-
-    list.innerHTML = items.map((c) =>
-      '<div class="cd-item" data-number="' + this._esc(c.number) + '">' +
-        '<div class="cd-icon ' + c.reason + '">' + (reasonIcon[c.reason] || "?") + '</div>' +
-        '<div class="cd-info">' +
-          '<div class="cd-number">' + this._esc(c.contact_name || c.number) + '</div>' +
-          '<div class="cd-meta">' + this._t("call_reason_" + c.reason) + ' · ' + this._formatShort(c.called_at) + '</div>' +
-        '</div>' +
-        '<button class="cd-del" data-id="' + c.id + '">' + svgDel + '</button>' +
-      '</div>'
-    ).join("");
-
-    list.querySelectorAll(".cd-item").forEach((el) => {
-      el.addEventListener("click", (e) => {
-        if (e.target.closest(".cd-del")) return;
-        const number = el.dataset.number;
-        this._closeCallHistory();
-        this._callNumber(number);
-      });
-    });
-    list.querySelectorAll(".cd-del").forEach((btn) => {
-      btn.addEventListener("click", async (e) => {
-        e.stopPropagation();
-        const id = parseInt(btn.dataset.id);
-        try {
-          await this._api("delete_call/" + id, "POST");
-          this._callHistory = this._callHistory.filter((c) => c.id !== id);
-          this._renderCallHistory();
-        } catch (_) {}
-      });
-    });
-  }
-
-  async _sendSms() {
-    const number = this._activeNumber;
-    const text = this._sendText.trim();
-    if (!number || !text || this._sending) return;
-
-    this._sending = true;
-    const btn = this.shadowRoot.getElementById("send-btn");
-    const ta  = this.shadowRoot.getElementById("send-input");
-    const counter = this.shadowRoot.getElementById("char-counter");
-    if (btn) { btn.disabled = true; btn.style.opacity = "0.5"; }
-
-    // Оптимистично очищаем поле сразу — не ждём ответа сервера
-    const savedText = text;
-    this._sendText = "";
-    if (ta) { ta.value = ""; ta.style.height = "auto"; }
-    if (counter) counter.style.display = "none";
-
-    try {
-      const res = await this._api("send", "POST", { number, text: savedText });
-      if (res.ok) {
-        // Удаляем черновик — сообщение отправлено
-        this._saveDraft(number, "");
-        // Перезагружаем историю и контакты
-        this._messages = await this._api(`messages/${encodeURIComponent(number)}`);
-        this._renderMessages();
-        await this._refreshContacts();
-        // Финальная очистка поля
-        const taFresh = this.shadowRoot.getElementById("send-input");
-        const counterFresh = this.shadowRoot.getElementById("char-counter");
-        if (taFresh) { taFresh.value = ""; taFresh.style.height = "auto"; }
-        if (counterFresh) counterFresh.style.display = "none";
-      } else {
-        // Возвращаем текст обратно если не отправился
-        this._sendText = savedText;
-        if (ta) { ta.value = savedText; }
-        this._showToast(this._t("send_error"));
-      }
-    } catch (e) {
-      // Возвращаем текст если сеть упала
-      this._sendText = savedText;
-      if (ta) { ta.value = savedText; }
-      this._showToast(this._t("send_error") + ": " + e.message);
-    } finally {
-      this._sending = false;
-      if (btn) { btn.disabled = !this._sendText.trim(); btn.style.opacity = ""; }
-    }
-  }
-
-  _restoreDraftUI() {
-    // Восстанавливает черновик в поле ввода для текущего активного чата.
-    // Вызывается из _renderMessages после того как send-bar уже отображён.
-    const number = this._activeNumber;
-    if (!number) return;
-    const draft = this._drafts[number] || "";
-    const ta = this.shadowRoot.getElementById("send-input");
-    const sendBtn = this.shadowRoot.getElementById("send-btn");
-    const counter = this.shadowRoot.getElementById("char-counter");
-    if (ta && ta.value !== draft) {
-      ta.value = draft;
-      ta.style.height = "auto";
-      if (draft) ta.style.height = Math.min(ta.scrollHeight, 120) + "px";
-    }
-    if (sendBtn) sendBtn.disabled = !draft.trim();
-    if (counter) {
-      if (!draft) {
-        counter.style.display = "none";
-      } else {
-        const hasCyrillic = /[а-яёА-ЯЁ]/.test(draft);
-        const singleSize = hasCyrillic ? 70 : 160;
-        const partSize = hasCyrillic ? 67 : 153;
-        const isMulti = draft.length > singleSize;
-        const parts = isMulti ? Math.ceil(draft.length / partSize) : 1;
-        const limit = isMulti ? parts * partSize : singleSize;
-        const left = limit - draft.length;
-        counter.style.display = "";
-        counter.textContent = isMulti ? `${draft.length} / ${limit} · ${parts} SMS` : `${left}`;
-        counter.className = "char-counter" + (left < 10 ? " over" : left < 30 ? " warn" : "");
-      }
-    }
-  }
-
-  _saveDraft(number, text) {
-    if (text) {
-      this._drafts[number] = text;
-    } else {
-      delete this._drafts[number];
-    }
-    try { localStorage.setItem("sms_gammu_drafts", JSON.stringify(this._drafts)); } catch {}
-  }
-
-  async _refreshContacts() {
-    try {
-      this._contacts = await this._api("contacts");
-      this._renderContacts();
-      this._updateBadge();
-    } catch (_) {}
-  }
-
-  _openPbSheet(number, name, isMuted) {
-    if (!this._pbDialog) return;
-    this._pbSheetNumber = number;
-    this._pbDialog.querySelector("#pb-d-name").textContent = name;
-    this._pbDialog.querySelector("#pb-d-num").textContent = number;
-    this._pbDialog.querySelector("#pb-d-open-lbl").textContent = this._t("open_chat");
-    this._pbDialog.querySelector("#pb-d-mute-lbl").textContent = isMuted ? this._t("unmute_chat") : this._t("mute_chat");
-    this._pbDialog.querySelector("#pb-d-edit-lbl").textContent = this._t("edit");
-    this._pbDialog.querySelector("#pb-d-delete-lbl").textContent = this._t("delete_msg");
-    this._pbDialog.showModal();
-    // Убираем автофокус с первой кнопки — иначе браузер рисует outline
-    this._pbDialog.querySelector(".pb-d-btn").blur();
-  }
-
-  _closePbSheet() {
-    this._pbDialog?.close();
-    this._pbSheetNumber = null;
-  }
-
-  _initPbSheet() {
-    const dialog = document.createElement("dialog");
-    dialog.id = "pb-dialog";
-    // Позиционируем через margin:auto auto 0 — прижимаем к низу экрана
-    dialog.style.cssText = [
-      "border:none; padding:0; background:transparent;",
-      "width:100%; max-width:480px;",
-      "margin: auto auto 0 auto;",   // bottom sheet — прижат к низу
-      "max-height: 90vh;",
-    ].join(" ");
-
-    const style = document.createElement("style");
-    // Берём цвета из CSS переменных HA которые доступны в document (не в shadow)
-    style.textContent = [
-      "dialog#pb-dialog, dialog#pb-dialog * { outline:none; }",
-      "dialog#pb-dialog::backdrop { background: rgba(0,0,0,.55); }",
-      ".pb-d-sheet {",
-      "  background: var(--card-background-color, #fff);",
-      "  border-radius: 18px 18px 0 0;",
-      "  padding-bottom: max(env(safe-area-inset-bottom,0px), 16px);",
-      "  font-family: var(--paper-font-body1_-_font-family, Roboto, sans-serif);",
-      "}",
-      ".pb-d-handle {",
-      "  width:36px; height:4px; border-radius:2px;",
-      "  background: var(--divider-color, #ddd);",
-      "  margin: 12px auto 6px;",
-      "}",
-      ".pb-d-header {",
-      "  padding: 6px 20px 14px;",
-      "  border-bottom: 1px solid var(--divider-color, #eee);",
-      "}",
-      ".pb-d-name { font-size:16px; font-weight:600; color: var(--primary-text-color, #111); }",
-      ".pb-d-num  { font-size:13px; color: var(--secondary-text-color, #666); margin-top:2px; }",
-      ".pb-d-btn {",
-      "  display:flex; align-items:center; gap:16px;",
-      "  width:100%; padding:15px 24px;",
-      "  border:none; background:none; cursor:pointer;",
-      "  font-size:15px; color: var(--primary-text-color, #111);",
-      "  font-family:inherit; text-align:left;",
-      "  transition: background .15s;",
-      "}",
-      ".pb-d-btn:active { background: rgba(0,0,0,.06); }",
-      ".pb-d-btn.danger { color: #e53935; }",
-    ].join(" ");
-    document.head.appendChild(style);
-
-    const svgChat = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
-    const svgMute = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>';
-    const svgEdit = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
-    const svgDel  = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>';
-
-    dialog.innerHTML =
-      '<div class="pb-d-sheet">' +
-        '<div class="pb-d-handle"></div>' +
-        '<div class="pb-d-header">' +
-          '<div class="pb-d-name" id="pb-d-name"></div>' +
-          '<div class="pb-d-num" id="pb-d-num"></div>' +
-        '</div>' +
-        '<button class="pb-d-btn" id="pb-d-open">' + svgChat + '<span id="pb-d-open-lbl"></span></button>' +
-        '<button class="pb-d-btn" id="pb-d-mute">' + svgMute + '<span id="pb-d-mute-lbl"></span></button>' +
-        '<button class="pb-d-btn" id="pb-d-edit">' + svgEdit + '<span id="pb-d-edit-lbl"></span></button>' +
-        '<button class="pb-d-btn danger" id="pb-d-delete">' + svgDel + '<span id="pb-d-delete-lbl"></span></button>' +
-      '</div>';
-
-    document.body.appendChild(dialog);
-
-    dialog.addEventListener("click", (e) => {
-      const rect = dialog.querySelector(".pb-d-sheet").getBoundingClientRect();
-      if (e.clientY < rect.top) dialog.close();
-    });
-    dialog.querySelector("#pb-d-open").addEventListener("click", () => {
-      const n = this._pbSheetNumber; dialog.close();
-      this._activeTab = "chats";
-      this.shadowRoot.getElementById("phonebook-btn").style.color = "";
-      this._switchTab(); this._selectContact(n);
-    });
-    dialog.querySelector("#pb-d-mute").addEventListener("click", () => {
-      const n = this._pbSheetNumber; dialog.close(); this._togglePhonebookMute(n);
-    });
-    dialog.querySelector("#pb-d-edit").addEventListener("click", () => {
-      const n = this._pbSheetNumber; dialog.close();
-      const c = this._phonebook.find((x) => x.number === n);
-      this._openContactEditor(c);
-    });
-    dialog.querySelector("#pb-d-delete").addEventListener("click", () => {
-      const n = this._pbSheetNumber; dialog.close(); this._deleteContactFromBook(n);
-    });
-
-    this._pbDialog = dialog;
-
-
-  }
 
   async _copyToClipboard(text) {
     // Современный API — работает только на HTTPS / localhost
@@ -2254,6 +1943,25 @@ class SmsGammuPanel extends HTMLElement {
 
           </div>
 
+          <!-- История звонков overlay -->
+          <div class="call-history-overlay" id="call-history-overlay">
+            <div class="ch-overlay-sheet">
+              <div class="ch-overlay-head">
+                <span class="ch-overlay-title"></span>
+                <button class="ch-overlay-clear"></button>
+              </div>
+              <div class="ch-overlay-input-row">
+                <input class="ch-overlay-input" type="tel" id="ch-overlay-input" />
+                <button class="ch-overlay-call-btn" id="ch-overlay-call-btn" disabled>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
+                  </svg>
+                </button>
+              </div>
+              <div class="ch-overlay-list" id="ch-overlay-list"></div>
+            </div>
+          </div>
+
           <!-- Modal: новый чат -->
           <div class="new-chat-overlay" id="new-chat-overlay">
             <div class="new-chat-sheet">
@@ -2400,6 +2108,35 @@ class SmsGammuPanel extends HTMLElement {
     this.shadowRoot.getElementById("fab-call").addEventListener("click", (e) => {
       e.stopPropagation();
       this._openCallHistory();
+    });
+
+    // Закрытие overlay по клику на фон
+    this.shadowRoot.getElementById("call-history-overlay").addEventListener("click", (e) => {
+      if (e.target === this.shadowRoot.getElementById("call-history-overlay")) {
+        this._closeCallHistory();
+      }
+    });
+
+    const chInp = this.shadowRoot.getElementById("ch-overlay-input");
+    const chCallBtn = this.shadowRoot.getElementById("ch-overlay-call-btn");
+    const chClearBtn = this.shadowRoot.querySelector(".ch-overlay-clear");
+
+    chInp.addEventListener("input", () => { chCallBtn.disabled = !chInp.value.trim(); });
+    chInp.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && chInp.value.trim()) { e.preventDefault(); chCallBtn.click(); }
+    });
+    chCallBtn.addEventListener("click", async () => {
+      const number = chInp.value.trim();
+      if (!number) return;
+      this._closeCallHistory();
+      await this._callNumber(number);
+    });
+    chClearBtn.addEventListener("click", async () => {
+      try {
+        await this._api("clear_call_history", "POST");
+        this._callHistory = [];
+        this._renderCallHistory();
+      } catch (_) {}
     });
 
     // Применяем состояние narrow если уже знаем
