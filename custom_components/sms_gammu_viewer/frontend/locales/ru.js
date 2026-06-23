@@ -105,6 +105,7 @@ export default {
   back: "Назад",
   modem_btn: "Статус модема",
   draft: "Черновик",
+  call_waiting_sms: "Получение SMS, подождите…",
 };
 
 
