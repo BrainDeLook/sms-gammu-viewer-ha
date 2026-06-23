@@ -6,7 +6,9 @@
 
 > 🇬🇧 [English version](README.md)
 
-Нативная панель для просмотра и отправки SMS прямо в Home Assistant. Работает с аддоном [sms-gammu-gateway](https://github.com/PavelVe/home-assistant-addons/tree/main/sms-gammu-gateway) и любым совместимым шлюзом на базе [pajikos/sms-gammu-gateway](https://github.com/pajikos/sms-gammu-gateway).
+Нативная панель для **SMS переписки и голосовых звонков** прямо в Home Assistant. Работает с аддоном [sms-gammu-gateway](https://github.com/PavelVe/home-assistant-addons/tree/main/sms-gammu-gateway) и любым совместимым шлюзом на базе [pajikos/sms-gammu-gateway](https://github.com/pajikos/sms-gammu-gateway).
+
+> 💬 **Отправка и приём SMS** · 📞 **Исходящие звонки** · 📇 **Телефонная книга** · 🔔 **Push-уведомления** · 🚪 **Сущности звонков для ворот и домофонов**
 
 После установки в сайдбаре появляется вкладка **SMS**. Сообщения хранятся во внутренней SQLite базе и автоматически удаляются с модема после получения.
 
