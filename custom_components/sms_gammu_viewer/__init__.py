@@ -143,6 +143,13 @@ async def _register_services(hass: HomeAssistant) -> None:
         call_duration = coord.entry.data.get(CONF_CALL_DURATION, DEFAULT_CALL_DURATION)
 
         _LOGGER.info("Calling +%s via call service...", number)
+        # Ждём завершения активной сборки SMS
+        wait = 0
+        while coord.collecting and wait < 30:
+            _LOGGER.debug("Call service: waiting for SMS collect to finish…")
+            await asyncio.sleep(1)
+            wait += 1
+
         coord.call_in_progress = True
         try:
             reason = await dial_number(
@@ -460,6 +467,15 @@ class SmsCoordinator:
         empty_streak = 0
         while empty_streak < collect_empty_max:
             await asyncio.sleep(collect_interval)
+
+            # Если начался звонок — приостанавливаем сборку до его завершения
+            if self.call_in_progress:
+                _LOGGER.debug("Collect: pausing — call in progress")
+                while self.call_in_progress:
+                    await asyncio.sleep(1)
+                _LOGGER.debug("Collect: resuming after call")
+                continue
+
             messages = await self._safe_get_all()
 
             if not messages:
@@ -803,6 +819,13 @@ class SmsApiView(HomeAssistantView):
             call_duration = coord.entry.data.get(CONF_CALL_DURATION, DEFAULT_CALL_DURATION)
 
             async def _do_call():
+                # Ждём завершения активной сборки SMS перед звонком
+                wait = 0
+                while coord.collecting and wait < 30:
+                    _LOGGER.debug("Call: waiting for SMS collect to finish…")
+                    await asyncio.sleep(1)
+                    wait += 1
+
                 coord.call_in_progress = True
                 try:
                     reason = await dial_number(
