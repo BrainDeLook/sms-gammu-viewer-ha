@@ -704,10 +704,10 @@ const CSS = `
   .pb-item:last-child { border-bottom: none; }
   .pb-item:hover { background: rgba(0,0,0,.03); }
   .pb-avatar {
-    width: 38px; height: 38px; border-radius: 50%;
+    width: 42px; height: 42px; border-radius: 50%;
     background: var(--accent); color: #fff;
     display: flex; align-items: center; justify-content: center;
-    font-size: 15px; font-weight: 700; flex-shrink: 0;
+    font-size: 16px; font-weight: 700; flex-shrink: 0;
   }
   .pb-info { flex: 1; min-width: 0; }
   .pb-name {
@@ -715,8 +715,9 @@ const CSS = `
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .pb-meta {
-    font-size: 12px; color: var(--sub);
+    font-size: 13px; color: var(--sub);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    margin-top: 1px;
   }
   .pb-action-btn {
     background: none; border: none; cursor: pointer;
@@ -728,6 +729,63 @@ const CSS = `
   .pb-action-btn:hover { background: rgba(0,0,0,.06); color: var(--text); }
   .pb-action-btn.danger:hover { background: rgba(229,57,53,.1); color: var(--danger); }
   .pb-action-btn.muted-active { color: #ff9800; }
+
+  /* ─── Bottom sheet для действий над контактом (мобиле) ─── */
+  .pb-sheet-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,.45); z-index: 200;
+    align-items: flex-end; justify-content: center;
+  }
+  .pb-sheet-overlay.open { display: flex; }
+  .pb-sheet {
+    background: var(--card); border-radius: 18px 18px 0 0;
+    width: 100%; max-width: 480px;
+    padding-bottom: env(safe-area-inset-bottom, 12px);
+    animation: pb-sheet-in .22s ease;
+  }
+  @keyframes pb-sheet-in { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  .pb-sheet-handle {
+    width: 36px; height: 4px; border-radius: 2px;
+    background: var(--line); margin: 10px auto 4px;
+  }
+  .pb-sheet-header {
+    padding: 8px 20px 12px;
+    border-bottom: 1px solid var(--line);
+  }
+  .pb-sheet-name {
+    font-size: 16px; font-weight: 600; color: var(--text);
+  }
+  .pb-sheet-number {
+    font-size: 13px; color: var(--sub); margin-top: 2px;
+  }
+  .pb-sheet-actions {
+    padding: 8px 0;
+  }
+  .pb-sheet-action {
+    display: flex; align-items: center; gap: 16px;
+    padding: 14px 24px; cursor: pointer;
+    font-size: 15px; color: var(--text);
+    transition: background .15s;
+    border: none; background: none; width: 100%; text-align: left;
+  }
+  .pb-sheet-action:hover { background: rgba(0,0,0,.04); }
+  .pb-sheet-action.danger { color: var(--danger); }
+  .pb-sheet-action svg { flex-shrink: 0; }
+
+  /* На широком экране — кнопки inline, sheet скрыт */
+  .pb-actions-inline { display: flex; gap: 0; }
+  .pb-more-btn { display: none; }
+
+  @media (max-width: 580px) {
+    .pb-actions-inline { display: none; }
+    .pb-more-btn {
+      display: flex; align-items: center; justify-content: center;
+      background: none; border: none; cursor: pointer;
+      color: var(--sub); padding: 8px; border-radius: 6px;
+      flex-shrink: 0;
+    }
+    .pb-meta { font-size: 13px; }
+  }
   .pb-empty {
     padding: 30px 14px; text-align: center;
     color: var(--sub); font-size: 13px;
@@ -1565,6 +1623,65 @@ class SmsGammuPanel extends HTMLElement {
     } catch (_) {}
   }
 
+  _openPbSheet(number, name, isMuted) {
+    const overlay = this.shadowRoot.getElementById("pb-sheet-overlay");
+    if (!overlay) return;
+    this._pbSheetNumber = number;
+    this._pbSheetMuted = isMuted;
+
+    this.shadowRoot.getElementById("pb-sheet-name").textContent = name;
+    this.shadowRoot.getElementById("pb-sheet-number").textContent = number;
+    this.shadowRoot.getElementById("pb-sheet-open-label").textContent = this._t("open_chat");
+    this.shadowRoot.getElementById("pb-sheet-mute-label").textContent = isMuted ? this._t("unmute_chat") : this._t("mute_chat");
+    this.shadowRoot.getElementById("pb-sheet-delete-label").textContent = this._t("delete_msg");
+
+    overlay.classList.add("open");
+  }
+
+  _closePbSheet() {
+    this.shadowRoot.getElementById("pb-sheet-overlay")?.classList.remove("open");
+    this._pbSheetNumber = null;
+  }
+
+  _initPbSheet() {
+    const overlay = this.shadowRoot.getElementById("pb-sheet-overlay");
+    if (!overlay) return;
+
+    // Закрытие по клику на фон
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) this._closePbSheet();
+    });
+
+    this.shadowRoot.getElementById("pb-sheet-open")?.addEventListener("click", () => {
+      const number = this._pbSheetNumber;
+      this._closePbSheet();
+      this._activeTab = "chats";
+      const pbBtn = this.shadowRoot.getElementById("phonebook-btn");
+      if (pbBtn) pbBtn.style.color = "";
+      this._switchTab();
+      this._selectContact(number);
+    });
+
+    this.shadowRoot.getElementById("pb-sheet-mute")?.addEventListener("click", () => {
+      const number = this._pbSheetNumber;
+      this._closePbSheet();
+      this._togglePhonebookMute(number);
+    });
+
+    this.shadowRoot.getElementById("pb-sheet-edit")?.addEventListener("click", () => {
+      const number = this._pbSheetNumber;
+      this._closePbSheet();
+      const contact = this._phonebook.find((c) => c.number === number);
+      this._openContactEditor(contact);
+    });
+
+    this.shadowRoot.getElementById("pb-sheet-delete")?.addEventListener("click", () => {
+      const number = this._pbSheetNumber;
+      this._closePbSheet();
+      this._deleteContactFromBook(number);
+    });
+  }
+
   async _copyToClipboard(text) {
     // Современный API — работает только на HTTPS / localhost
     if (navigator.clipboard && window.isSecureContext) {
@@ -1707,28 +1824,38 @@ class SmsGammuPanel extends HTMLElement {
                 ${this._esc(c.number)}${c.label ? " · " + this._esc(c.label) : ""}
               </div>
             </div>
-            <button class="pb-action-btn" data-action="open" data-number="${this._esc(c.number)}" title="${this._t("open_chat")}">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-              </svg>
-            </button>
-            <button class="pb-action-btn ${c.is_muted ? "muted-active" : ""}" data-action="mute" data-number="${this._esc(c.number)}" title="${c.is_muted ? this._t("unmute_chat") : this._t("mute_chat")}">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                ${c.is_muted
-                  ? '<path d="M11 5 6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/>'
-                  : '<path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>'}
-              </svg>
-            </button>
-            <button class="pb-action-btn" data-action="edit" data-number="${this._esc(c.number)}" title="${this._t("edit")}">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-              </svg>
-            </button>
-            <button class="pb-action-btn danger" data-action="delete" data-number="${this._esc(c.number)}" title="${this._t("delete_msg")}">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="3 6 5 6 21 6"/>
-                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+            <!-- Кнопки на десктопе — inline -->
+            <div class="pb-actions-inline">
+              <button class="pb-action-btn" data-action="open" data-number="${this._esc(c.number)}" title="${this._t("open_chat")}">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+              </button>
+              <button class="pb-action-btn ${c.is_muted ? "muted-active" : ""}" data-action="mute" data-number="${this._esc(c.number)}" title="${c.is_muted ? this._t("unmute_chat") : this._t("mute_chat")}">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  ${c.is_muted
+                    ? '<path d="M11 5 6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/>'
+                    : '<path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>'}
+                </svg>
+              </button>
+              <button class="pb-action-btn" data-action="edit" data-number="${this._esc(c.number)}" title="${this._t("edit")}">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+              </button>
+              <button class="pb-action-btn danger" data-action="delete" data-number="${this._esc(c.number)}" title="${this._t("delete_msg")}">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="3 6 5 6 21 6"/>
+                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                </svg>
+              </button>
+            </div>
+            <!-- Кнопка ⋯ на мобиле — открывает bottom sheet -->
+            <button class="pb-more-btn" data-action="more" data-number="${this._esc(c.number)}"
+              data-name="${this._esc(c.name)}" data-muted="${c.is_muted ? "1" : "0"}">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <circle cx="12" cy="5" r="1" fill="currentColor"/><circle cx="12" cy="12" r="1" fill="currentColor"/><circle cx="12" cy="19" r="1" fill="currentColor"/>
               </svg>
             </button>
           </div>
@@ -1763,6 +1890,16 @@ class SmsGammuPanel extends HTMLElement {
         }
       });
     }
+
+    page.querySelectorAll(".pb-more-btn").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const number = btn.dataset.number;
+        const name = btn.dataset.name;
+        const isMuted = btn.dataset.muted === "1";
+        this._openPbSheet(number, name, isMuted);
+      });
+    });
 
     page.querySelectorAll(".pb-action-btn").forEach((btn) => {
       btn.addEventListener("click", (e) => {
@@ -2089,6 +2226,46 @@ class SmsGammuPanel extends HTMLElement {
             </div>
           </div>
 
+          <!-- Bottom sheet: действия над контактом в телефонной книге -->
+          <div class="pb-sheet-overlay" id="pb-sheet-overlay">
+            <div class="pb-sheet" id="pb-sheet">
+              <div class="pb-sheet-handle"></div>
+              <div class="pb-sheet-header">
+                <div class="pb-sheet-name" id="pb-sheet-name"></div>
+                <div class="pb-sheet-number" id="pb-sheet-number"></div>
+              </div>
+              <div class="pb-sheet-actions">
+                <button class="pb-sheet-action" id="pb-sheet-open">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                  </svg>
+                  <span id="pb-sheet-open-label"></span>
+                </button>
+                <button class="pb-sheet-action" id="pb-sheet-mute">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M11 5 6 9H2v6h4l5 4V5z"/>
+                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
+                  </svg>
+                  <span id="pb-sheet-mute-label"></span>
+                </button>
+                <button class="pb-sheet-action" id="pb-sheet-edit">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                  </svg>
+                  <span></span><span>${this._t ? this._t("edit") : "Изменить"}</span>
+                </button>
+                <button class="pb-sheet-action danger" id="pb-sheet-delete">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="3 6 5 6 21 6"/>
+                    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                  </svg>
+                  <span id="pb-sheet-delete-label"></span>
+                </button>
+              </div>
+            </div>
+          </div>
+
           <!-- Modal: новый чат -->
           <div class="new-chat-overlay" id="new-chat-overlay">
             <div class="new-chat-sheet">
@@ -2317,6 +2494,8 @@ class SmsGammuPanel extends HTMLElement {
       this._renderContacts();
     });
 
+
+    this._initPbSheet();
 
     this.shadowRoot.getElementById("back-btn").addEventListener("click", () => {
       if (this._activeTab === "status" || this._activeTab === "phonebook") {
