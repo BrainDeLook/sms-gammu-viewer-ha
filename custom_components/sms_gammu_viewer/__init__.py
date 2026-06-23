@@ -22,6 +22,8 @@ from homeassistant.helpers import config_validation as cv
 
 from .const import (
     CONF_COLLECT_EMPTY_MAX,
+    CONF_SHOW_PANEL,
+    DEFAULT_SHOW_PANEL,
     CONF_COLLECT_INTERVAL,
     CONF_NOTIFY_TARGETS,
     CONF_POLL_INTERVAL,
@@ -64,7 +66,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     is_first = len(hass.data[DOMAIN]) == 1
     if is_first:
-        await _register_panel(hass)
+        show_panel = entry.data.get(CONF_SHOW_PANEL, DEFAULT_SHOW_PANEL)
+        if show_panel:
+            await _register_panel(hass)
         await _register_services(hass)
 
     hass.http.register_view(SmsApiView(hass))
@@ -190,6 +194,19 @@ async def _options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
     coord = hass.data[DOMAIN].get(entry.entry_id)
     if coord:
         await coord.restart()
+
+    # Обновляем видимость панели в сайдбаре
+    show_panel = entry.data.get(CONF_SHOW_PANEL, DEFAULT_SHOW_PANEL)
+    try:
+        if show_panel:
+            await _register_panel(hass)
+        else:
+            try:
+                async_remove_panel(hass, PANEL_URL)
+            except KeyError:
+                pass
+    except Exception as e:
+        _LOGGER.warning("Failed to update panel visibility: %s", e)
 
     try:
         await hass.config_entries.async_unload_platforms(entry, ["cover", "button"])
