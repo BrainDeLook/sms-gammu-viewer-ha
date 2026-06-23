@@ -469,17 +469,19 @@ class SmsCoordinator:
 
             got_new = self._add_to_buffers(buffers, messages)
             await self._safe_delete_all()
+            # Сбрасываем счётчик при ЛЮБОМ непустом ответе — раз на симке
+            # что-то есть, сборка ещё идёт (gammu может отдавать ту же запись
+            # пока части ещё не все собраны)
+            empty_streak = 0
             if got_new:
                 _LOGGER.debug(
                     "Collect: new part(s) received (%d msg on SIM), resetting empty counter",
                     len(messages)
                 )
-                empty_streak = 0
             else:
-                empty_streak += 1
                 _LOGGER.debug(
-                    "Collect: %d msg on SIM but no new content, empty %d/%d",
-                    len(messages), empty_streak, collect_empty_max
+                    "Collect: %d msg on SIM, no new content yet, waiting…",
+                    len(messages)
                 )
 
         for (number, _date), buf in buffers.items():
