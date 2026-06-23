@@ -295,38 +295,48 @@ def _looks_like_wap_push(text: str) -> bool:
 class NumberBuffer:
     """Буфер для сборки SMS от одного номера за один цикл collect.
 
-    Gateway может отдавать SMS двумя способами:
-    1. Одна запись которая растёт (multipart собирается постепенно) —
-       в этом случае берём самый длинный текст.
-    2. Несколько отдельных записей с разными датами (части пришли
-       отдельными волнами и gateway отдаёт каждую отдельно) —
-       в этом случае конкатенируем все уникальные части по порядку дат.
+    Gateway возвращает SMS по-разному в зависимости от ситуации:
+    - Одна запись которая растёт (multipart собирается постепенно по эфиру)
+    - Несколько записей — каждая часть своя запись, они могут иметь
+      одинаковую или разную дату
+
+    Стратегия: для каждой уникальной (date, text_prefix) пары храним
+    лучший текст. Если пришёл текст длиннее для той же записи — обновляем.
+    Если пришёл совсем другой текст с той же датой — это новая часть,
+    добавляем отдельно. В конце конкатенируем все части по порядку получения.
     """
 
     def __init__(self, number: str) -> None:
         self.number = number
         self.first_date: str = ""
         self.seen_count: int = 0
-        # Словарь date → лучший текст для этой даты
-        self._parts: dict[str, str] = {}
+        # Список (date, text) в порядке получения — каждый элемент это часть SMS
+        self._parts: list[tuple[str, str]] = []
 
     def add(self, text: str, date: str) -> bool:
         self.seen_count += 1
         if not self.first_date:
             self.first_date = date
 
-        existing = self._parts.get(date, "")
-        if len(text) <= len(existing):
-            return False  # Не новее уже сохранённого для этой даты
+        # Ищем существующую часть которую этот текст может обновить:
+        # текст является продолжением (начинается с сохранённого) или наоборот
+        for i, (d, existing) in enumerate(self._parts):
+            if d != date:
+                continue
+            if text.startswith(existing) or existing.startswith(text):
+                # Это та же запись — обновляем до более длинной версии
+                if len(text) > len(existing):
+                    self._parts[i] = (date, text)
+                    return True
+                return False  # Не новее
 
-        self._parts[date] = text
+        # Это новая часть — добавляем
+        self._parts.append((date, text))
         return True
 
     @property
     def full_text(self) -> str:
-        # Сортируем части по дате и склеиваем
-        parts = [text for _, text in sorted(self._parts.items())]
-        result = "".join(parts)
+        result = "".join(text for _, text in self._parts)
         if _looks_like_wap_push(result):
             return "📎 Входящий MMS (не поддерживается)"
         return result
