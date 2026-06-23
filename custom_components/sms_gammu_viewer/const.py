@@ -57,3 +57,7 @@ CONF_CALL_ENTITIES = "call_entities"
 
 CALL_ENTITY_TYPE_COVER = "cover"
 CALL_ENTITY_TYPE_BUTTON = "button"
+
+# Показывать ли панель в сайдбаре HA
+CONF_SHOW_PANEL = "show_panel"
+DEFAULT_SHOW_PANEL = True
