@@ -771,6 +771,8 @@ const CSS = `
     .pb-more-btn { display: flex !important; }
   }
 
+  .pb-actions-inline { display: flex; align-items: center; }
+
   .pb-more-btn {
     display: none;
     align-items: center; justify-content: center;
