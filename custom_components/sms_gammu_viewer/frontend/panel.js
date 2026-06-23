@@ -1682,6 +1682,13 @@ class SmsGammuPanel extends HTMLElement {
     });
 
     this._pbDialog = dialog;
+
+    // Закрываем sheet при переходе на другую панель HA
+    window.addEventListener("location-changed", () => dialog.close());
+    // Закрываем при скрытии вкладки / уходе со страницы
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) dialog.close();
+    });
   }
 
   async _copyToClipboard(text) {
