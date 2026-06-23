@@ -138,6 +138,7 @@ class SmsGammuOptionsFlow(OptionsFlow):
                     CONF_COLLECT_INTERVAL: int(user_input.get(CONF_COLLECT_INTERVAL, DEFAULT_COLLECT_INTERVAL)),
                     CONF_COLLECT_EMPTY_MAX: int(user_input.get(CONF_COLLECT_EMPTY_MAX, DEFAULT_COLLECT_EMPTY_MAX)),
                     CONF_LANGUAGE: user_input.get(CONF_LANGUAGE, DEFAULT_LANGUAGE),
+                    CONF_SHOW_PANEL: bool(user_input.get(CONF_SHOW_PANEL, DEFAULT_SHOW_PANEL)),
                 },
             )
             # ВАЖНО: async_create_entry(data=...) для OptionsFlow ПОЛНОСТЬЮ
@@ -233,6 +234,11 @@ class SmsGammuOptionsFlow(OptionsFlow):
                 mode=SelectSelectorMode.DROPDOWN,
             )
         )
+
+        schema_fields[vol.Optional(
+            CONF_SHOW_PANEL,
+            default=self._entry.data.get(CONF_SHOW_PANEL, DEFAULT_SHOW_PANEL),
+        )] = bool
 
         return self.async_show_form(
             step_id="settings",
