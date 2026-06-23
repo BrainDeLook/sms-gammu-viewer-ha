@@ -1,6 +1,6 @@
 {
   "domain": "sms_gammu_viewer",
-  "name": "SMS Gammu Viewer",
+  "name": "GSM Gammu Viewer",
   "codeowners": [],
   "config_flow": true,
   "dependencies": [
