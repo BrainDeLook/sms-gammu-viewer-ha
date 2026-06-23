@@ -293,39 +293,43 @@ def _looks_like_wap_push(text: str) -> bool:
 
 
 class NumberBuffer:
-    """Хранит самую длинную версию текста, увиденную от номера за сессию сбора.
+    """Буфер для сборки SMS от одного номера за один цикл collect.
 
-    Gammu иногда отдаёт один и тот же объект SMS постепенно растущим по мере
-    того как приходят его части по эфиру — то есть это НЕ отдельные куски для
-    конкатенации, а прогрессивно дозаполняемая одна запись. Поэтому вместо
-    "".join(parts) просто берём самый длинный текст увиденный для этого
-    номера+даты — он и есть финальная полная версия.
+    Gateway может отдавать SMS двумя способами:
+    1. Одна запись которая растёт (multipart собирается постепенно) —
+       в этом случае берём самый длинный текст.
+    2. Несколько отдельных записей с разными датами (части пришли
+       отдельными волнами и gateway отдаёт каждую отдельно) —
+       в этом случае конкатенируем все уникальные части по порядку дат.
     """
 
     def __init__(self, number: str) -> None:
         self.number = number
-        self.best_text: str = ""
         self.first_date: str = ""
         self.seen_count: int = 0
+        # Словарь date → лучший текст для этой даты
+        self._parts: dict[str, str] = {}
 
     def add(self, text: str, date: str) -> bool:
         self.seen_count += 1
         if not self.first_date:
             self.first_date = date
 
-        if len(text) <= len(self.best_text):
-            # Текст короче или равен уже сохранённому — не новость, но это
-            # ОЖИДАЕМЫЙ повторный опрос той же записи, не дублирующая часть
-            return False
+        existing = self._parts.get(date, "")
+        if len(text) <= len(existing):
+            return False  # Не новее уже сохранённого для этой даты
 
-        self.best_text = text
+        self._parts[date] = text
         return True
 
     @property
     def full_text(self) -> str:
-        if _looks_like_wap_push(self.best_text):
+        # Сортируем части по дате и склеиваем
+        parts = [text for _, text in sorted(self._parts.items())]
+        result = "".join(parts)
+        if _looks_like_wap_push(result):
             return "📎 Входящий MMS (не поддерживается)"
-        return self.best_text
+        return result
 
 
 class SmsCoordinator:
