@@ -2,7 +2,7 @@
   "config": {
     "step": {
       "user": {
-        "title": "GSM Gammu Viewer Setup",
+        "title": "SMS Gammu Viewer Setup",
         "description": "Enter the address and credentials for the sms-gammu-gateway add-on.\n\nDon't have it yet? Install [sms-gammu-gateway](https://github.com/PavelVe/home-assistant-addons/tree/main/sms-gammu-gateway) first.\n\n⚠️ Before continuing, disable these in the add-on's settings: SMS monitoring, auto-delete read SMS, call monitoring, and MQTT (if enabled). This integration handles all of that itself — leaving them on causes message loss and conflicts.",
         "data": {
           "host": "Host (IP or hostname)",
@@ -29,7 +29,7 @@
         }
       },
       "settings": {
-        "title": "GSM Gammu Viewer Settings",
+        "title": "SMS Gammu Viewer Settings",
         "description": "Configure polling interval and notification targets.",
         "data": {
           "poll_interval": "Polling interval (seconds, min 5)",
