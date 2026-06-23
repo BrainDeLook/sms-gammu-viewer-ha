@@ -2,7 +2,7 @@
   "config": {
     "step": {
       "user": {
-        "title": "Настройка SMS Gammu Viewer",
+        "title": "Настройка GSM Gammu Viewer",
         "description": "Укажи адрес и данные доступа к аддону sms-gammu-gateway.\n\nЕщё не установил? Сначала поставь [sms-gammu-gateway](https://github.com/PavelVe/home-assistant-addons/tree/main/sms-gammu-gateway).\n\n⚠️ Перед продолжением отключи в настройках аддона: мониторинг SMS, автоудаление прочитанных SMS, мониторинг звонков и MQTT (если включён). Всё это интеграция берёт на себя — если оставить включённым, будут теряться сообщения и возникать конфликты.",
         "data": {
           "host": "Хост (IP или hostname)",
@@ -29,7 +29,7 @@
         }
       },
       "settings": {
-        "title": "Настройки SMS Gammu Viewer",
+        "title": "Настройки GSM Gammu Viewer",
         "description": "Интервал опроса и устройства для уведомлений.",
         "data": {
           "poll_interval": "Интервал опроса (секунды, минимум 5)",
