@@ -1611,7 +1611,7 @@ class SmsGammuPanel extends HTMLElement {
     const style = document.createElement("style");
     // Берём цвета из CSS переменных HA которые доступны в document (не в shadow)
     style.textContent = [
-      "dialog#pb-dialog { padding:0; }",
+      "dialog#pb-dialog { padding:0; outline:none; }",
       "dialog#pb-dialog::backdrop { background: rgba(0,0,0,.55); }",
       ".pb-d-sheet {",
       "  background: var(--card-background-color, #fff);",
