@@ -495,7 +495,7 @@ class SmsCoordinator:
                     len(messages)
                 )
 
-        for (number, _date), buf in buffers.items():
+        for number, buf in buffers.items():
             full_text = buf.full_text
             _LOGGER.info("SMS assembled from %s: %d updates seen, %d chars", number, buf.seen_count, len(full_text))
             await self._save_one(number, full_text, buf.first_date)
@@ -503,35 +503,20 @@ class SmsCoordinator:
         self.collecting = False
 
     async def _save_one(self, number: str, text: str, date: str) -> None:
-        # Проверяем есть ли недавнее сообщение от этого номера (в рамках 2 минут)
-        # Если да — это продолжение того же SMS, дописываем к нему
-        recent = await self.hass.async_add_executor_job(
-            self.store.find_recent, number, 120
+        """Сохраняет SMS. Gateway уже склеил multipart через gammu.LinkSMS(),
+        поэтому просто сохраняем готовый текст без дополнительной склейки."""
+        msg_id = await self.hass.async_add_executor_job(
+            self.store.add, number, text, date
         )
-        if recent:
-            _LOGGER.info(
-                "Appending to recent SMS id=%s from %s (%d chars + %d chars)",
-                recent["id"], number, len(recent["text"]), len(text)
-            )
-            await self.hass.async_add_executor_job(
-                self.store.append_text, recent["id"], text
-            )
-            # Обновляем полный текст для уведомления
-            full_text = recent["text"] + text
+        if msg_id:
             self.push_event("new_message", {
-                "id": recent["id"], "number": number,
-                "text": full_text, "date": date, "is_read": 0
+                "id": msg_id, "number": number,
+                "text": text, "date": date, "is_read": 0
             })
-            await self._notify(number, full_text)
-        else:
-            msg_id = await self.hass.async_add_executor_job(
-                self.store.add, number, text, date
-            )
-            if msg_id:
-                self.push_event("new_message", {"id": msg_id, "number": number, "text": text, "date": date, "is_read": 0})
-                await self._notify(number, text)
+        await self._notify(number, text)
 
-    def _add_to_buffers(self, buffers: dict[tuple, NumberBuffer], messages: list[dict]) -> bool:
+
+    def _add_to_buffers(self, buffers: dict[str, NumberBuffer], messages: list[dict]) -> bool:
         got_new = False
         for msg in messages:
             number = msg.get("Number", "Unknown")
@@ -539,10 +524,10 @@ class SmsCoordinator:
             date   = msg.get("Date", "")
             if not text:
                 continue
-            key = (number, date)
-            if key not in buffers:
-                buffers[key] = NumberBuffer(number)
-            if buffers[key].add(text, date):
+            # Группируем только по номеру — части одного SMS могут иметь разные даты
+            if number not in buffers:
+                buffers[number] = NumberBuffer(number)
+            if buffers[number].add(text, date):
                 got_new = True
         return got_new
 
