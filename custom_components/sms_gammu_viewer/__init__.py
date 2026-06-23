@@ -517,8 +517,38 @@ class SmsCoordinator:
         self.collecting = False
 
     async def _save_one(self, number: str, text: str, date: str) -> None:
-        """Сохраняет SMS. Gateway уже склеил multipart через gammu.LinkSMS(),
-        поэтому просто сохраняем готовый текст без дополнительной склейки."""
+        """Сохраняет SMS в БД.
+
+        Если звонок прервал сборку — части SMS могут прийти в нескольких
+        отдельных collect-циклах. В этом случае ищем недавнее сообщение
+        от того же номера и дописываем к нему — но только если текст
+        реально новый (не пересекается с уже сохранённым).
+        """
+        recent = await self.hass.async_add_executor_job(
+            self.store.find_recent, number, 120
+        )
+        if recent:
+            saved = recent["text"]
+            # Дописываем только если текст реально новый:
+            # - не является подстрокой уже сохранённого
+            # - уже сохранённый не является подстрокой нового
+            if text not in saved and saved not in text:
+                _LOGGER.info(
+                    "Appending continuation to SMS id=%s from %s (+%d chars)",
+                    recent["id"], number, len(text)
+                )
+                await self.hass.async_add_executor_job(
+                    self.store.append_text, recent["id"], text
+                )
+                full_text = saved + text
+                self.push_event("new_message", {
+                    "id": recent["id"], "number": number,
+                    "text": full_text, "date": date, "is_read": 0
+                })
+                await self._notify(number, full_text)
+                return
+
+        # Новое сообщение
         msg_id = await self.hass.async_add_executor_job(
             self.store.add, number, text, date
         )
