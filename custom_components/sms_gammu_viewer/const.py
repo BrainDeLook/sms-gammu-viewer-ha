@@ -3,7 +3,7 @@
 DOMAIN = "sms_gammu_viewer"
 
 PANEL_URL = "sms-viewer"
-PANEL_TITLE = "GSM"
+PANEL_TITLE = "SMS"
 PANEL_ICON = "mdi:message-text"
 FRONTEND_PATH = "frontend"
 
