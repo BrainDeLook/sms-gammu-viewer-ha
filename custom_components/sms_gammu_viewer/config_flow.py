@@ -8,6 +8,7 @@ import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
 from homeassistant.core import callback
 from homeassistant.helpers.selector import (
+    BooleanSelector,
     NumberSelector,
     NumberSelectorConfig,
     NumberSelectorMode,
@@ -238,7 +239,7 @@ class SmsGammuOptionsFlow(OptionsFlow):
         schema_fields[vol.Optional(
             CONF_SHOW_PANEL,
             default=self._entry.data.get(CONF_SHOW_PANEL, DEFAULT_SHOW_PANEL),
-        )] = bool
+        )] = BooleanSelector()
 
         return self.async_show_form(
             step_id="settings",
