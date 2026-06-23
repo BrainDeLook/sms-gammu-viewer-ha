@@ -105,6 +105,7 @@ export default {
   back: "Back",
   modem_btn: "Modem status",
   draft: "Draft",
+  call_waiting_sms: "Receiving SMS, please wait…",
 };
 
 
