@@ -1250,11 +1250,12 @@ class SmsGammuPanel extends HTMLElement {
     }
 
     // Если идёт активный приём SMS — ждём завершения (макс 30 сек)
-    // и показываем пользователю что происходит
+    // и показываем пользователю что происходит с обратным отсчётом
     if (this._status?.collecting) {
-      this._showToast(this._t("call_waiting_sms"), 8000);
       let waited = 0;
       while (waited < 30) {
+        const left = 30 - waited;
+        this._showToast(`${this._t("call_waiting_sms")} (${left}s)`, 1500);
         await new Promise(r => setTimeout(r, 1000));
         waited++;
         try {
