@@ -6,7 +6,9 @@
 
 > 🇷🇺 [Русская версия](README_RU.md)
 
-A native panel for viewing and sending SMS messages directly in Home Assistant. Works with the [sms-gammu-gateway](https://github.com/PavelVe/home-assistant-addons/tree/main/sms-gammu-gateway) add-on and any compatible gateway based on [pajikos/sms-gammu-gateway](https://github.com/pajikos/sms-gammu-gateway).
+A native panel for **SMS messaging and voice calls** directly in Home Assistant. Works with the [sms-gammu-gateway](https://github.com/PavelVe/home-assistant-addons/tree/main/sms-gammu-gateway) add-on and any compatible gateway based on [pajikos/sms-gammu-gateway](https://github.com/pajikos/sms-gammu-gateway).
+
+> 💬 **Send & receive SMS** · 📞 **Outgoing voice calls** · 📇 **Phonebook** · 🔔 **Push notifications** · 🚪 **Call entities for gates & intercoms**
 
 After installation, an **SMS** tab appears in the sidebar. Messages are stored in an internal SQLite database and are automatically deleted from the modem after being received.
 
