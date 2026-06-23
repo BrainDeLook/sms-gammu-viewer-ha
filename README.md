@@ -22,30 +22,16 @@ After installation, an **SMS** tab appears in the sidebar. Messages are stored i
 
 ## Features
 
-- 💬 Chat-style view — all SMS from one sender in one thread
-- ✍️ **Send SMS** — reply from inside a chat, or start a brand-new conversation via the compact `+` button. Sent messages appear in the chat thread (right-aligned blue bubbles) and are saved to history
-- 🔢 **SMS character counter** — shows remaining characters while typing, accounting for GSM limits (160 Latin / 70 Cyrillic); displays part count for long messages
-- 📞 **Outgoing voice calls** (dial-only) — via a separate voice AT interface on modems that expose multiple serial ports (e.g. Huawei). Standalone call FAB or call button in a chat, plus dedicated `sms_gammu_viewer.call` / `sms_gammu_viewer.hangup` services for automations
-- 🚪 **Call entities** — create dedicated `cover`/`button` entities that dial a fixed number, for gates/intercoms that open via a phone call. Works with dashboards, automations, and voice assistants
-- 📇 **Phonebook** — save names for your contacts, shown across the conversation list, call history, and chat headers
-- 🔇 **Per-conversation mute** — silence push notifications for a specific number while still saving and showing its messages normally
-- 🔢 Unread SMS counter badge on the sidebar icon (`sensor.sms_unread_count`)
-- 📨 Sensors for the last received SMS — `sensor.sms_last_sms_number` and `sensor.sms_last_sms_text`, updated instantly on arrival (handy for automations)
-- 🌐 **Multi-language UI** (English / Russian) — switchable via the 🌐 button in the header, independent of HA's language. Add your own language by dropping a `frontend/locales/{code}.js` file and opening a PR
-- 🔔 Push notifications on new SMS with tap-to-open (iOS & Android)
-- 🔄 Auto-refresh — chat updates automatically when new messages arrive (event polling every 4s)
-- 💾 Open chat is restored after a full page reload (F5 / pull-to-refresh)
-- 📋 Tap any message to copy its text — works on plain HTTP too, not just HTTPS
-- 📶 Modem status page — signal, operator, IMEI, SIM capacity, editable SIM phone number, voice port diagnostics, modem reset
-- 🩺 **Automatic modem recovery** — after 5 consecutive failed polls the integration resets the modem itself (2-minute cooldown between resets), with a live warning in the status bar
-- 🗄 Internal SQLite storage — messages persist independently of SIM card memory
-- 🧩 Smart multipart SMS assembly — long messages collected in full before saving, including messages split across multiple delivery waves
-- 🏷 Alpha-tag sender support — shows names like `Yandex` or bank senders correctly, not just phone numbers
-- 🔍 Search by phone number or message text
-- 🗑 Delete individual messages or entire conversations
-- ⚙️ Configurable polling interval and notification targets from the HA UI
-- 📱 Mobile-friendly: hamburger menu button to open the HA sidebar, back navigation, compact floating "new message" button
-- 🗓 Date dividers in chat (Today, Yesterday, full date)
+- 💬 **Chat-style SMS** — all messages from one sender in one thread, with full send/receive support
+- 📞 **Outgoing voice calls** (dial-only) — via a separate voice AT interface on modems with multiple serial ports (e.g. Huawei)
+- 🚪 **Call entities** — `cover`/`button` entities that dial a fixed number, for gates and intercoms that open via a phone call
+- 📇 **Phonebook** — save contact names, shown across conversations, call history, and chat headers
+- 🔔 **Push notifications** — on new SMS with tap-to-open (iOS & Android), grouped by sender
+- 🩺 **Automatic modem recovery** — resets the modem after repeated failures, with a live warning in the status bar
+- 📨 **Sensors** — `sensor.sms_unread_count`, `sensor.sms_last_sms_number`, `sensor.sms_last_sms_text` for automations
+- 🌐 **English / Russian UI** — switchable independently of HA's language
+- 🔍 **Search** by phone number or message text
+- 📱 **Mobile-friendly** — responsive layout with bottom sheet menus and back navigation
 
 ---
 
