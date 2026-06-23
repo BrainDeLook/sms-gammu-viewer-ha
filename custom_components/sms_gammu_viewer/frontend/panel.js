@@ -769,10 +769,8 @@ const CSS = `
     }
     .pb-actions-inline { display: none !important; }
     .pb-more-btn { display: flex !important; }
-    .pb-meta { font-size: 13px; }
   }
 
-  /* ─── Кнопка ⋯ для мобиле в телефонной книге ─── */
   .pb-more-btn {
     display: none;
     align-items: center; justify-content: center;
@@ -781,44 +779,6 @@ const CSS = `
     flex-shrink: 0; transition: color .15s;
   }
   .pb-more-btn:hover { color: var(--text); }
-
-  /* ─── Bottom sheet для телефонной книги ─── */
-  .pb-sheet-overlay {
-    display: none; position: fixed; inset: 0;
-    background: rgba(0,0,0,.5); z-index: 500;
-    align-items: flex-end; justify-content: center;
-  }
-  .pb-sheet-overlay.open { display: flex; }
-  .pb-sheet {
-    background: var(--card); border-radius: 18px 18px 0 0;
-    width: 100%; max-width: 480px;
-    padding-bottom: max(env(safe-area-inset-bottom, 0px), 16px);
-    animation: pb-sheet-in .2s ease;
-  }
-  @keyframes pb-sheet-in {
-    from { transform: translateY(60px); opacity: 0; }
-    to   { transform: translateY(0);    opacity: 1; }
-  }
-  .pb-sheet-handle {
-    width: 36px; height: 4px; border-radius: 2px;
-    background: var(--line); margin: 12px auto 6px;
-  }
-  .pb-sheet-header {
-    padding: 6px 20px 14px;
-    border-bottom: 1px solid var(--line);
-  }
-  .pb-sheet-name  { font-size: 16px; font-weight: 600; color: var(--text); }
-  .pb-sheet-num   { font-size: 13px; color: var(--sub); margin-top: 2px; }
-  .pb-sheet-action {
-    display: flex; align-items: center; gap: 16px;
-    width: 100%; padding: 15px 24px;
-    border: none; background: none; cursor: pointer;
-    font-size: 15px; color: var(--text);
-    font-family: inherit; text-align: left;
-    transition: background .15s;
-  }
-  .pb-sheet-action:active { background: rgba(0,0,0,.06); }
-  .pb-sheet-action.danger { color: var(--danger); }
 
   .menu-btn {
     display: none;
@@ -1634,104 +1594,70 @@ class SmsGammuPanel extends HTMLElement {
   }
 
   _initPbSheet() {
-    // Используем <dialog> — он рендерится в top layer браузера,
-    // поверх Shadow DOM и любых других элементов без z-index трюков
     const dialog = document.createElement("dialog");
     dialog.id = "pb-dialog";
-    dialog.style.cssText = [
-      "border:none; padding:0; background:transparent;",
-      "width:100%; max-width:480px;",
-      "position:fixed; bottom:0; left:50%; transform:translateX(-50%);",
-      "margin:0;",
-    ].join("");
+    dialog.style.cssText = "border:none;padding:0;background:transparent;width:100%;max-width:480px;position:fixed;bottom:0;left:50%;transform:translateX(-50%);margin:0;";
 
-    // Стили для содержимого
     const style = document.createElement("style");
-    style.textContent = [
-      "dialog#pb-dialog::backdrop { background: rgba(0,0,0,.5); }",
-      ".pb-d-sheet { background: #fff; border-radius: 18px 18px 0 0;",
-      "  padding-bottom: max(env(safe-area-inset-bottom,0px),16px);",
-      "  font-family: var(--paper-font-body1_-_font-family, Roboto, sans-serif); }",
-      ".pb-d-handle { width:36px; height:4px; border-radius:2px;",
-      "  background:#ddd; margin:12px auto 6px; }",
-      ".pb-d-header { padding:6px 20px 14px; border-bottom:1px solid #eee; }",
-      ".pb-d-name { font-size:16px; font-weight:600; color:#111; }",
-      ".pb-d-num { font-size:13px; color:#666; margin-top:2px; }",
-      ".pb-d-btn { display:flex; align-items:center; gap:16px;",
-      "  width:100%; padding:15px 24px; border:none; background:none;",
-      "  cursor:pointer; font-size:15px; color:#111;",
-      "  font-family:inherit; text-align:left; }",
-      ".pb-d-btn:active { background:rgba(0,0,0,.06); }",
-      ".pb-d-btn.danger { color:#e53935; }",
-      "@media (prefers-color-scheme: dark) {",
-      "  .pb-d-sheet { background:#1e1e1e; }",
-      "  .pb-d-handle { background:#444; }",
-      "  .pb-d-header { border-bottom-color:#333; }",
-      "  .pb-d-name { color:#fff; }",
-      "  .pb-d-num { color:#aaa; }",
-      "  .pb-d-btn { color:#fff; }",
-      "  .pb-d-btn:active { background:rgba(255,255,255,.08); }",
-      "}",
-    ].join(" ");
+    style.textContent = "dialog#pb-dialog::backdrop{background:rgba(0,0,0,.5)}" +
+      ".pb-d-sheet{background:#fff;border-radius:18px 18px 0 0;padding-bottom:max(env(safe-area-inset-bottom,0px),16px);font-family:var(--paper-font-body1_-_font-family,Roboto,sans-serif)}" +
+      ".pb-d-handle{width:36px;height:4px;border-radius:2px;background:#ddd;margin:12px auto 6px}" +
+      ".pb-d-header{padding:6px 20px 14px;border-bottom:1px solid #eee}" +
+      ".pb-d-name{font-size:16px;font-weight:600;color:#111}" +
+      ".pb-d-num{font-size:13px;color:#666;margin-top:2px}" +
+      ".pb-d-btn{display:flex;align-items:center;gap:16px;width:100%;padding:15px 24px;border:none;background:none;cursor:pointer;font-size:15px;color:#111;font-family:inherit;text-align:left}" +
+      ".pb-d-btn:active{background:rgba(0,0,0,.06)}" +
+      ".pb-d-btn.danger{color:#e53935}" +
+      "@media(prefers-color-scheme:dark){" +
+      ".pb-d-sheet{background:#1e1e1e}" +
+      ".pb-d-handle{background:#444}" +
+      ".pb-d-header{border-bottom-color:#333}" +
+      ".pb-d-name{color:#fff}" +
+      ".pb-d-num{color:#aaa}" +
+      ".pb-d-btn{color:#fff}" +
+      ".pb-d-btn:active{background:rgba(255,255,255,.08)}}";
     document.head.appendChild(style);
 
-    dialog.innerHTML = [
-      '<div class="pb-d-sheet">',
-      '  <div class="pb-d-handle"></div>',
-      '  <div class="pb-d-header">',
-      '    <div class="pb-d-name" id="pb-d-name"></div>',
-      '    <div class="pb-d-num"  id="pb-d-num"></div>',
-      '  </div>',
-      '  <button class="pb-d-btn" id="pb-d-open">',
-      '    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
-      '    <span id="pb-d-open-lbl"></span>',
-      '  </button>',
-      '  <button class="pb-d-btn" id="pb-d-mute">',
-      '    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>',
-      '    <span id="pb-d-mute-lbl"></span>',
-      '  </button>',
-      '  <button class="pb-d-btn" id="pb-d-edit">',
-      '    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>',
-      '    <span id="pb-d-edit-lbl"></span>',
-      '  </button>',
-      '  <button class="pb-d-btn danger" id="pb-d-delete">',
-      '    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>',
-      '    <span id="pb-d-delete-lbl"></span>',
-      '  </button>',
-      '</div>',
-    ].join("");
+    const svgChat = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
+    const svgMute = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>';
+    const svgEdit = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+    const svgDel  = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>';
+
+    dialog.innerHTML =
+      '<div class="pb-d-sheet">' +
+        '<div class="pb-d-handle"></div>' +
+        '<div class="pb-d-header">' +
+          '<div class="pb-d-name" id="pb-d-name"></div>' +
+          '<div class="pb-d-num" id="pb-d-num"></div>' +
+        '</div>' +
+        '<button class="pb-d-btn" id="pb-d-open">' + svgChat + '<span id="pb-d-open-lbl"></span></button>' +
+        '<button class="pb-d-btn" id="pb-d-mute">' + svgMute + '<span id="pb-d-mute-lbl"></span></button>' +
+        '<button class="pb-d-btn" id="pb-d-edit">' + svgEdit + '<span id="pb-d-edit-lbl"></span></button>' +
+        '<button class="pb-d-btn danger" id="pb-d-delete">' + svgDel + '<span id="pb-d-delete-lbl"></span></button>' +
+      '</div>';
 
     document.body.appendChild(dialog);
 
-    // Закрытие по backdrop (клик вне sheet)
     dialog.addEventListener("click", (e) => {
       const rect = dialog.querySelector(".pb-d-sheet").getBoundingClientRect();
       if (e.clientY < rect.top) dialog.close();
     });
-
     dialog.querySelector("#pb-d-open").addEventListener("click", () => {
-      const number = this._pbSheetNumber;
-      dialog.close();
+      const n = this._pbSheetNumber; dialog.close();
       this._activeTab = "chats";
       this.shadowRoot.getElementById("phonebook-btn").style.color = "";
-      this._switchTab();
-      this._selectContact(number);
+      this._switchTab(); this._selectContact(n);
     });
     dialog.querySelector("#pb-d-mute").addEventListener("click", () => {
-      const number = this._pbSheetNumber;
-      dialog.close();
-      this._togglePhonebookMute(number);
+      const n = this._pbSheetNumber; dialog.close(); this._togglePhonebookMute(n);
     });
     dialog.querySelector("#pb-d-edit").addEventListener("click", () => {
-      const number = this._pbSheetNumber;
-      dialog.close();
-      const contact = this._phonebook.find((c) => c.number === number);
-      this._openContactEditor(contact);
+      const n = this._pbSheetNumber; dialog.close();
+      const c = this._phonebook.find((x) => x.number === n);
+      this._openContactEditor(c);
     });
     dialog.querySelector("#pb-d-delete").addEventListener("click", () => {
-      const number = this._pbSheetNumber;
-      dialog.close();
-      this._deleteContactFromBook(number);
+      const n = this._pbSheetNumber; dialog.close(); this._deleteContactFromBook(n);
     });
 
     this._pbDialog = dialog;
@@ -1905,8 +1831,7 @@ class SmsGammuPanel extends HTMLElement {
                 </svg>
               </button>
             </div>
-            <button class="pb-more-btn" data-number="${this._esc(c.number)}"
-              data-name="${this._esc(c.name)}" data-muted="${c.is_muted ? "1" : "0"}">
+            <button class="pb-more-btn" data-number="${this._esc(c.number)}" data-name="${this._esc(c.name)}" data-muted="${c.is_muted ? "1" : "0"}">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                 <circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/>
               </svg>
@@ -1947,11 +1872,7 @@ class SmsGammuPanel extends HTMLElement {
     page.querySelectorAll(".pb-more-btn").forEach((btn) => {
       btn.addEventListener("click", (e) => {
         e.stopPropagation();
-        this._openPbSheet(
-          btn.dataset.number,
-          btn.dataset.name,
-          btn.dataset.muted === "1"
-        );
+        this._openPbSheet(btn.dataset.number, btn.dataset.name, btn.dataset.muted === "1");
       });
     });
 
