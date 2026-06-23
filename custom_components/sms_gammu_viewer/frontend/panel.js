@@ -1590,6 +1590,8 @@ class SmsGammuPanel extends HTMLElement {
     this._pbDialog.querySelector("#pb-d-edit-lbl").textContent = this._t("edit");
     this._pbDialog.querySelector("#pb-d-delete-lbl").textContent = this._t("delete_msg");
     this._pbDialog.showModal();
+    // Убираем автофокус с первой кнопки — иначе браузер рисует outline
+    this._pbDialog.querySelector(".pb-d-btn").blur();
   }
 
   _closePbSheet() {
@@ -1611,7 +1613,7 @@ class SmsGammuPanel extends HTMLElement {
     const style = document.createElement("style");
     // Берём цвета из CSS переменных HA которые доступны в document (не в shadow)
     style.textContent = [
-      "dialog#pb-dialog { padding:0; outline:none; }",
+      "dialog#pb-dialog, dialog#pb-dialog * { outline:none; }",
       "dialog#pb-dialog::backdrop { background: rgba(0,0,0,.55); }",
       ".pb-d-sheet {",
       "  background: var(--card-background-color, #fff);",
