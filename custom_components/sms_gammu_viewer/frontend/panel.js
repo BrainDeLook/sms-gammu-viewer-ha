@@ -51,6 +51,7 @@ const CSS = `
     background: var(--card);
     border-right: 1px solid var(--line);
     position: relative;
+    overflow: hidden;
   }
 
   .contacts-header {
@@ -583,18 +584,19 @@ const CSS = `
   .call-history-dropdown {
     display: none;
     position: absolute;
-    bottom: calc(100% + 10px);
-    right: 0;
-    background: var(--card);
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    box-shadow: 0 6px 24px rgba(0,0,0,.2);
-    overflow: hidden;
-    z-index: 100;
-    width: 280px;
-    flex-direction: column;
+    inset: 0;
+    background: rgba(0,0,0,.45);
+    z-index: 20;
+    align-items: flex-end;
+    justify-content: center;
   }
   .call-history-dropdown.open { display: flex; }
+  .ch-sheet {
+    background: var(--card);
+    border-radius: 18px 18px 0 0;
+    padding: 20px 20px 32px;
+    width: 100%;
+  }
   .ch-header {
     padding: 10px 14px;
     border-bottom: 1px solid var(--line);
@@ -2213,8 +2215,10 @@ class SmsGammuPanel extends HTMLElement {
                 <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
               </svg>
             </button>
+          </div>
 
-            <div class="call-history-dropdown" id="call-history-dropdown">
+          <div class="call-history-dropdown" id="call-history-dropdown">
+            <div class="ch-sheet">
               <div class="ch-header">
                 <span id="ch-title">История звонков</span>
                 <button class="ch-clear-btn" id="ch-clear-btn">Очистить</button>
@@ -2222,7 +2226,7 @@ class SmsGammuPanel extends HTMLElement {
               <div class="ch-new-input-row">
                 <input class="ch-new-input" id="ch-new-number" type="tel" placeholder="+79001234567" />
                 <button class="ch-call-btn" id="ch-call-btn" disabled title="Позвонить">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
                   </svg>
                 </button>
@@ -2382,7 +2386,7 @@ class SmsGammuPanel extends HTMLElement {
       this._openCallHistory();
     });
     this.shadowRoot.getElementById("call-history-dropdown").addEventListener("click", (e) => {
-      e.stopPropagation();
+      if (!e.target.closest(".ch-sheet")) this._closeCallHistory();
     });
     this.shadowRoot.getElementById("ch-clear-btn").addEventListener("click", async () => {
       try {
