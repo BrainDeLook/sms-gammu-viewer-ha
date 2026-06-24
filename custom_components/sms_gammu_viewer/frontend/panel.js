@@ -583,18 +583,20 @@ const CSS = `
   .call-history-dropdown {
     display: none;
     position: absolute;
-    bottom: calc(100% + 10px);
-    right: 0;
-    background: var(--card);
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    box-shadow: 0 6px 24px rgba(0,0,0,.2);
-    overflow: hidden;
-    z-index: 100;
-    width: 280px;
-    flex-direction: column;
+    inset: 0;
+    background: rgba(0,0,0,.4);
+    z-index: 20;
+    align-items: flex-end;
+    justify-content: center;
   }
   .call-history-dropdown.open { display: flex; }
+  .ch-inner {
+    background: var(--card);
+    border-radius: 18px 18px 0 0;
+    padding: 20px 20px 32px;
+    width: 100%;
+    max-width: 500px;
+  }
   .ch-header {
     padding: 10px 14px;
     border-bottom: 1px solid var(--line);
@@ -2215,6 +2217,7 @@ class SmsGammuPanel extends HTMLElement {
             </button>
 
             <div class="call-history-dropdown" id="call-history-dropdown">
+              <div class="ch-inner">
               <div class="ch-header">
                 <span id="ch-title">История звонков</span>
                 <button class="ch-clear-btn" id="ch-clear-btn">Очистить</button>
@@ -2228,6 +2231,7 @@ class SmsGammuPanel extends HTMLElement {
                 </button>
               </div>
               <div class="ch-list" id="ch-list"></div>
+              </div>
             </div>
           </div>
 
@@ -2382,7 +2386,9 @@ class SmsGammuPanel extends HTMLElement {
       this._openCallHistory();
     });
     this.shadowRoot.getElementById("call-history-dropdown").addEventListener("click", (e) => {
-      e.stopPropagation();
+      if (!e.target.closest(".ch-inner")) {
+        this.shadowRoot.getElementById("call-history-dropdown").classList.remove("open");
+      }
     });
     this.shadowRoot.getElementById("ch-clear-btn").addEventListener("click", async () => {
       try {
