@@ -582,21 +582,26 @@ const CSS = `
   /* ─── Call history dropdown ─── */
   .call-history-dropdown {
     display: none;
-    position: absolute;
-    inset: 0;
-    background: rgba(0,0,0,.4);
-    z-index: 20;
-    align-items: flex-end;
-    justify-content: center;
-  }
-  .call-history-dropdown.open { display: flex; }
-  .ch-inner {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 300px;
     background: var(--card);
     border-radius: 18px 18px 0 0;
-    padding: 20px 20px 32px;
-    width: 100%;
-    max-width: 500px;
+    box-shadow: 0 -4px 32px rgba(0,0,0,.25);
+    overflow: hidden;
+    z-index: 9999;
+    flex-direction: column;
   }
+  .call-history-dropdown.open { display: flex; }
+  .ch-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.4);
+    z-index: 9998;
+  }
+  .ch-backdrop.open { display: block; }
   .ch-header {
     padding: 10px 14px;
     border-bottom: 1px solid var(--line);
@@ -1420,6 +1425,7 @@ class SmsGammuPanel extends HTMLElement {
     if (numInput) numInput.placeholder = this._t("number_placeholder");
 
     dd.classList.add("open");
+    this.shadowRoot.getElementById("ch-backdrop").classList.add("open");
     numInput.value = "";
     this.shadowRoot.getElementById("ch-call-btn").disabled = true;
 
@@ -1434,6 +1440,7 @@ class SmsGammuPanel extends HTMLElement {
 
   _closeCallHistory() {
     this.shadowRoot.getElementById("call-history-dropdown")?.classList.remove("open");
+    this.shadowRoot.getElementById("ch-backdrop")?.classList.remove("open");
   }
 
   _renderCallHistory() {
@@ -2209,6 +2216,7 @@ class SmsGammuPanel extends HTMLElement {
             </svg>
           </button>
 
+          <div class="ch-backdrop" id="ch-backdrop"></div>
           <div id="fab-call-anchor" style="position:absolute; bottom:18px; right:16px; z-index:10">
             <button class="fab fab-call" id="fab-call" title="Call" style="display:none; position:static">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -2217,7 +2225,6 @@ class SmsGammuPanel extends HTMLElement {
             </button>
 
             <div class="call-history-dropdown" id="call-history-dropdown">
-              <div class="ch-inner">
               <div class="ch-header">
                 <span id="ch-title">История звонков</span>
                 <button class="ch-clear-btn" id="ch-clear-btn">Очистить</button>
@@ -2231,7 +2238,6 @@ class SmsGammuPanel extends HTMLElement {
                 </button>
               </div>
               <div class="ch-list" id="ch-list"></div>
-              </div>
             </div>
           </div>
 
@@ -2386,9 +2392,10 @@ class SmsGammuPanel extends HTMLElement {
       this._openCallHistory();
     });
     this.shadowRoot.getElementById("call-history-dropdown").addEventListener("click", (e) => {
-      if (!e.target.closest(".ch-inner")) {
-        this.shadowRoot.getElementById("call-history-dropdown").classList.remove("open");
-      }
+      e.stopPropagation();
+    });
+    this.shadowRoot.getElementById("ch-backdrop").addEventListener("click", () => {
+      this._closeCallHistory();
     });
     this.shadowRoot.getElementById("ch-clear-btn").addEventListener("click", async () => {
       try {
