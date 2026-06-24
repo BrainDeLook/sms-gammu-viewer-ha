@@ -1298,10 +1298,11 @@ class SmsGammuPanel extends HTMLElement {
   }
 
   _dateLocale() {
-    // Возвращаем BCP 47 locale на основе выбранного языка интерфейса
+    // Явный выбор в нашем UI → язык HA → fallback ru
     try {
-      const lang = localStorage.getItem("sms_gammu_lang") || "ru";
-      return lang === "en" ? "en-GB" : "ru-RU";
+      const explicit = localStorage.getItem("sms_gammu_lang");
+      const lang = explicit || this._hass?.language || "ru";
+      return lang.startsWith("en") ? "en-GB" : "ru-RU";
     } catch { return "ru-RU"; }
   }
 
