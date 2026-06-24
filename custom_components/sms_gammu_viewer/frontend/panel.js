@@ -521,44 +521,6 @@ const CSS = `
     align-items: flex-end; justify-content: center;
   }
   .new-chat-overlay.open { display: flex; }
-
-  .call-hist-overlay {
-    display: none; position: absolute; inset: 0;
-    background: rgba(0,0,0,.4); z-index: 20;
-    align-items: flex-end; justify-content: center;
-  }
-  .call-hist-overlay.open { display: flex; }
-  .call-hist-sheet {
-    background: var(--card); border-radius: 18px 18px 0 0;
-    padding: 20px 20px 32px; width: 100%; max-width: 500px;
-  }
-  .call-hist-title {
-    font-size: 16px; font-weight: 600; color: var(--text);
-    margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between;
-  }
-  .call-hist-clear {
-    background: none; border: none; cursor: pointer;
-    font-size: 12px; color: var(--sub); padding: 4px 8px; border-radius: 6px;
-  }
-  .call-hist-clear:hover { color: var(--danger); background: rgba(229,57,53,.08); }
-  .call-hist-input-row {
-    display: flex; gap: 8px; margin: 14px 0 10px;
-  }
-  .call-hist-input {
-    flex: 1; padding: 10px 14px;
-    border: 1px solid var(--line); border-radius: 10px;
-    background: var(--bg); color: var(--text);
-    font-size: 14px; font-family: inherit; outline: none;
-  }
-  .call-hist-input:focus { border-color: #4caf50; }
-  .call-hist-dial-btn {
-    width: 44px; height: 44px; border-radius: 50%;
-    background: #4caf50; color: #fff; border: none;
-    cursor: pointer; display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0; transition: opacity .15s;
-  }
-  .call-hist-dial-btn:disabled { opacity: .35; cursor: default; }
-  .call-hist-list { max-height: 200px; overflow-y: auto; }
   .new-chat-sheet {
     background: var(--card); border-radius: 18px 18px 0 0;
     padding: 20px 20px 32px; width: 100%; max-width: 500px;
@@ -618,6 +580,58 @@ const CSS = `
   .lang-option.active { color: var(--accent); font-weight: 500; }
 
   /* ─── Call history dropdown ─── */
+  .call-history-dropdown {
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 10px);
+    right: 0;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    box-shadow: 0 6px 24px rgba(0,0,0,.2);
+    overflow: hidden;
+    z-index: 100;
+    width: 280px;
+    flex-direction: column;
+  }
+  .call-history-dropdown.open { display: flex; }
+  .ch-header {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--line);
+    font-size: 13px; font-weight: 600;
+    color: var(--text);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .ch-clear-btn {
+    background: none; border: none; cursor: pointer;
+    color: var(--sub); font-size: 11px;
+    padding: 2px 6px; border-radius: 4px;
+    transition: color .15s, background .15s;
+  }
+  .ch-clear-btn:hover { color: var(--danger); background: rgba(229,57,53,.08); }
+  .ch-new-input-row {
+    padding: 10px 14px;
+    display: flex; gap: 6px;
+    border-bottom: 1px solid var(--line);
+  }
+  .ch-new-input {
+    flex: 1; padding: 7px 10px;
+    border: 1px solid var(--line); border-radius: 8px;
+    background: var(--bg); color: var(--text);
+    font-size: 13px; outline: none;
+  }
+  .ch-new-input:focus { border-color: var(--accent); }
+  .ch-call-btn {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: #4caf50; color: #fff; border: none;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; transition: opacity .15s;
+  }
+  .ch-call-btn:disabled { opacity: .4; cursor: default; }
+  .ch-list {
+    overflow-y: auto;
+    max-height: 208px; /* ~4 записи по 52px каждая */
+  }
   .ch-empty {
     padding: 24px 14px; text-align: center;
     color: var(--sub); font-size: 12px;
@@ -1264,7 +1278,7 @@ class SmsGammuPanel extends HTMLElement {
     const text = reasonMap[data.reason] || data.reason;
     this._showToast(`${data.number}: ${text}`);
 
-    const dd = this.shadowRoot.getElementById("call-hist-overlay");
+    const dd = this.shadowRoot.getElementById("call-history-dropdown");
     if (dd?.classList.contains("open")) {
       this._api("call_history").then((h) => {
         this._callHistory = h;
@@ -1388,32 +1402,40 @@ class SmsGammuPanel extends HTMLElement {
   }
 
   async _openCallHistory() {
-    const overlay = this.shadowRoot.getElementById("call-hist-overlay");
-    if (!overlay) return;
-    if (overlay.classList.contains("open")) {
-      overlay.classList.remove("open");
+    const dd = this.shadowRoot.getElementById("call-history-dropdown");
+    if (!dd) return;
+    const isOpen = dd.classList.contains("open");
+    if (isOpen) {
+      dd.classList.remove("open");
       return;
     }
-    const titleEl = this.shadowRoot.getElementById("call-hist-title-text");
-    const numInput = this.shadowRoot.getElementById("call-hist-number");
+
+    const titleEl = this.shadowRoot.getElementById("ch-title");
+    const clearBtn = this.shadowRoot.getElementById("ch-clear-btn");
+    const numInput = this.shadowRoot.getElementById("ch-new-number");
     if (titleEl) titleEl.textContent = this._t("call_history");
-    if (numInput) { numInput.placeholder = this._t("number_placeholder"); numInput.value = ""; }
-    const dialBtn = this.shadowRoot.getElementById("call-hist-dial");
-    if (dialBtn) dialBtn.disabled = true;
-    overlay.classList.add("open");
+    if (clearBtn) clearBtn.textContent = this._t("clear");
+    if (numInput) numInput.placeholder = this._t("number_placeholder");
+
+    dd.classList.add("open");
+    numInput.value = "";
+    this.shadowRoot.getElementById("ch-call-btn").disabled = true;
+
     try {
       this._callHistory = await this._api("call_history");
-    } catch (_) { this._callHistory = []; }
+    } catch (_) {
+      this._callHistory = [];
+    }
     this._renderCallHistory();
-    setTimeout(() => numInput?.focus(), 50);
+    setTimeout(() => numInput.focus(), 50);
   }
 
   _closeCallHistory() {
-    this.shadowRoot.getElementById("call-hist-overlay")?.classList.remove("open");
+    this.shadowRoot.getElementById("call-history-dropdown")?.classList.remove("open");
   }
 
   _renderCallHistory() {
-    const list = this.shadowRoot.getElementById("call-hist-list");
+    const list = this.shadowRoot.getElementById("ch-list");
     if (!list) return;
 
     const items = this._callHistory || [];
@@ -2192,23 +2214,35 @@ class SmsGammuPanel extends HTMLElement {
               </svg>
             </button>
 
-          </div>
-
-          <div class="call-hist-overlay" id="call-hist-overlay">
-            <div class="call-hist-sheet">
-              <div class="call-hist-title">
-                <span id="call-hist-title-text">История звонков</span>
-                <button class="call-hist-clear" id="call-hist-clear">Очистить</button>
+            <div class="call-history-dropdown" id="call-history-dropdown">
+              <div class="ch-header">
+                <span id="ch-title">История звонков</span>
+                <button class="ch-clear-btn" id="ch-clear-btn">Очистить</button>
               </div>
-              <div class="call-hist-input-row">
-                <input class="call-hist-input" id="call-hist-number" type="tel" placeholder="+79001234567" />
-                <button class="call-hist-dial-btn" id="call-hist-dial" disabled>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <div class="ch-new-input-row">
+                <input class="ch-new-input" id="ch-new-number" type="tel" placeholder="+79001234567" />
+                <button class="ch-call-btn" id="ch-call-btn" disabled title="Позвонить">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
                   </svg>
                 </button>
               </div>
-              <div class="call-hist-list" id="call-hist-list"></div>
+              <div class="ch-list" id="ch-list"></div>
+            </div>
+          </div>
+
+          <!-- Modal: новый чат -->
+          <div class="new-chat-overlay" id="new-chat-overlay">
+            <div class="new-chat-sheet">
+              <div class="new-chat-title" id="new-chat-title">Новое сообщение</div>
+              <input class="new-chat-input" id="new-chat-number" type="tel"
+                placeholder="+79001234567" />
+              <textarea class="new-chat-input" id="new-chat-text" rows="3"
+                placeholder="Текст сообщения…" style="resize:none"></textarea>
+              <div class="new-chat-actions">
+                <button class="btn-cancel" id="new-chat-cancel">Отмена</button>
+                <button class="btn-start" id="new-chat-send" disabled>Отправить</button>
+              </div>
             </div>
           </div>
         </div>
@@ -2292,7 +2326,10 @@ class SmsGammuPanel extends HTMLElement {
       this.dispatchEvent(new Event("hass-toggle-menu", { bubbles: true, composed: true }));
     });
 
-
+    // Закрываем dropdown при клике вне
+    this.shadowRoot.addEventListener("click", () => {
+      this.shadowRoot.getElementById("call-history-dropdown")?.classList.remove("open");
+    });
 
     // FAB — новый чат
     this.shadowRoot.getElementById("fab-new-chat").addEventListener("click", (e) => {
@@ -2344,13 +2381,10 @@ class SmsGammuPanel extends HTMLElement {
       e.stopPropagation();
       this._openCallHistory();
     });
-
-    // Закрытие по клику на фон
-    this.shadowRoot.getElementById("call-hist-overlay").addEventListener("click", (e) => {
-      if (!e.target.closest(".call-hist-sheet")) this._closeCallHistory();
+    this.shadowRoot.getElementById("call-history-dropdown").addEventListener("click", (e) => {
+      e.stopPropagation();
     });
-
-    this.shadowRoot.getElementById("call-hist-clear").addEventListener("click", async () => {
+    this.shadowRoot.getElementById("ch-clear-btn").addEventListener("click", async () => {
       try {
         await this._api("clear_call_history", "POST");
         this._callHistory = [];
@@ -2358,12 +2392,17 @@ class SmsGammuPanel extends HTMLElement {
       } catch (_) {}
     });
 
-    const chInput   = this.shadowRoot.getElementById("call-hist-number");
-    const chCallBtn = this.shadowRoot.getElementById("call-hist-dial");
+    const chInput   = this.shadowRoot.getElementById("ch-new-number");
+    const chCallBtn = this.shadowRoot.getElementById("ch-call-btn");
 
-    chInput.addEventListener("input", () => { chCallBtn.disabled = !chInput.value.trim(); });
+    chInput.addEventListener("input", () => {
+      chCallBtn.disabled = !chInput.value.trim();
+    });
     chInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && chInput.value.trim()) { e.preventDefault(); chCallBtn.click(); }
+      if (e.key === "Enter" && chInput.value.trim()) {
+        e.preventDefault();
+        chCallBtn.click();
+      }
     });
     chCallBtn.addEventListener("click", async () => {
       const number = chInput.value.trim();
