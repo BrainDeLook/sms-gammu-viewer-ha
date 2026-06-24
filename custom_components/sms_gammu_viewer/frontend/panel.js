@@ -614,14 +614,14 @@ const CSS = `
     display: flex; gap: 8px; margin-bottom: 12px;
   }
   .ch-new-input {
-    flex: 1; padding: 7px 12px;
-    border: 1px solid var(--line); border-radius: 8px;
+    flex: 1; padding: 9px 13px;
+    border: 1px solid var(--line); border-radius: 10px;
     background: var(--bg); color: var(--text);
-    font-size: 13px; font-family: inherit; outline: none;
+    font-size: 14px; font-family: inherit; outline: none;
   }
   .ch-new-input:focus { border-color: #4caf50; }
   .ch-call-btn {
-    width: 36px; height: 36px; border-radius: 50%;
+    width: 40px; height: 40px; border-radius: 50%;
     background: #4caf50; color: #fff; border: none;
     cursor: pointer; display: flex; align-items: center; justify-content: center;
     flex-shrink: 0; transition: opacity .15s;
