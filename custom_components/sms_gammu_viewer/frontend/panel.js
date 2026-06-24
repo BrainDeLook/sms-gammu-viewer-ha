@@ -599,33 +599,29 @@ const CSS = `
     max-width: 500px;
   }
   .ch-header {
-    padding: 10px 14px;
-    border-bottom: 1px solid var(--line);
-    font-size: 13px; font-weight: 600;
-    color: var(--text);
     display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 14px;
+    font-size: 16px; font-weight: 600; color: var(--text);
   }
   .ch-clear-btn {
     background: none; border: none; cursor: pointer;
-    color: var(--sub); font-size: 11px;
-    padding: 2px 6px; border-radius: 4px;
+    color: var(--sub); font-size: 12px;
+    padding: 4px 8px; border-radius: 6px;
     transition: color .15s, background .15s;
   }
   .ch-clear-btn:hover { color: var(--danger); background: rgba(229,57,53,.08); }
   .ch-new-input-row {
-    padding: 10px 14px;
-    display: flex; gap: 6px;
-    border-bottom: 1px solid var(--line);
+    display: flex; gap: 8px; margin-bottom: 12px;
   }
   .ch-new-input {
-    flex: 1; padding: 7px 10px;
-    border: 1px solid var(--line); border-radius: 8px;
+    flex: 1; padding: 10px 14px;
+    border: 1px solid var(--line); border-radius: 10px;
     background: var(--bg); color: var(--text);
-    font-size: 13px; outline: none;
+    font-size: 14px; font-family: inherit; outline: none;
   }
-  .ch-new-input:focus { border-color: var(--accent); }
+  .ch-new-input:focus { border-color: #4caf50; }
   .ch-call-btn {
-    width: 32px; height: 32px; border-radius: 8px;
+    width: 44px; height: 44px; border-radius: 50%;
     background: #4caf50; color: #fff; border: none;
     cursor: pointer; display: flex; align-items: center; justify-content: center;
     flex-shrink: 0; transition: opacity .15s;
@@ -633,7 +629,7 @@ const CSS = `
   .ch-call-btn:disabled { opacity: .4; cursor: default; }
   .ch-list {
     overflow-y: auto;
-    max-height: 208px; /* ~4 записи по 52px каждая */
+    max-height: 220px;
   }
   .ch-empty {
     padding: 24px 14px; text-align: center;
