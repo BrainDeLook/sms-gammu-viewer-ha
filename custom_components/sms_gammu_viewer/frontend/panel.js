@@ -596,6 +596,7 @@ const CSS = `
     border-radius: 18px 18px 0 0;
     padding: 20px 20px 32px;
     width: 100%;
+    max-width: 500px;
   }
   .ch-header {
     padding: 10px 14px;
