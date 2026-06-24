@@ -1297,22 +1297,32 @@ class SmsGammuPanel extends HTMLElement {
     }
   }
 
+  _dateLocale() {
+    // Возвращаем BCP 47 locale на основе выбранного языка интерфейса
+    try {
+      const lang = localStorage.getItem("sms_gammu_lang") || "ru";
+      return lang === "en" ? "en-GB" : "ru-RU";
+    } catch { return "ru-RU"; }
+  }
+
   _formatShort(str) {
     if (!str) return "";
     try {
+      const loc = this._dateLocale();
       const d = new Date(str);
       const now = new Date();
       if (now - d < 86400000)
-        return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+        return d.toLocaleTimeString(loc, { hour: "2-digit", minute: "2-digit" });
       if (now - d < 604800000)
-        return d.toLocaleDateString([], { weekday: "short" });
-      return d.toLocaleDateString([], { day: "2-digit", month: "short" });
+        return d.toLocaleDateString(loc, { weekday: "short" });
+      return d.toLocaleDateString(loc, { day: "2-digit", month: "short" });
     } catch { return str; }
   }
 
   _fmtDateLabel(str) {
     if (!str) return "";
     try {
+      const loc = this._dateLocale();
       const d   = new Date(str);
       const now = new Date();
       const today     = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -1320,14 +1330,15 @@ class SmsGammuPanel extends HTMLElement {
       const msgDay    = new Date(d.getFullYear(), d.getMonth(), d.getDate());
       if (msgDay.getTime() === today.getTime())     return this._t("today");
       if (msgDay.getTime() === yesterday.getTime()) return this._t("yesterday");
-      return d.toLocaleDateString("ru-RU", { day: "2-digit", month: "long", year: "numeric" });
+      return d.toLocaleDateString(loc, { day: "2-digit", month: "long", year: "numeric" });
     } catch { return str; }
   }
 
   _formatFull(str) {
     if (!str) return "";
     try {
-      return new Date(str).toLocaleString([], {
+      const loc = this._dateLocale();
+      return new Date(str).toLocaleString(loc, {
         day: "2-digit", month: "short", year: "numeric",
         hour: "2-digit", minute: "2-digit",
       });
