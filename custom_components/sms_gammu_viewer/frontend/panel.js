@@ -1020,6 +1020,9 @@ class SmsGammuPanel extends HTMLElement {
         if (cached) {
           this._status = JSON.parse(cached);
           this._renderStatusBar();
+          // Показываем кнопку звонка если она была включена
+          const fabCall = this.shadowRoot.getElementById("fab-call");
+          if (fabCall) fabCall.style.display = this._status?.call_enabled ? "" : "none";
         }
       } catch (_) {}
     }
