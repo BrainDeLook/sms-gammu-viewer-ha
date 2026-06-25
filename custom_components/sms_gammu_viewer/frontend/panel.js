@@ -1012,11 +1012,14 @@ class SmsGammuPanel extends HTMLElement {
 
   async _loadStatus() {
     const hadStatusBefore = !!this._status;
+    this._statusLoading = true;
+    this._renderStatusBar();
     try {
       const s = await this._api("status");
       this._status = s;
       this._pollInterval = s.poll_interval_hint || 30;
     } catch (_) {}
+    this._statusLoading = false;
 
     // Первая загрузка статуса — только теперь известна настройка языка
     // из конфигурации интеграции. Если пользователь не выбирал язык
