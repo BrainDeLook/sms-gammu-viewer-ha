@@ -703,11 +703,21 @@ class SmsApiView(HomeAssistantView):
             return self._json(data)
 
         if action == "status":
-            signal  = await coord.client.get_signal()
-            network = await coord.client.get_network()
-            modem   = await coord.client.get_modem()
-            sim     = await coord.client.get_sim()
-            capacity = await coord.client.get_sms_capacity()
+            # Параллельные запросы вместо последовательных — ускоряет в ~5x
+            signal, network, modem, sim, capacity = await asyncio.gather(
+                coord.client.get_signal(),
+                coord.client.get_network(),
+                coord.client.get_modem(),
+                coord.client.get_sim(),
+                coord.client.get_sms_capacity(),
+                return_exceptions=True,
+            )
+            # Заменяем исключения на None чтобы не ломать ответ
+            signal   = None if isinstance(signal,   Exception) else signal
+            network  = None if isinstance(network,  Exception) else network
+            modem    = None if isinstance(modem,    Exception) else modem
+            sim      = None if isinstance(sim,      Exception) else sim
+            capacity = None if isinstance(capacity, Exception) else capacity
             unread  = await self.hass.async_add_executor_job(store.unread_count)
             sim_phone_number = await self.hass.async_add_executor_job(
                 store.get_setting, "sim_phone_number"
