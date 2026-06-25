@@ -2231,7 +2231,7 @@ class SmsGammuPanel extends HTMLElement {
             </div>
             <input class="search" id="search" type="text" placeholder="Поиск…" />
           </div>
-          <div class="status-bar" id="status-bar">${this._t("loading_status")}</div>
+          <div class="status-bar" id="status-bar"><span class="status-spin"></span></div>
           <div class="contact-list" id="contact-list"></div>
 
           <button class="fab" id="fab-new-chat" title="New message">
