@@ -2230,7 +2230,7 @@ class SmsGammuPanel extends HTMLElement {
                 </svg>
               </button>
             </div>
-            <input class="search" id="search" type="text" placeholder="" />
+            <input class="search" id="search" type="text" />
           </div>
           <div class="status-bar" id="status-bar">${this._t("loading_status")}</div>
           <div class="contact-list" id="contact-list"></div>
@@ -2548,6 +2548,8 @@ class SmsGammuPanel extends HTMLElement {
   }
 
   _renderStatusBar() {
+    const _srch = this.shadowRoot?.getElementById("search");
+    if (_srch) _srch.placeholder = this._t("search");
     const bar = this.shadowRoot.getElementById("status-bar");
     if (!bar) return;
 
