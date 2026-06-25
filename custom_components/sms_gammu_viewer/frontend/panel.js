@@ -251,12 +251,6 @@ const CSS = `
   @keyframes pulse-call { 0%,100%{opacity:1} 50%{opacity:.5} }
   .icon-btn.spin svg { animation: spin 1s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
-  .status-spin {
-    display: inline-block; width: 9px; height: 9px;
-    border: 1.5px solid var(--sub); border-top-color: var(--accent);
-    border-radius: 50%; animation: spin .7s linear infinite;
-    margin-left: 5px; vertical-align: middle; flex-shrink: 0;
-  }
 
   .messages-area {
     flex: 1;
@@ -1018,14 +1012,11 @@ class SmsGammuPanel extends HTMLElement {
 
   async _loadStatus() {
     const hadStatusBefore = !!this._status;
-    this._statusLoading = true;
-    this._renderStatusBar();
     try {
       const s = await this._api("status");
       this._status = s;
       this._pollInterval = s.poll_interval_hint || 30;
     } catch (_) {}
-    this._statusLoading = false;
 
     // Первая загрузка статуса — только теперь известна настройка языка
     // из конфигурации интеграции. Если пользователь не выбирал язык
@@ -2240,7 +2231,7 @@ class SmsGammuPanel extends HTMLElement {
             </div>
             <input class="search" id="search" type="text" placeholder="Поиск…" />
           </div>
-          <div class="status-bar" id="status-bar"><span class="status-spin"></span></div>
+          <div class="status-bar" id="status-bar">${this._t("loading_status")}</div>
           <div class="contact-list" id="contact-list"></div>
 
           <button class="fab" id="fab-new-chat" title="New message">
@@ -2577,8 +2568,7 @@ class SmsGammuPanel extends HTMLElement {
       return;
     }
     if (!s?.signal) {
-      const sp = this._statusLoading ? '<span class="status-spin"></span>' : "";
-      bar.innerHTML = `<span class="signal-dot bad"></span><span>${this._t("no_modem")}</span>${sp}`;
+      bar.innerHTML = `<span class="signal-dot bad"></span><span>${this._t("no_modem")}</span>`;
       return;
     }
     const pct = s.signal?.SignalPercent ?? "?";
