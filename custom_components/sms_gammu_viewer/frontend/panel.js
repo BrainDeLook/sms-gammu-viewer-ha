@@ -1012,10 +1012,24 @@ class SmsGammuPanel extends HTMLElement {
 
   async _loadStatus() {
     const hadStatusBefore = !!this._status;
+
+    // Показываем закешированный статус мгновенно пока не пришёл свежий
+    if (!hadStatusBefore) {
+      try {
+        const cached = localStorage.getItem("sms_gammu_status_cache");
+        if (cached) {
+          this._status = JSON.parse(cached);
+          this._renderStatusBar();
+        }
+      } catch (_) {}
+    }
+
     try {
       const s = await this._api("status");
       this._status = s;
       this._pollInterval = s.poll_interval_hint || 30;
+      // Кешируем для следующей загрузки
+      try { localStorage.setItem("sms_gammu_status_cache", JSON.stringify(s)); } catch (_) {}
     } catch (_) {}
 
     // Первая загрузка статуса — только теперь известна настройка языка
