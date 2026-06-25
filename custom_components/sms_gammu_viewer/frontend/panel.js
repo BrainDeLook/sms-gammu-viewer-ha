@@ -113,6 +113,13 @@ const CSS = `
   }
   .signal-dot.bad { background: #f44336; }
   .signal-dot.mid { background: #ff9800; }
+  .status-spinner {
+    display: inline-block; width: 9px; height: 9px;
+    border: 1.5px solid var(--sub); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin-status .7s linear infinite;
+    margin-left: 5px; vertical-align: middle; flex-shrink: 0;
+  }
+  @keyframes spin-status { to { transform: rotate(360deg); } }
   .status-refreshing {
     display: inline-block; width: 10px; height: 10px;
     border: 1.5px solid var(--sub); border-top-color: var(--accent);
