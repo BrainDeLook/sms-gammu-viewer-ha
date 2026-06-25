@@ -28,30 +28,16 @@ class GatewayClient:
             "Authorization": f"Basic {creds}",
         }
 
-    def _session(self, timeout: int = 10) -> aiohttp.ClientSession:
-        """Возвращает переиспользуемую сессию или создаёт новую если закрыта."""
-        if not hasattr(self, "_client") or self._client.closed:
-            connector = aiohttp.TCPConnector(limit=10)
-            self._client = aiohttp.ClientSession(
-                timeout=aiohttp.ClientTimeout(total=timeout),
-                connector=connector,
-            )
-        return self._client
-
-    async def close(self) -> None:
-        """Закрываем сессию при выгрузке интеграции."""
-        if hasattr(self, "_client") and not self._client.closed:
-            await self._client.close()
-
     async def _request(self, method: str, path: str, timeout: int = 10, **kwargs) -> Any:
-        s = self._session(timeout)
-        async with s.request(
-            method, f"{self._base}{path}", headers=self._headers, **kwargs
-        ) as r:
-            r.raise_for_status()
-            if r.content_length == 0 or r.status == 204:
-                return None
-            return await r.json()
+        t = aiohttp.ClientTimeout(total=timeout)
+        async with aiohttp.ClientSession(timeout=t) as s:
+            async with s.request(
+                method, f"{self._base}{path}", headers=self._headers, **kwargs
+            ) as r:
+                r.raise_for_status()
+                if r.content_length == 0 or r.status == 204:
+                    return None
+                return await r.json()
 
     async def get_all_sms(self) -> list[dict]:
         """GET /sms — возвращает все SMS целиком."""
