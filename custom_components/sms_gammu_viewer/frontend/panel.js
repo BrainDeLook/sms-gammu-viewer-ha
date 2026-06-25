@@ -1026,6 +1026,11 @@ class SmsGammuPanel extends HTMLElement {
         const cached = localStorage.getItem("sms_gammu_status_cache");
         if (cached) {
           this._status = JSON.parse(cached);
+          // Восстанавливаем интервал опроса из кеша
+          if (this._status?.poll_interval_hint) {
+            this._pollInterval = this._status.poll_interval_hint;
+          }
+          this._statusLoading = true;
           this._renderStatusBar();
           // Показываем кнопку звонка если она была включена
           const fabCall = this.shadowRoot.getElementById("fab-call");
@@ -1034,7 +1039,7 @@ class SmsGammuPanel extends HTMLElement {
       } catch (_) {}
     }
 
-    this._statusLoading = true;
+    if (!this._statusLoading) this._statusLoading = true;
     try {
       const s = await this._api("status");
       this._status = s;
