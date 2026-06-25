@@ -1049,12 +1049,12 @@ class SmsGammuPanel extends HTMLElement {
       } catch (_) {}
     }
 
-    if (!this._statusLoading) this._statusLoading = true;
+    this._statusLoading = true;
+    this._renderStatusBar();
     try {
       const s = await this._api("status");
       this._status = s;
       this._pollInterval = s.poll_interval_hint || 30;
-      try { localStorage.setItem("sms_gammu_status_cache", JSON.stringify(s)); } catch (_) {}
     } catch (_) {}
     this._statusLoading = false;
 
@@ -2618,7 +2618,7 @@ class SmsGammuPanel extends HTMLElement {
     const net = s.network?.NetworkName ?? "";
     const interval = this._pollInterval;
     const dotClass = pct >= 50 ? "" : pct >= 20 ? "mid" : "bad";
-    const spinner = this._statusLoading ? '<span class="status-refreshing"></span>' : "";
+    const spinner = this._statusLoading ? '<span class="status-spinner"></span>' : "";
     bar.innerHTML = `
       <span class="signal-dot ${dotClass}"></span>
       <span>${net ? net + " · " : ""}${pct}% · ${this._t("poll_every", interval)}</span>
