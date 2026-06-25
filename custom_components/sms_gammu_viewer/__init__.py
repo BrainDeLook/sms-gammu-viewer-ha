@@ -386,6 +386,7 @@ class SmsCoordinator:
         # call/cover/button сущности выставляют этот флаг перед дозвоном и
         # снимают по завершении, чтобы не тратить циклы опроса впустую.
         self.call_in_progress: bool = False
+        self._status_cache: dict | None = None  # кеш статуса модема
         # Пока идёт отправка SMS — приостанавливаем опрос модема,
         # чтобы gateway не был занят двумя запросами одновременно
         self.send_in_progress: bool = False
