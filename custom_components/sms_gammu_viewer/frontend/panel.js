@@ -1023,31 +1023,12 @@ class SmsGammuPanel extends HTMLElement {
   async _loadStatus() {
     const hadStatusBefore = !!this._status;
 
-    // Показываем закешированный статус мгновенно пока не пришёл свежий
-    if (!hadStatusBefore) {
-      try {
-        const cached = localStorage.getItem("sms_gammu_status_cache");
-        if (cached) {
-          this._status = JSON.parse(cached);
-          // Восстанавливаем интервал опроса из кеша
-          if (this._status?.poll_interval_hint) {
-            this._pollInterval = this._status.poll_interval_hint;
-          }
-          this._statusLoading = true;
-          this._renderStatusBar();
-          // Показываем кнопку звонка если она была включена
-          const fabCall = this.shadowRoot.getElementById("fab-call");
-          if (fabCall) fabCall.style.display = this._status?.call_enabled ? "" : "none";
-        }
-      } catch (_) {}
-    }
-
-    if (!this._statusLoading) this._statusLoading = true;
+    // Бэкенд уже кеширует статус в памяти HA — просто запрашиваем
+    this._statusLoading = true;
     try {
       const s = await this._api("status");
       this._status = s;
       this._pollInterval = s.poll_interval_hint || 30;
-      try { localStorage.setItem("sms_gammu_status_cache", JSON.stringify(s)); } catch (_) {}
     } catch (_) {}
     this._statusLoading = false;
 
