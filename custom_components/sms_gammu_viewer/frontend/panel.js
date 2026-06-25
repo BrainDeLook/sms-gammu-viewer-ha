@@ -816,7 +816,10 @@ class SmsGammuPanel extends HTMLElement {
     this._refreshing = false;
     this._error = null;
     this._status = null;
-    this._pollInterval = 30;
+    try {
+      const cached = localStorage.getItem("sms_gammu_poll_interval");
+      this._pollInterval = cached ? parseInt(cached) : 30;
+    } catch (_) { this._pollInterval = 30; }
     this._timer = null;
     this._eventTimer = null;
     this._lastEventId = 0;
@@ -1070,6 +1073,7 @@ class SmsGammuPanel extends HTMLElement {
     try {
       const pi = await this._api("poll_interval");
       this._pollInterval = pi.interval || 30;
+      try { localStorage.setItem("sms_gammu_poll_interval", String(this._pollInterval)); } catch (_) {}
     } catch (_) {}
 
     this._renderStatusBar();
