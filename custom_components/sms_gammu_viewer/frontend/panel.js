@@ -2568,7 +2568,8 @@ class SmsGammuPanel extends HTMLElement {
       return;
     }
     if (!s?.signal) {
-      bar.innerHTML = `<span class="signal-dot bad"></span><span>${this._t("no_modem")}</span>`;
+      const sp = this._statusLoading ? '<span class="status-spin"></span>' : "";
+      bar.innerHTML = `<span class="signal-dot bad"></span><span>${this._t("no_modem")}</span>${sp}`;
       return;
     }
     const pct = s.signal?.SignalPercent ?? "?";
