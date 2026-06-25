@@ -1598,6 +1598,7 @@ class SmsGammuPanel extends HTMLElement {
     this._pbDialog.querySelector("#pb-d-name").textContent = name;
     this._pbDialog.querySelector("#pb-d-num").textContent = number;
     this._pbDialog.querySelector("#pb-d-open-lbl").textContent = this._t("open_chat");
+    this._pbDialog.querySelector("#pb-d-call-lbl").textContent = this._t("call_number");
     this._pbDialog.querySelector("#pb-d-mute-lbl").textContent = isMuted ? this._t("unmute_chat") : this._t("mute_chat");
     this._pbDialog.querySelector("#pb-d-edit-lbl").textContent = this._t("edit");
     this._pbDialog.querySelector("#pb-d-delete-lbl").textContent = this._t("delete_msg");
@@ -2229,7 +2230,7 @@ class SmsGammuPanel extends HTMLElement {
                 </svg>
               </button>
             </div>
-            <input class="search" id="search" type="text" placeholder="Поиск…" />
+            <input class="search" id="search" type="text" placeholder="" />
           </div>
           <div class="status-bar" id="status-bar">${this._t("loading_status")}</div>
           <div class="contact-list" id="contact-list"></div>
