@@ -251,6 +251,12 @@ const CSS = `
   @keyframes pulse-call { 0%,100%{opacity:1} 50%{opacity:.5} }
   .icon-btn.spin svg { animation: spin 1s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
+  .status-spin {
+    display: inline-block; width: 9px; height: 9px;
+    border: 1.5px solid var(--sub); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin .7s linear infinite;
+    margin-left: 5px; vertical-align: middle; flex-shrink: 0;
+  }
 
   .messages-area {
     flex: 1;
