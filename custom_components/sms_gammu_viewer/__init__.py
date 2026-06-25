@@ -76,32 +76,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await hass.config_entries.async_forward_entry_setups(entry, ["sensor", "cover", "button"])
     entry.async_on_unload(entry.add_update_listener(_options_updated))
 
-    # Прогреваем кеш статуса в фоне — к моменту открытия UI данные уже готовы
-    async def _warm_status_cache():
-        try:
-            signal, network, modem, sim, capacity = await asyncio.gather(
-                coordinator.client.get_signal(),
-                coordinator.client.get_network(),
-                coordinator.client.get_modem(),
-                coordinator.client.get_sim(),
-                coordinator.client.get_sms_capacity(),
-                return_exceptions=True,
-            )
-            coordinator._status_cache = {
-                "signal":     None if isinstance(signal,   Exception) else signal,
-                "network":    None if isinstance(network,  Exception) else network,
-                "modem":      None if isinstance(modem,    Exception) else modem,
-                "sim":        None if isinstance(sim,      Exception) else sim,
-                "capacity":   None if isinstance(capacity, Exception) else capacity,
-                "call_enabled": bool(coordinator.entry.data.get("call_device", "").strip()),
-                "language":   coordinator.entry.data.get("language", "ru"),
-                "show_panel": coordinator.entry.data.get("show_panel", True),
-            }
-            _LOGGER.debug("Status cache warmed up")
-        except Exception as e:
-            _LOGGER.debug("Status cache warmup failed: %s", e)
-    hass.async_create_task(_warm_status_cache())
-
     _LOGGER.info("SMS Gammu Viewer started: %s", entry.title)
     return True
 
@@ -387,7 +361,6 @@ class SmsCoordinator:
         # call/cover/button сущности выставляют этот флаг перед дозвоном и
         # снимают по завершении, чтобы не тратить циклы опроса впустую.
         self.call_in_progress: bool = False
-        self._status_cache: dict | None = None
         # Пока идёт отправка SMS — приостанавливаем опрос модема,
         # чтобы gateway не был занят двумя запросами одновременно
         self.send_in_progress: bool = False
@@ -730,67 +703,15 @@ class SmsApiView(HomeAssistantView):
             return self._json(data)
 
         if action == "status":
-            unread = await self.hass.async_add_executor_job(store.unread_count)
+            signal  = await coord.client.get_signal()
+            network = await coord.client.get_network()
+            modem   = await coord.client.get_modem()
+            sim     = await coord.client.get_sim()
+            capacity = await coord.client.get_sms_capacity()
+            unread  = await self.hass.async_add_executor_job(store.unread_count)
             sim_phone_number = await self.hass.async_add_executor_job(
                 store.get_setting, "sim_phone_number"
             )
-            if coord._status_cache is not None:
-                # Есть кеш — возвращаем мгновенно, обновляем в фоне
-                async def _bg_refresh(c=coord):
-                    try:
-                        s, n, m, si, cap = await asyncio.gather(
-                            c.client.get_signal(), c.client.get_network(),
-                            c.client.get_modem(), c.client.get_sim(),
-                            c.client.get_sms_capacity(), return_exceptions=True,
-                        )
-                        c._status_cache = {
-                            "signal":     None if isinstance(s,   Exception) else s,
-                            "network":    None if isinstance(n,   Exception) else n,
-                            "modem":      None if isinstance(m,   Exception) else m,
-                            "sim":        None if isinstance(si,  Exception) else si,
-                            "capacity":   None if isinstance(cap, Exception) else cap,
-                            "call_enabled": bool(c.entry.data.get("call_device", "").strip()),
-                            "language":   c.entry.data.get("language", "ru"),
-                            "show_panel": c.entry.data.get("show_panel", True),
-                        }
-                    except Exception:
-                        pass
-                self.hass.async_create_task(_bg_refresh())
-                cache = coord._status_cache
-                return self._json({
-                    "signal":   cache.get("signal"),
-                    "network":  cache.get("network"),
-                    "modem":    cache.get("modem"),
-                    "sim":      cache.get("sim"),
-                    "capacity": cache.get("capacity"),
-                    "unread":   unread,
-                    "sim_phone_number": sim_phone_number,
-                    "collecting":    coord.collecting,
-                    "error_streak":  coord._error_streak,
-                    "call_enabled":  cache.get("call_enabled"),
-                    "language":      cache.get("language"),
-                    "show_panel":    cache.get("show_panel"),
-                    "poll_interval_hint": coord._poll_interval,
-                    "cached": True,
-                })
-            # Кеша нет — первый запрос после рестарта HA, ждём
-            signal, network, modem, sim, capacity = await asyncio.gather(
-                coord.client.get_signal(), coord.client.get_network(),
-                coord.client.get_modem(), coord.client.get_sim(),
-                coord.client.get_sms_capacity(), return_exceptions=True,
-            )
-            signal   = None if isinstance(signal,   Exception) else signal
-            network  = None if isinstance(network,  Exception) else network
-            modem    = None if isinstance(modem,    Exception) else modem
-            sim      = None if isinstance(sim,      Exception) else sim
-            capacity = None if isinstance(capacity, Exception) else capacity
-            coord._status_cache = {
-                "signal": signal, "network": network, "modem": modem,
-                "sim": sim, "capacity": capacity,
-                "call_enabled": bool(coord.entry.data.get("call_device", "").strip()),
-                "language": coord.entry.data.get("language", "ru"),
-                "show_panel": coord.entry.data.get("show_panel", True),
-            }
             return self._json({
                 "signal": signal,
                 "network": network,
