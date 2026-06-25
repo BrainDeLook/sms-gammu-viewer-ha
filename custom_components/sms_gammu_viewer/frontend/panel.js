@@ -113,13 +113,6 @@ const CSS = `
   }
   .signal-dot.bad { background: #f44336; }
   .signal-dot.mid { background: #ff9800; }
-  .status-refreshing {
-    display: inline-block; width: 10px; height: 10px;
-    border: 1.5px solid var(--sub); border-top-color: var(--accent);
-    border-radius: 50%; animation: spin .7s linear infinite;
-    margin-left: 4px; vertical-align: middle; flex-shrink: 0;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
 
   .contact-list {
     flex: 1;
@@ -816,10 +809,7 @@ class SmsGammuPanel extends HTMLElement {
     this._refreshing = false;
     this._error = null;
     this._status = null;
-    try {
-      const cached = localStorage.getItem("sms_gammu_poll_interval");
-      this._pollInterval = cached ? parseInt(cached) : 30;
-    } catch (_) { this._pollInterval = 30; }
+    this._pollInterval = 30;
     this._timer = null;
     this._eventTimer = null;
     this._lastEventId = 0;
@@ -1022,34 +1012,11 @@ class SmsGammuPanel extends HTMLElement {
 
   async _loadStatus() {
     const hadStatusBefore = !!this._status;
-
-    // Показываем закешированный статус мгновенно пока не пришёл свежий
-    if (!hadStatusBefore) {
-      try {
-        const cached = localStorage.getItem("sms_gammu_status_cache");
-        if (cached) {
-          this._status = JSON.parse(cached);
-          // Восстанавливаем интервал опроса из кеша
-          if (this._status?.poll_interval_hint) {
-            this._pollInterval = this._status.poll_interval_hint;
-          }
-          this._statusLoading = true;
-          this._renderStatusBar();
-          // Показываем кнопку звонка если она была включена
-          const fabCall = this.shadowRoot.getElementById("fab-call");
-          if (fabCall) fabCall.style.display = this._status?.call_enabled ? "" : "none";
-        }
-      } catch (_) {}
-    }
-
-    if (!this._statusLoading) this._statusLoading = true;
     try {
       const s = await this._api("status");
       this._status = s;
       this._pollInterval = s.poll_interval_hint || 30;
-      try { localStorage.setItem("sms_gammu_status_cache", JSON.stringify(s)); } catch (_) {}
     } catch (_) {}
-    this._statusLoading = false;
 
     // Первая загрузка статуса — только теперь известна настройка языка
     // из конфигурации интеграции. Если пользователь не выбирал язык
@@ -1073,7 +1040,6 @@ class SmsGammuPanel extends HTMLElement {
     try {
       const pi = await this._api("poll_interval");
       this._pollInterval = pi.interval || 30;
-      try { localStorage.setItem("sms_gammu_poll_interval", String(this._pollInterval)); } catch (_) {}
     } catch (_) {}
 
     this._renderStatusBar();
@@ -1098,13 +1064,11 @@ class SmsGammuPanel extends HTMLElement {
     this._stopTimer();
     this._timer = setInterval(() => this._load(), this._pollInterval * 1000);
     this._eventTimer = setInterval(() => this._pollEvents(), 4000);
-    this._statusTimer = setInterval(() => this._loadStatus(), 15000);
   }
 
   _stopTimer() {
     if (this._timer) { clearInterval(this._timer); this._timer = null; }
     if (this._eventTimer) { clearInterval(this._eventTimer); this._eventTimer = null; }
-    if (this._statusTimer) { clearInterval(this._statusTimer); this._statusTimer = null; }
   }
 
   async _pollEvents() {
@@ -2611,11 +2575,9 @@ class SmsGammuPanel extends HTMLElement {
     const net = s.network?.NetworkName ?? "";
     const interval = this._pollInterval;
     const dotClass = pct >= 50 ? "" : pct >= 20 ? "mid" : "bad";
-    const spinner = this._statusLoading ? '<span class="status-refreshing"></span>' : "";
     bar.innerHTML = `
       <span class="signal-dot ${dotClass}"></span>
       <span>${net ? net + " · " : ""}${pct}% · ${this._t("poll_every", interval)}</span>
-      ${spinner}
     `;
   }
 
