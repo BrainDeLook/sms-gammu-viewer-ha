@@ -1098,13 +1098,13 @@ class SmsGammuPanel extends HTMLElement {
     this._stopTimer();
     this._timer = setInterval(() => this._load(), this._pollInterval * 1000);
     this._eventTimer = setInterval(() => this._pollEvents(), 4000);
-    this._statusTimer = setInterval(() => this._loadStatus(), 15000);
+
   }
 
   _stopTimer() {
     if (this._timer) { clearInterval(this._timer); this._timer = null; }
     if (this._eventTimer) { clearInterval(this._eventTimer); this._eventTimer = null; }
-    if (this._statusTimer) { clearInterval(this._statusTimer); this._statusTimer = null; }
+
   }
 
   async _pollEvents() {
