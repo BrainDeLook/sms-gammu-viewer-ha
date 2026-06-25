@@ -224,6 +224,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coord = hass.data[DOMAIN].pop(entry.entry_id, None)
     if coord:
         await coord.stop()
+        await coord.client.close()
     if not hass.data[DOMAIN]:
         try:
             async_remove_panel(hass, PANEL_URL)
