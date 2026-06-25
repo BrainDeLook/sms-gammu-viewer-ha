@@ -51,6 +51,7 @@ const CSS = `
     background: var(--card);
     border-right: 1px solid var(--line);
     position: relative;
+    overflow: hidden;
   }
 
   .contacts-header {
@@ -583,46 +584,44 @@ const CSS = `
   .call-history-dropdown {
     display: none;
     position: absolute;
-    bottom: calc(100% + 10px);
-    right: 0;
-    background: var(--card);
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    box-shadow: 0 6px 24px rgba(0,0,0,.2);
-    overflow: hidden;
-    z-index: 100;
-    width: 280px;
-    flex-direction: column;
+    inset: 0;
+    background: rgba(0,0,0,.45);
+    z-index: 20;
+    align-items: flex-end;
+    justify-content: center;
   }
   .call-history-dropdown.open { display: flex; }
+  .ch-sheet {
+    background: var(--card);
+    border-radius: 18px 18px 0 0;
+    padding: 20px 20px 32px;
+    width: 100%;
+    max-width: 500px;
+  }
   .ch-header {
-    padding: 10px 14px;
-    border-bottom: 1px solid var(--line);
-    font-size: 13px; font-weight: 600;
-    color: var(--text);
     display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 14px;
+    font-size: 16px; font-weight: 600; color: var(--text);
   }
   .ch-clear-btn {
     background: none; border: none; cursor: pointer;
-    color: var(--sub); font-size: 11px;
-    padding: 2px 6px; border-radius: 4px;
+    color: var(--sub); font-size: 12px;
+    padding: 4px 8px; border-radius: 6px;
     transition: color .15s, background .15s;
   }
   .ch-clear-btn:hover { color: var(--danger); background: rgba(229,57,53,.08); }
   .ch-new-input-row {
-    padding: 10px 14px;
-    display: flex; gap: 6px;
-    border-bottom: 1px solid var(--line);
+    display: flex; gap: 8px; margin-bottom: 12px;
   }
   .ch-new-input {
-    flex: 1; padding: 7px 10px;
-    border: 1px solid var(--line); border-radius: 8px;
+    flex: 1; padding: 9px 13px;
+    border: 1px solid var(--line); border-radius: 10px;
     background: var(--bg); color: var(--text);
-    font-size: 13px; outline: none;
+    font-size: 14px; font-family: inherit; outline: none;
   }
-  .ch-new-input:focus { border-color: var(--accent); }
+  .ch-new-input:focus { border-color: #4caf50; }
   .ch-call-btn {
-    width: 32px; height: 32px; border-radius: 8px;
+    width: 40px; height: 40px; border-radius: 50%;
     background: #4caf50; color: #fff; border: none;
     cursor: pointer; display: flex; align-items: center; justify-content: center;
     flex-shrink: 0; transition: opacity .15s;
@@ -630,7 +629,7 @@ const CSS = `
   .ch-call-btn:disabled { opacity: .4; cursor: default; }
   .ch-list {
     overflow-y: auto;
-    max-height: 208px; /* ~4 записи по 52px каждая */
+    max-height: 220px;
   }
   .ch-empty {
     padding: 24px 14px; text-align: center;
@@ -1298,22 +1297,33 @@ class SmsGammuPanel extends HTMLElement {
     }
   }
 
+  _dateLocale() {
+    // Явный выбор в нашем UI → язык HA → fallback ru
+    try {
+      const explicit = localStorage.getItem("sms_gammu_lang");
+      const lang = explicit || this._hass?.language || "ru";
+      return lang.startsWith("en") ? "en-GB" : "ru-RU";
+    } catch { return "ru-RU"; }
+  }
+
   _formatShort(str) {
     if (!str) return "";
     try {
+      const loc = this._dateLocale();
       const d = new Date(str);
       const now = new Date();
       if (now - d < 86400000)
-        return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+        return d.toLocaleTimeString(loc, { hour: "2-digit", minute: "2-digit" });
       if (now - d < 604800000)
-        return d.toLocaleDateString([], { weekday: "short" });
-      return d.toLocaleDateString([], { day: "2-digit", month: "short" });
+        return d.toLocaleDateString(loc, { weekday: "short" });
+      return d.toLocaleDateString(loc, { day: "2-digit", month: "short" });
     } catch { return str; }
   }
 
   _fmtDateLabel(str) {
     if (!str) return "";
     try {
+      const loc = this._dateLocale();
       const d   = new Date(str);
       const now = new Date();
       const today     = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -1321,14 +1331,15 @@ class SmsGammuPanel extends HTMLElement {
       const msgDay    = new Date(d.getFullYear(), d.getMonth(), d.getDate());
       if (msgDay.getTime() === today.getTime())     return this._t("today");
       if (msgDay.getTime() === yesterday.getTime()) return this._t("yesterday");
-      return d.toLocaleDateString("ru-RU", { day: "2-digit", month: "long", year: "numeric" });
+      return d.toLocaleDateString(loc, { day: "2-digit", month: "long", year: "numeric" });
     } catch { return str; }
   }
 
   _formatFull(str) {
     if (!str) return "";
     try {
-      return new Date(str).toLocaleString([], {
+      const loc = this._dateLocale();
+      return new Date(str).toLocaleString(loc, {
         day: "2-digit", month: "short", year: "numeric",
         hour: "2-digit", minute: "2-digit",
       });
@@ -1646,6 +1657,7 @@ class SmsGammuPanel extends HTMLElement {
     ].join(" ");
     document.head.appendChild(style);
 
+    const svgPhone = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>';
     const svgChat = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
     const svgMute = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>';
     const svgEdit = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
@@ -1659,6 +1671,7 @@ class SmsGammuPanel extends HTMLElement {
           '<div class="pb-d-num" id="pb-d-num"></div>' +
         '</div>' +
         '<button class="pb-d-btn" id="pb-d-open">' + svgChat + '<span id="pb-d-open-lbl"></span></button>' +
+        '<button class="pb-d-btn" id="pb-d-call">' + svgPhone + '<span id="pb-d-call-lbl"></span></button>' +
         '<button class="pb-d-btn" id="pb-d-mute">' + svgMute + '<span id="pb-d-mute-lbl"></span></button>' +
         '<button class="pb-d-btn" id="pb-d-edit">' + svgEdit + '<span id="pb-d-edit-lbl"></span></button>' +
         '<button class="pb-d-btn danger" id="pb-d-delete">' + svgDel + '<span id="pb-d-delete-lbl"></span></button>' +
@@ -1841,6 +1854,11 @@ class SmsGammuPanel extends HTMLElement {
                   <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
                 </svg>
               </button>
+              <button class="pb-action-btn" data-action="call" data-number="${this._esc(c.number)}" title="${this._t("call_number")}">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
+                </svg>
+              </button>
               <button class="pb-action-btn ${c.is_muted ? "muted-active" : ""}" data-action="mute" data-number="${this._esc(c.number)}" title="${c.is_muted ? this._t("unmute_chat") : this._t("mute_chat")}">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   ${c.is_muted
@@ -1906,11 +1924,27 @@ class SmsGammuPanel extends HTMLElement {
       });
     });
 
+    // На мобиле клик по строке контакта (не по кнопке) → сразу открываем pb-sheet
+    // Двойное нажатие на мобиле не нужно — сразу sheet с кнопками
+    page.querySelectorAll(".pb-item").forEach((item) => {
+      item.addEventListener("click", (e) => {
+        if (e.target.closest(".pb-action-btn") || e.target.closest(".pb-more-btn")) return;
+        const btn = item.querySelector(".pb-more-btn");
+        if (btn && getComputedStyle(btn).display !== "none") {
+          this._openPbSheet(btn.dataset.number, btn.dataset.name, btn.dataset.muted === "1");
+        }
+      });
+    });
+
     page.querySelectorAll(".pb-action-btn").forEach((btn) => {
       btn.addEventListener("click", (e) => {
         e.stopPropagation();
         const number = btn.dataset.number;
         const action = btn.dataset.action;
+        if (action === "call") {
+          this._callNumber(number);
+          return;
+        }
         if (action === "open") {
           this._activeTab = "chats";
           const pbBtn = this.shadowRoot.getElementById("phonebook-btn");
@@ -2213,8 +2247,10 @@ class SmsGammuPanel extends HTMLElement {
                 <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
               </svg>
             </button>
+          </div>
 
-            <div class="call-history-dropdown" id="call-history-dropdown">
+          <div class="call-history-dropdown" id="call-history-dropdown">
+            <div class="ch-sheet">
               <div class="ch-header">
                 <span id="ch-title">История звонков</span>
                 <button class="ch-clear-btn" id="ch-clear-btn">Очистить</button>
@@ -2222,7 +2258,7 @@ class SmsGammuPanel extends HTMLElement {
               <div class="ch-new-input-row">
                 <input class="ch-new-input" id="ch-new-number" type="tel" placeholder="+79001234567" />
                 <button class="ch-call-btn" id="ch-call-btn" disabled title="Позвонить">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
                   </svg>
                 </button>
@@ -2382,7 +2418,7 @@ class SmsGammuPanel extends HTMLElement {
       this._openCallHistory();
     });
     this.shadowRoot.getElementById("call-history-dropdown").addEventListener("click", (e) => {
-      e.stopPropagation();
+      if (!e.target.closest(".ch-sheet")) this._closeCallHistory();
     });
     this.shadowRoot.getElementById("ch-clear-btn").addEventListener("click", async () => {
       try {
