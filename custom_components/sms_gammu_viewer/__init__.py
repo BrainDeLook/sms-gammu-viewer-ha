@@ -62,6 +62,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     client = GatewayClient(entry.data)
     coordinator = SmsCoordinator(hass, entry, store, client)
+    coordinator._status_cache = None
     hass.data[DOMAIN][entry.entry_id] = coordinator
 
     is_first = len(hass.data[DOMAIN]) == 1
@@ -704,7 +705,39 @@ class SmsApiView(HomeAssistantView):
             return self._json(data)
 
         if action == "status":
-            # Параллельные запросы вместо последовательных — ускоряет в ~5x
+            unread = await self.hass.async_add_executor_job(store.unread_count)
+            sim_phone_number = await self.hass.async_add_executor_job(
+                store.get_setting, "sim_phone_number"
+            )
+            # Возвращаем кеш мгновенно если есть, и обновляем в фоне
+            if coord._status_cache is not None:
+                cached = dict(coord._status_cache)
+                cached["unread"] = unread
+                cached["collecting"] = coord.collecting
+                cached["error_streak"] = coord._error_streak
+                cached["poll_interval_hint"] = coord._poll_interval
+                cached["sim_phone_number"] = sim_phone_number
+                # Обновляем кеш в фоне
+                async def _refresh_cache():
+                    signal, network, modem, sim, capacity = await asyncio.gather(
+                        coord.client.get_signal(), coord.client.get_network(),
+                        coord.client.get_modem(), coord.client.get_sim(),
+                        coord.client.get_sms_capacity(), return_exceptions=True,
+                    )
+                    coord._status_cache = {
+                        "signal":   None if isinstance(signal,   Exception) else signal,
+                        "network":  None if isinstance(network,  Exception) else network,
+                        "modem":    None if isinstance(modem,    Exception) else modem,
+                        "sim":      None if isinstance(sim,      Exception) else sim,
+                        "capacity": None if isinstance(capacity, Exception) else capacity,
+                        "call_enabled": bool(coord.entry.data.get("call_device", "").strip()),
+                        "language": coord.entry.data.get("language", "ru"),
+                        "show_panel": coord.entry.data.get("show_panel", True),
+                    }
+                self.hass.async_create_task(_refresh_cache())
+                return self._json(cached)
+
+            # Первый запрос — ждём реального ответа
             signal, network, modem, sim, capacity = await asyncio.gather(
                 coord.client.get_signal(),
                 coord.client.get_network(),
@@ -713,16 +746,18 @@ class SmsApiView(HomeAssistantView):
                 coord.client.get_sms_capacity(),
                 return_exceptions=True,
             )
-            # Заменяем исключения на None чтобы не ломать ответ
             signal   = None if isinstance(signal,   Exception) else signal
             network  = None if isinstance(network,  Exception) else network
             modem    = None if isinstance(modem,    Exception) else modem
             sim      = None if isinstance(sim,      Exception) else sim
             capacity = None if isinstance(capacity, Exception) else capacity
-            unread  = await self.hass.async_add_executor_job(store.unread_count)
-            sim_phone_number = await self.hass.async_add_executor_job(
-                store.get_setting, "sim_phone_number"
-            )
+            coord._status_cache = {
+                "signal": signal, "network": network, "modem": modem,
+                "sim": sim, "capacity": capacity,
+                "call_enabled": bool(coord.entry.data.get("call_device", "").strip()),
+                "language": coord.entry.data.get("language", "ru"),
+                "show_panel": coord.entry.data.get("show_panel", True),
+            }
             return self._json({
                 "signal": signal,
                 "network": network,
