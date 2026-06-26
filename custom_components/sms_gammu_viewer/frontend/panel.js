@@ -133,6 +133,7 @@ const CSS = `
   .swipe-btn.mute { background: #888780; }
   .swipe-btn.swipe-del { background: #E24B4A; }
   .swipe-inner { position: relative; z-index: 2; background-color: var(--card) !important; will-change: transform; }
+  .swipe-inner.active { background-color: rgba(3,169,244,.1) !important; }
   .swipe-inner.snapping { transition: transform 0.25s ease; }
   .contact-item {
     display: flex;
@@ -1142,7 +1143,6 @@ class SmsGammuPanel extends HTMLElement {
   }
 
   async _selectContact(number) {
-    console.log("_selectContact called:", number, "activeNumber:", this._activeNumber);
     // Сохраняем черновик текущего чата перед переключением
     if (this._activeNumber && this._activeNumber !== number) {
       const ta = this.shadowRoot.getElementById("send-input");
