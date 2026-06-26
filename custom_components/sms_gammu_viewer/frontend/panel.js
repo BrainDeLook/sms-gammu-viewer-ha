@@ -132,9 +132,9 @@ const CSS = `
   .swipe-btn.pin { background: #1D9E75; }
   .swipe-btn.mute { background: #888780; }
   .swipe-btn.swipe-del { background: #E24B4A; }
-  .swipe-inner { position: relative; z-index: 2; background-color: var(--card) !important; will-change: transform; transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94); }
+  .swipe-inner { position: relative; z-index: 2; background-color: var(--card) !important; will-change: transform; }
   .swipe-inner.active { background-color: rgba(3,169,244,.1) !important; }
-  .swipe-inner.snapping { transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94); }
+  .swipe-inner.snapping { transition: transform 0.25s ease; }
   .contact-item {
     display: flex;
     align-items: center;
@@ -2747,8 +2747,6 @@ class SmsGammuPanel extends HTMLElement {
         const number = btn.dataset.number;
         const action = btn.dataset.action;
         const wrap = btn.closest(".swipe-wrap");
-        // Закрываем свайп сразу
-        if (wrap) this._swipeClose(wrap);
         if (action === "read") {
           await this._api(`mark_read/${encodeURIComponent(number)}`, "POST").catch(() => {});
           // Обновляем локально
@@ -2782,14 +2780,10 @@ class SmsGammuPanel extends HTMLElement {
   _swipeClose(wrap, animate = true) {
     const inner = wrap.querySelector(".swipe-inner");
     if (!inner) return;
+    inner.classList.toggle("snapping", animate);
+    inner.style.transform = "translateX(0)";
     if (this._swipeState) this._swipeState.set(wrap, 0);
-    if (animate) {
-      inner.style.transform = "translateX(0)";
-    } else {
-      inner.style.transition = "none";
-      inner.style.transform = "translateX(0)";
-      requestAnimationFrame(() => { inner.style.transition = ""; });
-    }
+    if (animate) setTimeout(() => inner.classList.remove("snapping"), 260);
   }
 
   _initSwipe(list) {
@@ -2810,7 +2804,7 @@ class SmsGammuPanel extends HTMLElement {
         inner.classList.toggle("snapping", animate);
         inner.style.transform = `translateX(${x}px)`;
         this._swipeState.set(wrap, x);
-        if (animate) setTimeout(() => inner.classList.remove("snapping"), 450);
+        if (animate) setTimeout(() => inner.classList.remove("snapping"), 260);
       };
 
       const onStart = cx => {
@@ -2824,7 +2818,7 @@ class SmsGammuPanel extends HTMLElement {
         const delta = cx - startX;
         curX = Math.max(-W, Math.min(W, (this._swipeState.get(wrap) || 0) + delta));
         moved = Math.abs(delta) > 5;
-        inner.style.transition = "none";
+        inner.style.transition = "";
         inner.style.transform = `translateX(${curX}px)`;
       };
       const onEnd = () => {
