@@ -62,7 +62,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     client = GatewayClient(entry.data)
     coordinator = SmsCoordinator(hass, entry, store, client)
-    coordinator._status_cache = None
     hass.data[DOMAIN][entry.entry_id] = coordinator
 
     is_first = len(hass.data[DOMAIN]) == 1
@@ -75,32 +74,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.http.register_view(SmsApiView(hass))
     await coordinator.start()
     await hass.config_entries.async_forward_entry_setups(entry, ["sensor", "cover", "button"])
-
-    # Прогреваем кеш статуса в фоне сразу при старте
-    async def _warm_status_cache():
-        try:
-            signal, network, modem, sim, capacity = await asyncio.gather(
-                coordinator.client.get_signal(),
-                coordinator.client.get_network(),
-                coordinator.client.get_modem(),
-                coordinator.client.get_sim(),
-                coordinator.client.get_sms_capacity(),
-                return_exceptions=True,
-            )
-            coordinator._status_cache = {
-                "signal":   None if isinstance(signal,   Exception) else signal,
-                "network":  None if isinstance(network,  Exception) else network,
-                "modem":    None if isinstance(modem,    Exception) else modem,
-                "sim":      None if isinstance(sim,      Exception) else sim,
-                "capacity": None if isinstance(capacity, Exception) else capacity,
-                "call_enabled": bool(coordinator.entry.data.get("call_device", "").strip()),
-                "language": coordinator.entry.data.get("language", "ru"),
-                "show_panel": coordinator.entry.data.get("show_panel", True),
-            }
-            _LOGGER.debug("Status cache warmed up")
-        except Exception as e:
-            _LOGGER.debug("Status cache warmup failed: %s", e)
-    hass.async_create_task(_warm_status_cache())
     entry.async_on_unload(entry.add_update_listener(_options_updated))
 
     _LOGGER.info("SMS Gammu Viewer started: %s", entry.title)
@@ -251,7 +224,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coord = hass.data[DOMAIN].pop(entry.entry_id, None)
     if coord:
         await coord.stop()
-        await coord.client.close()
     if not hass.data[DOMAIN]:
         try:
             async_remove_panel(hass, PANEL_URL)
@@ -731,59 +703,15 @@ class SmsApiView(HomeAssistantView):
             return self._json(data)
 
         if action == "status":
-            unread = await self.hass.async_add_executor_job(store.unread_count)
+            signal  = await coord.client.get_signal()
+            network = await coord.client.get_network()
+            modem   = await coord.client.get_modem()
+            sim     = await coord.client.get_sim()
+            capacity = await coord.client.get_sms_capacity()
+            unread  = await self.hass.async_add_executor_job(store.unread_count)
             sim_phone_number = await self.hass.async_add_executor_job(
                 store.get_setting, "sim_phone_number"
             )
-            # Возвращаем кеш мгновенно если есть, и обновляем в фоне
-            if coord._status_cache is not None:
-                cached = dict(coord._status_cache)
-                cached["unread"] = unread
-                cached["collecting"] = coord.collecting
-                cached["error_streak"] = coord._error_streak
-                cached["poll_interval_hint"] = coord._poll_interval
-                cached["sim_phone_number"] = sim_phone_number
-                # Обновляем кеш в фоне
-                async def _refresh_cache():
-                    signal, network, modem, sim, capacity = await asyncio.gather(
-                        coord.client.get_signal(), coord.client.get_network(),
-                        coord.client.get_modem(), coord.client.get_sim(),
-                        coord.client.get_sms_capacity(), return_exceptions=True,
-                    )
-                    coord._status_cache = {
-                        "signal":   None if isinstance(signal,   Exception) else signal,
-                        "network":  None if isinstance(network,  Exception) else network,
-                        "modem":    None if isinstance(modem,    Exception) else modem,
-                        "sim":      None if isinstance(sim,      Exception) else sim,
-                        "capacity": None if isinstance(capacity, Exception) else capacity,
-                        "call_enabled": bool(coord.entry.data.get("call_device", "").strip()),
-                        "language": coord.entry.data.get("language", "ru"),
-                        "show_panel": coord.entry.data.get("show_panel", True),
-                    }
-                self.hass.async_create_task(_refresh_cache())
-                return self._json(cached)
-
-            # Первый запрос — ждём реального ответа
-            signal, network, modem, sim, capacity = await asyncio.gather(
-                coord.client.get_signal(),
-                coord.client.get_network(),
-                coord.client.get_modem(),
-                coord.client.get_sim(),
-                coord.client.get_sms_capacity(),
-                return_exceptions=True,
-            )
-            signal   = None if isinstance(signal,   Exception) else signal
-            network  = None if isinstance(network,  Exception) else network
-            modem    = None if isinstance(modem,    Exception) else modem
-            sim      = None if isinstance(sim,      Exception) else sim
-            capacity = None if isinstance(capacity, Exception) else capacity
-            coord._status_cache = {
-                "signal": signal, "network": network, "modem": modem,
-                "sim": sim, "capacity": capacity,
-                "call_enabled": bool(coord.entry.data.get("call_device", "").strip()),
-                "language": coord.entry.data.get("language", "ru"),
-                "show_panel": coord.entry.data.get("show_panel", True),
-            }
             return self._json({
                 "signal": signal,
                 "network": network,
