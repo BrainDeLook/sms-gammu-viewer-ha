@@ -132,7 +132,7 @@ const CSS = `
   .swipe-btn.pin { background: #1D9E75; }
   .swipe-btn.mute { background: #888780; }
   .swipe-btn.swipe-del { background: #E24B4A; }
-  .swipe-inner { position: relative; z-index: 2; background: var(--card); }
+  .swipe-inner { position: relative; z-index: 2; background-color: var(--card) !important; will-change: transform; }
   .swipe-inner.snapping { transition: transform 0.25s ease; }
   .contact-item {
     display: flex;
