@@ -152,16 +152,14 @@ const CSS = `
     top: 4px; left: 4px;
     background: none; border: none; cursor: pointer;
     color: var(--sub); padding: 2px; border-radius: 4px;
-    opacity: 0; transition: opacity .15s, color .15s;
-    z-index: 3; display: flex;
-  }
-  @media (max-width: 580px) {
-    .pin-hover-btn { display: none; }
+    transition: opacity .15s, color .15s;
+    z-index: 3; display: none;
   }
   @media (min-width: 581px) {
+    .pin-hover-btn { display: flex; opacity: 0; }
     .swipe-inner:hover .pin-hover-btn { opacity: 1; }
-    .swipe-inner.pinned-active .pin-hover-btn { opacity: 1; color: var(--accent); }
     .swipe-inner:hover .pin-hover-btn:hover { color: var(--accent); }
+    .swipe-inner.pinned-active .pin-hover-btn { opacity: 1; color: var(--accent); }
   }
   .contact-item.has-unread { background: var(--unread-bg); }
   .contact-item.has-unread::before {
