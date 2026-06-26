@@ -132,7 +132,7 @@ const CSS = `
   .swipe-btn.pin { background: #1D9E75; }
   .swipe-btn.mute { background: #888780; }
   .swipe-btn.swipe-del { background: #E24B4A; }
-  .swipe-inner { position: relative; z-index: 2; background-color: var(--card) !important; will-change: transform; }
+  .swipe-inner { position: relative; z-index: 2; background-color: var(--card) !important; will-change: transform; transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94); }
   .swipe-inner.active { background-color: rgba(3,169,244,.1) !important; }
   .swipe-inner.snapping { transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94); }
   .contact-item {
@@ -2784,15 +2784,11 @@ class SmsGammuPanel extends HTMLElement {
     if (!inner) return;
     if (this._swipeState) this._swipeState.set(wrap, 0);
     if (animate) {
-      inner.classList.add("snapping");
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          inner.style.transform = "translateX(0)";
-          setTimeout(() => inner.classList.remove("snapping"), 450);
-        });
-      });
-    } else {
       inner.style.transform = "translateX(0)";
+    } else {
+      inner.style.transition = "none";
+      inner.style.transform = "translateX(0)";
+      requestAnimationFrame(() => { inner.style.transition = ""; });
     }
   }
 
@@ -2828,7 +2824,7 @@ class SmsGammuPanel extends HTMLElement {
         const delta = cx - startX;
         curX = Math.max(-W, Math.min(W, (this._swipeState.get(wrap) || 0) + delta));
         moved = Math.abs(delta) > 5;
-        inner.style.transition = "";
+        inner.style.transition = "none";
         inner.style.transform = `translateX(${curX}px)`;
       };
       const onEnd = () => {
