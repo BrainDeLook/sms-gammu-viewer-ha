@@ -268,6 +268,11 @@ class SmsStore:
             r["is_pinned"] = bool(r["is_pinned"])
         return result
 
+    def get_message_count(self) -> int:
+        with self._conn() as conn:
+            row = conn.execute("SELECT COUNT(*) FROM messages").fetchone()
+            return row[0] if row else 0
+
     def unread_count(self) -> int:
         with self._conn() as conn:
             row = conn.execute(
