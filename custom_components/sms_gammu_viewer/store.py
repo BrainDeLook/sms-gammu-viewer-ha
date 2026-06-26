@@ -373,8 +373,11 @@ class SmsStore:
 
     def get_all_contacts(self) -> list[dict[str, Any]]:
         with self._conn() as conn:
+            conn.execute("CREATE TABLE IF NOT EXISTS pinned_numbers (number TEXT PRIMARY KEY)")
             rows = conn.execute("""
-                SELECT pb.*, (SELECT 1 FROM muted_numbers mn WHERE mn.number = pb.number) as is_muted
+                SELECT pb.*,
+                    (SELECT 1 FROM muted_numbers mn WHERE mn.number = pb.number) as is_muted,
+                    (SELECT 1 FROM pinned_numbers pn WHERE pn.number = pb.number) as is_pinned
                 FROM phonebook pb
                 ORDER BY pb.name COLLATE NOCASE
             """).fetchall()
