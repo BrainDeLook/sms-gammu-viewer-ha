@@ -773,6 +773,20 @@ class SmsApiView(HomeAssistantView):
             coord.push_event("message_read", {"id": msg_id})
             return self._json({"ok": True})
 
+        if action == "db_stats":
+            import os
+            db_path = store._path
+            db_size = os.path.getsize(db_path) if os.path.exists(db_path) else 0
+            msg_count = await self.hass.async_add_executor_job(
+                lambda: store._conn().__enter__().execute("SELECT COUNT(*) FROM messages").fetchone()[0]
+            )
+            unread = await self.hass.async_add_executor_job(store.unread_count)
+            return self._json({
+                "db_size": db_size,
+                "msg_count": msg_count,
+                "unread": unread,
+            })
+
         if action.startswith("mark_read/"):
             from urllib.parse import unquote as _uq
             number = _uq(action[len("mark_read/"):])
