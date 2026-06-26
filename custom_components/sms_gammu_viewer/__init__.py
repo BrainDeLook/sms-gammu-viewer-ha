@@ -702,6 +702,16 @@ class SmsApiView(HomeAssistantView):
             data = await self.hass.async_add_executor_job(store.get_all)
             return self._json(data)
 
+        if action == "db_stats":
+            import os
+            db_path = store._path
+            db_size = os.path.getsize(db_path) if os.path.exists(db_path) else 0
+            msg_count = await self.hass.async_add_executor_job(store.get_message_count)
+            return self._json({
+                "db_size": db_size,
+                "msg_count": msg_count,
+            })
+
         if action == "status":
             signal  = await coord.client.get_signal()
             network = await coord.client.get_network()
@@ -772,16 +782,6 @@ class SmsApiView(HomeAssistantView):
             await self.hass.async_add_executor_job(store.mark_read, msg_id)
             coord.push_event("message_read", {"id": msg_id})
             return self._json({"ok": True})
-
-        if action == "db_stats":
-            import os
-            db_path = store._path
-            db_size = os.path.getsize(db_path) if os.path.exists(db_path) else 0
-            msg_count = await self.hass.async_add_executor_job(store.get_message_count)
-            return self._json({
-                "db_size": db_size,
-                "msg_count": msg_count,
-            })
 
         if action.startswith("mark_read/"):
             from urllib.parse import unquote as _uq
