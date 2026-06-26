@@ -149,14 +149,16 @@ const CSS = `
   .contact-item.active { background: rgba(3,169,244,.1); }
   .pin-static-icon {
     position: absolute;
-    top: 4px; left: 4px;
+    top: 6px; left: 6px;
+    width: 14px; height: 14px;
     color: var(--accent);
-    display: flex; z-index: 3;
-    pointer-events: none;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 3; pointer-events: none;
   }
   .pin-hover-btn {
     position: absolute;
-    top: 4px; left: 4px;
+    top: 6px; left: 6px;
+    width: 14px; height: 14px;
     background: none; border: none; cursor: pointer;
     color: var(--sub); padding: 2px; border-radius: 4px;
     transition: color .15s; z-index: 3;
