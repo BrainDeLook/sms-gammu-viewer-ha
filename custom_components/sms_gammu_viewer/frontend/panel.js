@@ -119,7 +119,7 @@ const CSS = `
     overflow-y: auto;
   }
 
-  .swipe-wrap { position: relative; overflow: hidden; border-bottom: 0.5px solid var(--line); }
+  .swipe-wrap { position: relative; overflow: hidden; border-bottom: 0.5px solid var(--line); background: var(--card); }
   @media (min-width: 581px) {
     .swipe-actions-left, .swipe-actions-right { display: none !important; }
     .swipe-inner { transform: none !important; transition: none !important; cursor: pointer; }
@@ -132,7 +132,7 @@ const CSS = `
   .swipe-btn.pin { background: #1D9E75; }
   .swipe-btn.mute { background: #888780; }
   .swipe-btn.swipe-del { background: #E24B4A; }
-  .swipe-inner { position: relative; z-index: 2; }
+  .swipe-inner { position: relative; z-index: 2; background: var(--card); }
   .swipe-inner.snapping { transition: transform 0.25s ease; }
   .contact-item {
     display: flex;
