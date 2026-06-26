@@ -2753,6 +2753,7 @@ class SmsGammuPanel extends HTMLElement {
         const number = btn.dataset.number;
         const action = btn.dataset.action;
         const wrap = btn.closest(".swipe-wrap");
+        if (wrap) this._swipeClose(wrap);
         if (action === "read") {
           await this._api(`mark_read/${encodeURIComponent(number)}`, "POST").catch(() => {});
           // Обновляем локально
