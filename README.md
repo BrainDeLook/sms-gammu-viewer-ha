@@ -318,28 +318,59 @@ Add it via **Edit Dashboard → Add Card → Manual** with the YAML above, or se
 
 Home Assistant doesn't natively support notification badges on sidebar panel icons. You can add one using the [custom-sidebar](https://github.com/elchininet/custom-sidebar) HACS frontend plugin.
 
+> ⚠️ **Important limitation:** custom-sidebar takes over sidebar ordering. Any item listed in its config will be placed first, and other items without an explicit `order` will be pushed to the bottom. This means you **lose the ability to reorder sidebar items via Home Assistant's built-in UI** (long press on the sidebar title → Edit). If sidebar order matters to you, you'll need to define the full order manually in the config file.
+
 ### Setup
 
-**1. Install custom-sidebar via HACS** → Frontend → search for `custom-sidebar` → Download → Restart Home Assistant.
+**1. Install custom-sidebar via HACS** → Frontend → search for `custom-sidebar` → Download.
 
-**2. Create the file `/config/www/custom-sidebar-config.yaml`:**
+**2. Add to `configuration.yaml`:**
+
+```yaml
+frontend:
+  extra_module_url:
+    - /hacsfiles/custom-sidebar/custom-sidebar-plugin.js
+```
+
+**3. Restart Home Assistant.**
+
+**4. Find your SMS panel href.** Add `?cs_debug` to your HA URL and reload. Open DevTools (F12) → Console → expand `custom-sidebar debug: Top Native sidebar items`. Find the SMS row and copy its `href` (e.g. `/sms-viewer`).
+
+**5. Create `/config/www/custom-sidebar-config.yaml`.**
+
+Minimal config (SMS badge only, sidebar order managed by HA — SMS will appear first):
 
 ```yaml
 order:
-  - item: sms-viewer
+  - item: /sms-viewer
     match: href
     notification: |
       [[[
-        const count = parseInt(states['sensor.sms_unread_count']?.state) || 0;
+        const count = parseInt(states['sensor.unread_sms']?.state) || 0;
         return count > 0 ? String(count) : '';
       ]]]
 ```
 
-> The `item` value must match the `href` of the SMS panel. To find the exact href, add `?cs_debug` to your HA URL and open the browser console — look for `custom-sidebar debug: Native sidebar items`.
+Full config (define all items to preserve your sidebar order):
 
-**3. Restart Home Assistant.**
+```yaml
+order:
+  - item: /lovelace
+    match: href
+    order: 1
+  # ... add all your sidebar items in the desired order ...
+  - item: /sms-viewer
+    match: href
+    order: 11   # set to match SMS position in your sidebar
+    notification: |
+      [[[
+        const count = parseInt(states['sensor.unread_sms']?.state) || 0;
+        return count > 0 ? String(count) : '';
+      ]]]
+```
 
-The SMS sidebar icon will now show a badge with the number of unread messages. It disappears automatically when all messages are read.
+**6. Reload the page (F5)** — no HA restart needed for config changes.
+
 
 ## Credits & Inspiration
 
