@@ -325,6 +325,35 @@ show_unread_only: false
 
 ---
 
+
+---
+
+## Счётчик непрочитанных на иконке в сайдбаре (через custom-sidebar)
+
+Home Assistant не поддерживает badge на иконках панелей в сайдбаре нативно. Можно добавить через HACS плагин [custom-sidebar](https://github.com/elchininet/custom-sidebar).
+
+**1. Установи custom-sidebar через HACS** → Frontend → custom-sidebar
+
+**2. Создай `/config/custom_sidebar.yaml`:**
+
+```yaml
+order:
+  - new_item: false
+    item: sms-viewer
+    notification: "{{ states('sensor.sms_unread_count') }}"
+    hide_notification_on_zero: true
+```
+
+**3. Добавь в `configuration.yaml`:**
+
+```yaml
+custom_sidebar:
+```
+
+**4. Перезапусти Home Assistant.**
+
+На иконке SMS в сайдбаре появится красный кружок с числом непрочитанных. Исчезает автоматически когда все сообщения прочитаны.
+
 ## Благодарности и источники вдохновения
 
 Проект опирается на наработки нескольких открытых репозиториев:
