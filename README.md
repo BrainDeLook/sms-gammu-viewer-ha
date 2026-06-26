@@ -32,6 +32,9 @@ After installation, an **SMS** tab appears in the sidebar. Messages are stored i
 - 🌐 **English / Russian UI** — switchable independently of HA's language
 - 🔍 **Search** by phone number or message text
 - 📱 **Mobile-friendly** — responsive layout with bottom sheet menus and back navigation
+- 👆 **Swipe actions** (mobile) — swipe left to mute/delete, swipe right to mark as read/pin a conversation
+- 📌 **Pin conversations** — pinned chats stay at the top; pin button visible on hover (desktop) or via swipe (mobile)
+- ⚡ **Instant UI updates** — pin, mute, mark as read apply immediately without waiting for server response
 
 ---
 
