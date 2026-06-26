@@ -158,7 +158,7 @@ const CSS = `
   }
   @media (min-width: 581px) {
     .swipe-inner:hover .pin-hover-btn { display: flex; opacity: 1; }
-    .swipe-inner.pinned-active .pin-hover-btn { display: flex; opacity: 1; color: var(--accent); }
+    .swipe-inner.pinned-active .pin-hover-btn { display: flex !important; opacity: 1 !important; color: var(--accent) !important; }
     .swipe-inner:hover .pin-hover-btn:hover { color: var(--accent); }
   }
   .contact-item.has-unread { background: var(--unread-bg); }
