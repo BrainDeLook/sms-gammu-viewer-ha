@@ -332,28 +332,59 @@ show_unread_only: false
 
 Home Assistant не поддерживает badge на иконках панелей в сайдбаре нативно. Можно добавить через HACS плагин [custom-sidebar](https://github.com/elchininet/custom-sidebar).
 
+> ⚠️ **Важное ограничение:** custom-sidebar берёт управление порядком сайдбара на себя. Любой элемент из его конфига окажется вверху списка, остальные без явного `order` уйдут вниз. Это означает, что вы **теряете возможность менять порядок элементов через встроенный UI Home Assistant** (долгое нажатие на заголовок сайдбара → Редактировать). Если порядок важен — нужно прописать все элементы вручную в конфиг-файле.
+
 ### Настройка
 
-**1. Установи custom-sidebar через HACS** → Frontend → найди `custom-sidebar` → Скачать → Перезапусти Home Assistant.
+**1. Установи custom-sidebar через HACS** → Frontend → найди `custom-sidebar` → Скачать.
 
-**2. Создай файл `/config/www/custom-sidebar-config.yaml`:**
+**2. Добавь в `configuration.yaml`:**
+
+```yaml
+frontend:
+  extra_module_url:
+    - /hacsfiles/custom-sidebar/custom-sidebar-plugin.js
+```
+
+**3. Перезапусти Home Assistant.**
+
+**4. Найди href панели SMS.** Добавь `?cs_debug` к URL твоего HA и перезагрузи страницу. Открой DevTools (F12) → Console → раскрой `custom-sidebar debug: Top Native sidebar items`. Найди строку SMS и скопируй её `href` (например `/sms-viewer`).
+
+**5. Создай файл `/config/www/custom-sidebar-config.yaml`.**
+
+Минимальный конфиг (только badge, порядок не задан — SMS окажется первой):
 
 ```yaml
 order:
-  - item: sms-viewer
+  - item: /sms-viewer
     match: href
     notification: |
       [[[
-        const count = parseInt(states['sensor.sms_unread_count']?.state) || 0;
+        const count = parseInt(states['sensor.unread_sms']?.state) || 0;
         return count > 0 ? String(count) : '';
       ]]]
 ```
 
-> Значение `item` должно совпадать с `href` панели SMS. Чтобы найти точный href, добавь `?cs_debug` к URL твоего HA и открой консоль браузера — ищи `custom-sidebar debug: Native sidebar items`.
+Полный конфиг (перечисли все элементы чтобы сохранить нужный порядок):
 
-**3. Перезапусти Home Assistant.**
+```yaml
+order:
+  - item: /lovelace
+    match: href
+    order: 1
+  # ... добавь все элементы сайдбара в нужном порядке ...
+  - item: /sms-viewer
+    match: href
+    order: 11   # укажи позицию SMS в твоём сайдбаре
+    notification: |
+      [[[
+        const count = parseInt(states['sensor.unread_sms']?.state) || 0;
+        return count > 0 ? String(count) : '';
+      ]]]
+```
 
-На иконке SMS в сайдбаре появится badge с числом непрочитанных. Исчезает автоматически когда все сообщения прочитаны.
+**6. Перезагрузи страницу (F5)** — перезапуск HA не нужен.
+
 
 ## Благодарности и источники вдохновения
 
