@@ -174,6 +174,18 @@ class SmsStore:
         with self._conn() as conn:
             conn.execute("UPDATE messages SET is_read=1 WHERE id=?", (msg_id,))
 
+    def mark_read_by_number(self, number: str) -> None:
+        with self._conn() as conn:
+            conn.execute("UPDATE messages SET is_read=1 WHERE number=?", (number,))
+
+    def pin_number(self, number: str) -> None:
+        with self._conn() as conn:
+            conn.execute("INSERT OR IGNORE INTO pinned_numbers (number) VALUES (?)", (number,))
+
+    def unpin_number(self, number: str) -> None:
+        with self._conn() as conn:
+            conn.execute("DELETE FROM pinned_numbers WHERE number=?", (number,))
+
     def delete(self, msg_id: int) -> None:
         with self._conn() as conn:
             conn.execute("DELETE FROM messages WHERE id=?", (msg_id,))
@@ -243,7 +255,7 @@ class SmsStore:
                 FROM messages m
                 LEFT JOIN phonebook pb ON pb.number = m.number
                 GROUP BY m.number
-                ORDER BY last_activity DESC
+                ORDER BY is_pinned DESC, last_activity DESC
             """).fetchall()
         result = [dict(r) for r in rows]
         for r in result:
