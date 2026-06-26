@@ -2774,14 +2774,7 @@ class SmsGammuPanel extends HTMLElement {
         setPos(snap, true);
       };
 
-      inner.addEventListener("mousedown", e => {
-        // На десктопе (свайп отключён через CSS) не блокируем клик
-        if (window.innerWidth > 580) return;
-        e.preventDefault();
-        onStart(e.clientX);
-      });
-      window.addEventListener("mousemove", e => { if (dragging) onMove(e.clientX); });
-      window.addEventListener("mouseup", onEnd);
+      // Свайп только на тач-устройствах
       inner.addEventListener("touchstart", e => onStart(e.touches[0].clientX), {passive: true});
       inner.addEventListener("touchmove", e => { if (dragging) onMove(e.touches[0].clientX); }, {passive: true});
       inner.addEventListener("touchend", onEnd);
