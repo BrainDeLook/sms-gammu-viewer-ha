@@ -134,7 +134,7 @@ const CSS = `
   .swipe-btn.swipe-del { background: #E24B4A; }
   .swipe-inner { position: relative; z-index: 2; background-color: var(--card) !important; will-change: transform; }
   .swipe-inner.active { background-color: rgba(3,169,244,.1) !important; }
-  .swipe-inner.snapping { transition: transform 0.25s ease; }
+  .swipe-inner.snapping { transition: transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94); }
   .contact-item {
     display: flex;
     align-items: center;
