@@ -777,14 +777,10 @@ class SmsApiView(HomeAssistantView):
             import os
             db_path = store._path
             db_size = os.path.getsize(db_path) if os.path.exists(db_path) else 0
-            msg_count = await self.hass.async_add_executor_job(
-                lambda: store._conn().__enter__().execute("SELECT COUNT(*) FROM messages").fetchone()[0]
-            )
-            unread = await self.hass.async_add_executor_job(store.unread_count)
+            msg_count = await self.hass.async_add_executor_job(store.get_message_count)
             return self._json({
                 "db_size": db_size,
                 "msg_count": msg_count,
-                "unread": unread,
             })
 
         if action.startswith("mark_read/"):
