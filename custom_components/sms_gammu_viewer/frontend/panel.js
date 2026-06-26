@@ -2386,6 +2386,8 @@ class SmsGammuPanel extends HTMLElement {
       this._activeTab = this._activeTab === "status" ? "chats" : "status";
       const btn = this.shadowRoot.getElementById("modem-btn");
       btn.style.color = this._activeTab === "status" ? "var(--accent)" : "";
+      // Сбрасываем подсветку phonebook при переходе на статус
+      this.shadowRoot.getElementById("phonebook-btn").style.color = "";
       this._switchTab();
     });
 
