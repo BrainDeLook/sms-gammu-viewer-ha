@@ -2729,15 +2729,18 @@ class SmsGammuPanel extends HTMLElement {
     });
 
     list.querySelectorAll(".pin-hover-btn").forEach((btn) => {
-      btn.addEventListener("click", async (e) => {
+      btn.addEventListener("click", (e) => {
         e.stopPropagation();
         const number = btn.dataset.number;
         const isPinned = btn.dataset.pinned === "1";
         const endpoint = isPinned ? `unpin/${encodeURIComponent(number)}` : `pin/${encodeURIComponent(number)}`;
-        await this._api(endpoint, "POST").catch(() => {});
         const c = this._contacts.find(x => x.number === number);
         if (c) c.is_pinned = !isPinned;
         this._renderContacts();
+        this._api(endpoint, "POST").catch(() => {
+          if (c) c.is_pinned = isPinned;
+          this._renderContacts();
+        });
       });
     });
 
@@ -2757,9 +2760,12 @@ class SmsGammuPanel extends HTMLElement {
           const c = this._contacts.find(x => x.number === number);
           const isMuted = c?.is_muted || false;
           const endpoint = isMuted ? `unmute/${encodeURIComponent(number)}` : `mute/${encodeURIComponent(number)}`;
-          await this._api(endpoint, "POST").catch(() => {});
           if (c) c.is_muted = !isMuted;
           this._renderContacts();
+          this._api(endpoint, "POST").catch(() => {
+            if (c) c.is_muted = isMuted;
+            this._renderContacts();
+          });
         } else if (action === "delete") {
           if (confirm(this._t("delete_msg") + "?")) {
             await this._api(`delete_contact/${encodeURIComponent(number)}`, "POST").catch(() => {});
@@ -2769,9 +2775,14 @@ class SmsGammuPanel extends HTMLElement {
           const c = this._contacts.find(x => x.number === number);
           const isPinned = btn.dataset.pinned === "1";
           const endpoint = isPinned ? `unpin/${encodeURIComponent(number)}` : `pin/${encodeURIComponent(number)}`;
-          await this._api(endpoint, "POST").catch(() => {});
+          // Optimistic update — сначала UI, потом API
           if (c) c.is_pinned = !isPinned;
           this._renderContacts();
+          this._api(endpoint, "POST").catch(() => {
+            // Откат если ошибка
+            if (c) c.is_pinned = isPinned;
+            this._renderContacts();
+          });
         }
       });
     });
