@@ -2651,7 +2651,27 @@ class SmsGammuPanel extends HTMLElement {
       </div>
     `).join("");
 
+    // Восстанавливаем открытые свайпы после перерендера
+    const prevSnap = new Map();
+    if (this._swipeState) {
+      this._swipeState.forEach((val, wrap) => {
+        if (val !== 0) {
+          const num = wrap.dataset?.number;
+          if (num) prevSnap.set(num, val);
+        }
+      });
+    }
     this._initSwipe(list);
+    if (prevSnap.size) {
+      list.querySelectorAll(".swipe-wrap").forEach(wrap => {
+        const snap = prevSnap.get(wrap.dataset.number);
+        if (snap) {
+          const inner = wrap.querySelector(".swipe-inner");
+          if (inner) { inner.style.transform = `translateX(${snap}px)`; }
+          this._swipeState.set(wrap, snap);
+        }
+      });
+    }
 
     list.querySelectorAll(".swipe-inner").forEach((el) => {
       el.addEventListener("click", () => {
