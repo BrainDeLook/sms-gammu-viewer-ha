@@ -332,27 +332,28 @@ show_unread_only: false
 
 Home Assistant не поддерживает badge на иконках панелей в сайдбаре нативно. Можно добавить через HACS плагин [custom-sidebar](https://github.com/elchininet/custom-sidebar).
 
-**1. Установи custom-sidebar через HACS** → Frontend → custom-sidebar
+### Настройка
 
-**2. Создай `/config/custom_sidebar.yaml`:**
+**1. Установи custom-sidebar через HACS** → Frontend → найди `custom-sidebar` → Скачать → Перезапусти Home Assistant.
+
+**2. Создай файл `/config/www/custom-sidebar-config.yaml`:**
 
 ```yaml
 order:
-  - new_item: false
-    item: sms-viewer
-    notification: "{{ states('sensor.sms_unread_count') }}"
-    hide_notification_on_zero: true
+  - item: sms-viewer
+    match: href
+    notification: |
+      [[[
+        const count = parseInt(states['sensor.sms_unread_count']?.state) || 0;
+        return count > 0 ? String(count) : '';
+      ]]]
 ```
 
-**3. Добавь в `configuration.yaml`:**
+> Значение `item` должно совпадать с `href` панели SMS. Чтобы найти точный href, добавь `?cs_debug` к URL твоего HA и открой консоль браузера — ищи `custom-sidebar debug: Native sidebar items`.
 
-```yaml
-custom_sidebar:
-```
+**3. Перезапусти Home Assistant.**
 
-**4. Перезапусти Home Assistant.**
-
-На иконке SMS в сайдбаре появится красный кружок с числом непрочитанных. Исчезает автоматически когда все сообщения прочитаны.
+На иконке SMS в сайдбаре появится badge с числом непрочитанных. Исчезает автоматически когда все сообщения прочитаны.
 
 ## Благодарности и источники вдохновения
 
