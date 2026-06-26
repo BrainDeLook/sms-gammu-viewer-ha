@@ -1857,6 +1857,15 @@ class SmsGammuPanel extends HTMLElement {
   async _loadPhonebook() {
     const page = this.shadowRoot.getElementById("status-main");
     if (!page || this._activeTab !== "phonebook") return;
+    // Загружаем статистику БД
+    this._api("db_stats").then(db => {
+      const dbCard = this.shadowRoot.querySelector(".db-stat-card");
+      if (!dbCard || !db) return;
+      const fmt = (b) => b < 1024*1024 ? (b/1024).toFixed(1)+" KB" : (b/1024/1024).toFixed(2)+" MB";
+      dbCard.querySelector(".db-size-val").textContent = fmt(db.db_size);
+      dbCard.querySelector(".db-msg-val").textContent = db.msg_count;
+    }).catch(() => {});
+
     page.innerHTML = `<div class="status-loading">${this._t("loading_phonebook")}</div>`;
     try {
       this._phonebook = await this._api("phonebook");
