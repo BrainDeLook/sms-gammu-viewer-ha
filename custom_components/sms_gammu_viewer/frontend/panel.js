@@ -2625,7 +2625,7 @@ class SmsGammuPanel extends HTMLElement {
       <div class="swipe-wrap" data-number="${this._esc(c.number)}">
         <div class="swipe-actions-left">
           <button class="swipe-btn read" data-action="read" data-number="${this._esc(c.number)}">${svgCheck}<span>${this._t("mark_read")}</span></button>
-          <button class="swipe-btn pin" data-action="pin" data-number="${this._esc(c.number)}">${svgPin}<span>${this._t("pin")}</span></button>
+          <button class="swipe-btn pin" data-action="pin" data-number="${this._esc(c.number)}" data-pinned="${c.is_pinned ? '1' : '0'}">${svgPin}<span>${c.is_pinned ? this._t("unpin") : this._t("pin")}</span></button>
         </div>
         <div class="swipe-actions-right">
           <button class="swipe-btn mute" data-action="mute" data-number="${this._esc(c.number)}">${svgMute}<span>${c.is_muted ? this._t("unmute_chat") : this._t("mute_chat")}</span></button>
@@ -2686,8 +2686,12 @@ class SmsGammuPanel extends HTMLElement {
             this._renderContacts();
           }
         } else if (action === "pin") {
-          // TODO: pin functionality
-          if (wrap) this._swipeClose(wrap);
+          const c = this._contacts.find(x => x.number === number);
+          const isPinned = btn.dataset.pinned === "1";
+          const endpoint = isPinned ? `unpin/${encodeURIComponent(number)}` : `pin/${encodeURIComponent(number)}`;
+          await this._api(endpoint, "POST").catch(() => {});
+          if (c) c.is_pinned = !isPinned;
+          this._renderContacts();
         }
       });
     });
