@@ -2782,10 +2782,18 @@ class SmsGammuPanel extends HTMLElement {
   _swipeClose(wrap, animate = true) {
     const inner = wrap.querySelector(".swipe-inner");
     if (!inner) return;
-    inner.classList.toggle("snapping", animate);
-    inner.style.transform = "translateX(0)";
     if (this._swipeState) this._swipeState.set(wrap, 0);
-    if (animate) setTimeout(() => inner.classList.remove("snapping"), 450);
+    if (animate) {
+      inner.classList.add("snapping");
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          inner.style.transform = "translateX(0)";
+          setTimeout(() => inner.classList.remove("snapping"), 450);
+        });
+      });
+    } else {
+      inner.style.transform = "translateX(0)";
+    }
   }
 
   _initSwipe(list) {
