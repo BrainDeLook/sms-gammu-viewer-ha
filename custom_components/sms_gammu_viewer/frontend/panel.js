@@ -134,7 +134,7 @@ const CSS = `
   .swipe-btn.swipe-del { background: #E24B4A; }
   .swipe-inner { position: relative; z-index: 2; background-color: var(--card) !important; will-change: transform; }
   .swipe-inner.active { background-color: rgba(3,169,244,.1) !important; }
-  .swipe-inner.snapping { transition: transform 0.65s cubic-bezier(0.23, 1, 0.32, 1); }
+  .swipe-inner.snapping { transition: transform 1s cubic-bezier(0.23, 1, 0.32, 1); }
   .contact-item {
     display: flex;
     align-items: center;
@@ -2785,7 +2785,7 @@ class SmsGammuPanel extends HTMLElement {
     inner.classList.toggle("snapping", animate);
     inner.style.transform = "translateX(0)";
     if (this._swipeState) this._swipeState.set(wrap, 0);
-    if (animate) setTimeout(() => inner.classList.remove("snapping"), 680);
+    if (animate) setTimeout(() => inner.classList.remove("snapping"), 1050);
   }
 
   _initSwipe(list) {
@@ -2806,7 +2806,7 @@ class SmsGammuPanel extends HTMLElement {
         inner.classList.toggle("snapping", animate);
         inner.style.transform = `translateX(${x}px)`;
         this._swipeState.set(wrap, x);
-        if (animate) setTimeout(() => inner.classList.remove("snapping"), 680);
+        if (animate) setTimeout(() => inner.classList.remove("snapping"), 1050);
       };
 
       const onStart = cx => {
