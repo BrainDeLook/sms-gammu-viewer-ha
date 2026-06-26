@@ -119,6 +119,17 @@ const CSS = `
     overflow-y: auto;
   }
 
+  .swipe-wrap { position: relative; overflow: hidden; border-bottom: 0.5px solid var(--line); }
+  .swipe-wrap:last-child { border-bottom: none; }
+  .swipe-actions-left { position: absolute; left: 0; top: 0; bottom: 0; width: 160px; display: flex; align-items: center; gap: 8px; padding: 0 10px; box-sizing: border-box; background: var(--bg); z-index: 1; }
+  .swipe-actions-right { position: absolute; right: 0; top: 0; bottom: 0; width: 160px; display: flex; align-items: center; gap: 8px; padding: 0 10px; box-sizing: border-box; background: var(--bg); z-index: 1; }
+  .swipe-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 8px 4px; font-size: 11px; font-weight: 500; color: #fff; border: none; border-radius: 12px; cursor: pointer; }
+  .swipe-btn.read { background: #378ADD; }
+  .swipe-btn.pin { background: #1D9E75; }
+  .swipe-btn.mute { background: #888780; }
+  .swipe-btn.swipe-del { background: #E24B4A; }
+  .swipe-inner { position: relative; z-index: 2; }
+  .swipe-inner.snapping { transition: transform 0.25s ease; }
   .contact-item {
     display: flex;
     align-items: center;
@@ -2601,30 +2612,141 @@ class SmsGammuPanel extends HTMLElement {
       return;
     }
 
+    const svgCheck = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>';
+    const svgPin   = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg>';
+    const svgMute  = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 8a6 6 0 0 0-9.33-5"/><path d="m10 10-1.33 1.33A6 6 0 0 0 6 14v2m14-6v2a6 6 0 0 1-.67 2.74"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/><line x1="2" y1="2" x2="22" y2="22"/></svg>';
+    const svgDel   = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>';
+
     list.innerHTML = items.map((c) => `
-      <div class="contact-item ${c.unread > 0 ? "has-unread" : ""} ${
-        c.number === this._activeNumber ? "active" : ""
-      }" data-number="${this._esc(c.number)}">
-        <div class="avatar ${this._isAlphaTag(c.number) ? 'alpha' : ''}">${this._esc(c.contact_name ? c.contact_name.slice(0,1).toUpperCase() : this._avatar(c.number))}</div>
-        <div class="contact-info">
-          <div class="contact-row1">
-            <span class="contact-number">${c.is_muted ? "🔇 " : ""}${this._esc(c.contact_name || c.number)}</span>
-            <span class="contact-date">${this._formatShort(c.last_date)}</span>
-          </div>
-          <div class="contact-preview">
-            ${this._drafts[c.number]
-              ? '<span style="color:var(--accent);font-weight:500">' + this._t("draft") + ':</span> ' + this._esc(this._drafts[c.number].slice(0, 50))
-              : this._esc((c.last_text || "").slice(0, 60))}
-          </div>
+      <div class="swipe-wrap" data-number="${this._esc(c.number)}">
+        <div class="swipe-actions-left">
+          <button class="swipe-btn read" data-action="read" data-number="${this._esc(c.number)}">${svgCheck}<span>${this._t("mark_read")}</span></button>
+          <button class="swipe-btn pin" data-action="pin" data-number="${this._esc(c.number)}">${svgPin}<span>${this._t("pin")}</span></button>
         </div>
-        ${c.unread > 0 ? `<span class="contact-unread-cnt">${c.unread}</span>` : ""}
+        <div class="swipe-actions-right">
+          <button class="swipe-btn mute" data-action="mute" data-number="${this._esc(c.number)}">${svgMute}<span>${c.is_muted ? this._t("unmute_chat") : this._t("mute_chat")}</span></button>
+          <button class="swipe-btn swipe-del" data-action="delete" data-number="${this._esc(c.number)}">${svgDel}<span>${this._t("delete_msg")}</span></button>
+        </div>
+        <div class="swipe-inner contact-item ${c.unread > 0 ? "has-unread" : ""} ${
+          c.number === this._activeNumber ? "active" : ""
+        }">
+          <div class="avatar ${this._isAlphaTag(c.number) ? 'alpha' : ''}">${this._esc(c.contact_name ? c.contact_name.slice(0,1).toUpperCase() : this._avatar(c.number))}</div>
+          <div class="contact-info">
+            <div class="contact-row1">
+              <span class="contact-number">${c.is_muted ? "🔇 " : ""}${this._esc(c.contact_name || c.number)}</span>
+              <span class="contact-date">${this._formatShort(c.last_date)}</span>
+            </div>
+            <div class="contact-preview">
+              ${this._drafts[c.number]
+                ? '<span style="color:var(--accent);font-weight:500">' + this._t("draft") + ':</span> ' + this._esc(this._drafts[c.number].slice(0, 50))
+                : this._esc((c.last_text || "").slice(0, 60))}
+            </div>
+          </div>
+          ${c.unread > 0 ? `<span class="contact-unread-cnt">${c.unread}</span>` : ""}
+        </div>
       </div>
     `).join("");
 
-    list.querySelectorAll(".contact-item").forEach((el) => {
+    this._initSwipe(list);
+
+    list.querySelectorAll(".swipe-inner").forEach((el) => {
       el.addEventListener("click", () => {
-        this._selectContact(el.dataset.number);
+        const wrap = el.closest(".swipe-wrap");
+        if (wrap && this._swipeState?.get(wrap) !== 0) return;
+        this._selectContact(el.closest(".swipe-wrap").dataset.number);
       });
+    });
+
+    list.querySelectorAll(".swipe-btn").forEach((btn) => {
+      btn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const number = btn.dataset.number;
+        const action = btn.dataset.action;
+        const wrap = btn.closest(".swipe-wrap");
+        if (action === "read") {
+          await this._api(`mark_read/${encodeURIComponent(number)}`, "POST").catch(() => {});
+          this._renderContacts();
+        } else if (action === "mute") {
+          const c = this._contacts.find(x => x.number === number);
+          const isMuted = c?.is_muted || false;
+          await this._api(`mute/${encodeURIComponent(number)}`, "POST", { muted: !isMuted }).catch(() => {});
+          this._renderContacts();
+        } else if (action === "delete") {
+          if (confirm(this._t("delete_msg") + "?")) {
+            await this._api(`delete_contact/${encodeURIComponent(number)}`, "POST").catch(() => {});
+            this._renderContacts();
+          }
+        } else if (action === "pin") {
+          // TODO: pin functionality
+          if (wrap) this._swipeClose(wrap);
+        }
+      });
+    });
+  }
+
+  _swipeClose(wrap, animate = true) {
+    const inner = wrap.querySelector(".swipe-inner");
+    if (!inner) return;
+    inner.classList.toggle("snapping", animate);
+    inner.style.transform = "translateX(0)";
+    if (this._swipeState) this._swipeState.set(wrap, 0);
+    if (animate) setTimeout(() => inner.classList.remove("snapping"), 260);
+  }
+
+  _initSwipe(list) {
+    const W = 160;
+    const EDGE = 44;
+    const wraps = [...list.querySelectorAll(".swipe-wrap")];
+    this._swipeState = new Map();
+    wraps.forEach(wrap => this._swipeState.set(wrap, 0));
+
+    const closeAll = (except) => wraps.forEach(w => { if (w !== except) this._swipeClose(w); });
+
+    wraps.forEach(wrap => {
+      const inner = wrap.querySelector(".swipe-inner");
+      let startX = 0, curX = 0, dragging = false, allowed = false, moved = false;
+
+      const getRelX = cx => cx - wrap.getBoundingClientRect().left;
+      const setPos = (x, animate) => {
+        inner.classList.toggle("snapping", animate);
+        inner.style.transform = `translateX(${x}px)`;
+        this._swipeState.set(wrap, x);
+        if (animate) setTimeout(() => inner.classList.remove("snapping"), 260);
+      };
+
+      const onStart = cx => {
+        const relX = getRelX(cx);
+        const current = this._swipeState.get(wrap) || 0;
+        startX = cx; curX = current; moved = false; dragging = true;
+        allowed = current !== 0 || relX <= EDGE || relX >= wrap.getBoundingClientRect().width - EDGE;
+      };
+      const onMove = cx => {
+        if (!dragging || !allowed) return;
+        const delta = cx - startX;
+        curX = Math.max(-W, Math.min(W, (this._swipeState.get(wrap) || 0) + delta));
+        moved = Math.abs(delta) > 5;
+        inner.style.transition = "";
+        inner.style.transform = `translateX(${curX}px)`;
+      };
+      const onEnd = () => {
+        if (!dragging) return;
+        dragging = false;
+        if (!moved) {
+          if ((this._swipeState.get(wrap) || 0) !== 0) { setPos(0, true); return; }
+          return;
+        }
+        if (!allowed) return;
+        const snap = Math.abs(curX) > W / 2 ? (curX > 0 ? W : -W) : 0;
+        closeAll(wrap);
+        setPos(snap, true);
+      };
+
+      inner.addEventListener("mousedown", e => { e.preventDefault(); onStart(e.clientX); });
+      window.addEventListener("mousemove", e => { if (dragging) onMove(e.clientX); });
+      window.addEventListener("mouseup", onEnd);
+      inner.addEventListener("touchstart", e => onStart(e.touches[0].clientX), {passive: true});
+      inner.addEventListener("touchmove", e => { if (dragging) onMove(e.touches[0].clientX); }, {passive: true});
+      inner.addEventListener("touchend", onEnd);
     });
   }
 
