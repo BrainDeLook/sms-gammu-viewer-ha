@@ -149,16 +149,17 @@ const CSS = `
   .contact-item.active { background: rgba(3,169,244,.1); }
   .pin-hover-btn {
     display: none;
+    position: absolute;
+    top: 4px; left: 4px;
     background: none; border: none; cursor: pointer;
-    color: var(--sub); padding: 2px 3px; border-radius: 4px;
+    color: var(--sub); padding: 2px; border-radius: 4px;
     opacity: 0; transition: opacity .15s, color .15s;
-    flex-shrink: 0; line-height: 1;
+    z-index: 3;
   }
   @media (min-width: 581px) {
-    .swipe-inner:hover .pin-hover-btn { display: inline-flex; opacity: 1; }
-    .swipe-inner.active .pin-hover-btn { display: inline-flex; opacity: 0.6; }
-    .swipe-inner:hover .pin-hover-btn:hover { color: var(--accent); opacity: 1; }
-    .swipe-inner.pinned-active .pin-hover-btn { display: inline-flex; opacity: 1; color: var(--accent); }
+    .swipe-inner:hover .pin-hover-btn { display: flex; opacity: 1; }
+    .swipe-inner.pinned-active .pin-hover-btn { display: flex; opacity: 1; color: var(--accent); }
+    .swipe-inner:hover .pin-hover-btn:hover { color: var(--accent); }
   }
   .contact-item.has-unread { background: var(--unread-bg); }
   .contact-item.has-unread::before {
@@ -2651,14 +2652,11 @@ class SmsGammuPanel extends HTMLElement {
           <div class="avatar ${this._isAlphaTag(c.number) ? 'alpha' : ''}">${this._esc(c.contact_name ? c.contact_name.slice(0,1).toUpperCase() : this._avatar(c.number))}</div>
           <div class="contact-info">
             <div class="contact-row1">
-              <span class="contact-number" style="display:flex;align-items:center;gap:4px;min-width:0;overflow:hidden;">
-                <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c.is_muted ? "🔇 " : ""}${this._esc(c.contact_name || c.number)}</span>
-                ${c.is_pinned ? '<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" style="color:var(--accent);flex-shrink:0"><path d="M16 12V4h1a1 1 0 0 0 0-2H7a1 1 0 0 0 0 2h1v8l-2 2v2h5v5l1 1 1-1v-5h5v-2l-2-2z"/></svg>' : ""}
-                <button class="pin-hover-btn${c.is_pinned ? ' pinned-active' : ''}" data-action="pin-hover" data-number="${this._esc(c.number)}" data-pinned="${c.is_pinned ? '1' : '0'}" title="${c.is_pinned ? this._t('unpin') : this._t('pin')}">
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="${c.is_pinned ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M16 12V4h1a1 1 0 0 0 0-2H7a1 1 0 0 0 0 2h1v8l-2 2v2h5v5l1 1 1-1v-5h5v-2l-2-2z"/></svg>
-                </button>
-              </span>
+              <span class="contact-number">${c.is_muted ? "🔇 " : ""}${this._esc(c.contact_name || c.number)}${c.is_pinned ? ' <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" style="color:var(--accent);vertical-align:middle;margin-left:2px"><path d="M16 12V4h1a1 1 0 0 0 0-2H7a1 1 0 0 0 0 2h1v8l-2 2v2h5v5l1 1 1-1v-5h5v-2l-2-2z"/></svg>' : ""}</span>
               <span class="contact-date">${this._formatShort(c.last_date)}</span>
+              <button class="pin-hover-btn${c.is_pinned ? ' pinned-active' : ''}" data-action="pin-hover" data-number="${this._esc(c.number)}" data-pinned="${c.is_pinned ? '1' : '0'}" title="${c.is_pinned ? this._t('unpin') : this._t('pin')}">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="${c.is_pinned ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M16 12V4h1a1 1 0 0 0 0-2H7a1 1 0 0 0 0 2h1v8l-2 2v2h5v5l1 1 1-1v-5h5v-2l-2-2z"/></svg>
+              </button>
             </div>
             <div class="contact-preview">
               ${this._drafts[c.number]
