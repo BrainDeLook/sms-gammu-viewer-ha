@@ -180,10 +180,12 @@ class SmsStore:
 
     def pin_number(self, number: str) -> None:
         with self._conn() as conn:
+            self._ensure_pinned_table(conn)
             conn.execute("INSERT OR IGNORE INTO pinned_numbers (number) VALUES (?)", (number,))
 
     def unpin_number(self, number: str) -> None:
         with self._conn() as conn:
+            self._ensure_pinned_table(conn)
             conn.execute("DELETE FROM pinned_numbers WHERE number=?", (number,))
 
     def delete(self, msg_id: int) -> None:
@@ -228,12 +230,21 @@ class SmsStore:
             ).fetchall()
         return [dict(r) for r in rows]
 
+    def _ensure_pinned_table(self, conn) -> None:
+        """Миграция — создаём таблицу pinned_numbers если её нет (старые БД)."""
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS pinned_numbers (
+                number TEXT PRIMARY KEY
+            )
+        """)
+
     def get_contacts(self) -> list[dict[str, Any]]:
         """Список уникальных номеров с последним SMS, непрочитанными, mute-статусом и именем из книги.
         
         unread считает только входящие непрочитанные (direction='in').
         """
         with self._conn() as conn:
+            self._ensure_pinned_table(conn)
             rows = conn.execute("""
                 SELECT
                     m.number as number,
