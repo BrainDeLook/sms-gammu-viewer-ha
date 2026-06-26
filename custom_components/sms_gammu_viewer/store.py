@@ -174,6 +174,10 @@ class SmsStore:
         with self._conn() as conn:
             conn.execute("UPDATE messages SET is_read=1 WHERE id=?", (msg_id,))
 
+    def mark_read_by_number(self, number: str) -> None:
+        with self._conn() as conn:
+            conn.execute("UPDATE messages SET is_read=1 WHERE number=?", (number,))
+
     def delete(self, msg_id: int) -> None:
         with self._conn() as conn:
             conn.execute("DELETE FROM messages WHERE id=?", (msg_id,))
