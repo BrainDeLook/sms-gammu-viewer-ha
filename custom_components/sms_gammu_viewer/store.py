@@ -251,7 +251,8 @@ class SmsStore:
                      ORDER BY id DESC LIMIT 1) as last_direction,
                     (SELECT 1 FROM muted_numbers mn WHERE mn.number = m.number) as is_muted,
                     pb.name as contact_name,
-                    pb.label as contact_label
+                    pb.label as contact_label,
+                    (SELECT 1 FROM pinned_numbers pn WHERE pn.number = m.number) as is_pinned
                 FROM messages m
                 LEFT JOIN phonebook pb ON pb.number = m.number
                 GROUP BY m.number
@@ -260,6 +261,7 @@ class SmsStore:
         result = [dict(r) for r in rows]
         for r in result:
             r["is_muted"] = bool(r["is_muted"])
+            r["is_pinned"] = bool(r["is_pinned"])
         return result
 
     def unread_count(self) -> int:
@@ -375,4 +377,5 @@ class SmsStore:
         result = [dict(r) for r in rows]
         for r in result:
             r["is_muted"] = bool(r["is_muted"])
+            r["is_pinned"] = bool(r["is_pinned"])
         return result
