@@ -1857,15 +1857,6 @@ class SmsGammuPanel extends HTMLElement {
   async _loadPhonebook() {
     const page = this.shadowRoot.getElementById("status-main");
     if (!page || this._activeTab !== "phonebook") return;
-    // Загружаем статистику БД
-    this._api("db_stats").then(db => {
-      const dbCard = this.shadowRoot.querySelector(".db-stat-card");
-      if (!dbCard || !db) return;
-      const fmt = (b) => b < 1024*1024 ? (b/1024).toFixed(1)+" KB" : (b/1024/1024).toFixed(2)+" MB";
-      dbCard.querySelector(".db-size-val").textContent = fmt(db.db_size);
-      dbCard.querySelector(".db-msg-val").textContent = db.msg_count;
-    }).catch(() => {});
-
     page.innerHTML = `<div class="status-loading">${this._t("loading_phonebook")}</div>`;
     try {
       this._phonebook = await this._api("phonebook");
@@ -2109,6 +2100,14 @@ class SmsGammuPanel extends HTMLElement {
       ${row("IMEI", s.modem?.IMEI)}
     `);
 
+    const fmt = (b) => b < 1024*1024 ? (b/1024).toFixed(1)+" KB" : (b/1024/1024).toFixed(2)+" MB";
+    const storageCard = `
+      <div class="stat-card db-stat-card">
+        <h3>${this._t("storage")}</h3>
+        <div class="stat-row"><span class="stat-key">${this._t("db_size")}</span><span class="stat-val db-size-val">...</span></div>
+        <div class="stat-row"><span class="stat-key">${this._t("msg_count")}</span><span class="stat-val db-msg-val">...</span></div>
+      </div>`;
+
     const simCapacity = s.capacity;
     const simUsed = simCapacity ? `${simCapacity.SIMUsed}/${simCapacity.SIMSize}` : null;
     const phoneUsed = simCapacity ? `${simCapacity.PhoneUsed}/${simCapacity.PhoneSize}` : null;
@@ -2156,8 +2155,20 @@ class SmsGammuPanel extends HTMLElement {
         ${modemCard}
         ${memCard}
         ${portCard}
+        ${storageCard}
       </div>
       <button class="reset-btn" id="reset-modem-btn">${this._t("reset_modem")}</button>`;
+
+    // Загружаем статистику БД
+    this._api("db_stats").then(db => {
+      if (!db) return;
+      const fmt2 = (b) => b < 1024*1024 ? (b/1024).toFixed(1)+" KB" : (b/1024/1024).toFixed(2)+" MB";
+      const dbCard = page.querySelector(".db-stat-card");
+      if (dbCard) {
+        dbCard.querySelector(".db-size-val").textContent = fmt2(db.db_size);
+        dbCard.querySelector(".db-msg-val").textContent = db.msg_count;
+      }
+    }).catch(() => {});
 
     page.querySelector("#reset-modem-btn")?.addEventListener("click", async () => {
       if (!confirm(this._t("reset_confirm"))) return;
