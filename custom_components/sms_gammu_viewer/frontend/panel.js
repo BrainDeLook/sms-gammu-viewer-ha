@@ -2785,7 +2785,7 @@ class SmsGammuPanel extends HTMLElement {
     inner.classList.toggle("snapping", animate);
     inner.style.transform = "translateX(0)";
     if (this._swipeState) this._swipeState.set(wrap, 0);
-    if (animate) setTimeout(() => inner.classList.remove("snapping"), 260);
+    if (animate) setTimeout(() => inner.classList.remove("snapping"), 400);
   }
 
   _initSwipe(list) {
@@ -2806,7 +2806,7 @@ class SmsGammuPanel extends HTMLElement {
         inner.classList.toggle("snapping", animate);
         inner.style.transform = `translateX(${x}px)`;
         this._swipeState.set(wrap, x);
-        if (animate) setTimeout(() => inner.classList.remove("snapping"), 260);
+        if (animate) setTimeout(() => inner.classList.remove("snapping"), 400);
       };
 
       const onStart = cx => {
