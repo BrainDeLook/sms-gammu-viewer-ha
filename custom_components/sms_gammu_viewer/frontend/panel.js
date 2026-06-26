@@ -2676,7 +2676,8 @@ class SmsGammuPanel extends HTMLElement {
     list.querySelectorAll(".swipe-inner").forEach((el) => {
       el.addEventListener("click", () => {
         const wrap = el.closest(".swipe-wrap");
-        if (wrap && this._swipeState?.get(wrap) !== 0) return;
+        const snapVal = this._swipeState?.get(wrap);
+        if (wrap && snapVal !== undefined && snapVal !== 0) return;
         this._selectContact(el.closest(".swipe-wrap").dataset.number);
       });
     });
