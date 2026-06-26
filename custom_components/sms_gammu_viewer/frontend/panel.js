@@ -2627,6 +2627,9 @@ class SmsGammuPanel extends HTMLElement {
     const list = this.shadowRoot.getElementById("contact-list");
     if (!list) return;
 
+    // Локальная сортировка: закреплённые вверху
+    this._contacts.sort((a, b) => (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0) || new Date(b.last_activity) - new Date(a.last_activity));
+
     if (this._error && this._contacts.length === 0) {
       list.innerHTML = `<div class="err-box">⚠ ${this._esc(this._error)}</div>`;
       return;
