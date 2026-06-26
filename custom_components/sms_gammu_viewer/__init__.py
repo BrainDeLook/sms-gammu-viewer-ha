@@ -773,6 +773,22 @@ class SmsApiView(HomeAssistantView):
             coord.push_event("message_read", {"id": msg_id})
             return self._json({"ok": True})
 
+        if action.startswith("mark_read/"):
+            number = action[len("mark_read/"):]
+            await self.hass.async_add_executor_job(store.mark_read_by_number, number)
+            coord.push_event("contact_read", {"number": number})
+            return self._json({"ok": True})
+
+        if action.startswith("pin/"):
+            number = action[len("pin/"):]
+            await self.hass.async_add_executor_job(store.pin_number, number)
+            return self._json({"ok": True})
+
+        if action.startswith("unpin/"):
+            number = action[len("unpin/"):]
+            await self.hass.async_add_executor_job(store.unpin_number, number)
+            return self._json({"ok": True})
+
         if action.startswith("delete/"):
             msg_id = int(action[len("delete/"):])
             await self.hass.async_add_executor_job(store.delete, msg_id)
