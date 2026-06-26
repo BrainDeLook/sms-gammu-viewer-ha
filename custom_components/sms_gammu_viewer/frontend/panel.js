@@ -2669,6 +2669,9 @@ class SmsGammuPanel extends HTMLElement {
         const wrap = btn.closest(".swipe-wrap");
         if (action === "read") {
           await this._api(`mark_read/${encodeURIComponent(number)}`, "POST").catch(() => {});
+          // Обновляем локально
+          const c = this._contacts.find(x => x.number === number);
+          if (c) c.unread = 0;
           this._renderContacts();
         } else if (action === "mute") {
           const c = this._contacts.find(x => x.number === number);
