@@ -2680,6 +2680,11 @@ class SmsGammuPanel extends HTMLElement {
       });
     }
     this._initSwipe(list);
+    // Показываем кнопки пина для закреплённых чатов напрямую через JS
+    list.querySelectorAll(".swipe-inner.pinned-active .pin-hover-btn").forEach(btn => {
+      btn.style.opacity = "1";
+      btn.style.color = "var(--accent)";
+    });
     if (prevSnap.size) {
       list.querySelectorAll(".swipe-wrap").forEach(wrap => {
         const snap = prevSnap.get(wrap.dataset.number);
@@ -2690,6 +2695,14 @@ class SmsGammuPanel extends HTMLElement {
         }
       });
     }
+
+    list.querySelectorAll(".swipe-inner").forEach((el) => {
+      const pinBtn = el.querySelector(".pin-hover-btn");
+      if (pinBtn && !el.classList.contains("pinned-active")) {
+        el.addEventListener("mouseenter", () => { pinBtn.style.opacity = "0.4"; });
+        el.addEventListener("mouseleave", () => { pinBtn.style.opacity = "0"; });
+      }
+    });
 
     list.querySelectorAll(".swipe-inner").forEach((el) => {
       el.addEventListener("click", (e) => {
