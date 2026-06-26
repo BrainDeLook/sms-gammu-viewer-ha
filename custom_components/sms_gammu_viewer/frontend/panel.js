@@ -2654,7 +2654,7 @@ class SmsGammuPanel extends HTMLElement {
             <div class="contact-row1">
               <span class="contact-number">${c.is_muted ? "🔇 " : ""}${this._esc(c.contact_name || c.number)}</span>
               <span class="contact-date">${this._formatShort(c.last_date)}</span>
-              <button class="pin-hover-btn" data-action="pin-hover" data-number="${this._esc(c.number)}" data-pinned="${c.is_pinned ? '1' : '0'}" title="${c.is_pinned ? this._t('unpin') : this._t('pin')}">
+              <button class="pin-hover-btn" style="${c.is_pinned ? 'opacity:1;color:var(--accent)' : ''}" data-action="pin-hover" data-number="${this._esc(c.number)}" data-pinned="${c.is_pinned ? '1' : '0'}" title="${c.is_pinned ? this._t('unpin') : this._t('pin')}">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="${c.is_pinned ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M16 12V4h1a1 1 0 0 0 0-2H7a1 1 0 0 0 0 2h1v8l-2 2v2h5v5l1 1 1-1v-5h5v-2l-2-2z"/></svg>
               </button>
             </div>
