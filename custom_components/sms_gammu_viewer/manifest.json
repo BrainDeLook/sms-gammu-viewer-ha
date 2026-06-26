@@ -15,5 +15,5 @@
     "pyserial-asyncio-fast>=0.13"
   ],
   "single_config_entry": true,
-  "version": "3.11.0"
+  "version": "3.11.1"
 }
