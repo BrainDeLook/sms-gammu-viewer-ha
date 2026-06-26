@@ -120,6 +120,10 @@ const CSS = `
   }
 
   .swipe-wrap { position: relative; overflow: hidden; border-bottom: 0.5px solid var(--line); }
+  @media (min-width: 581px) {
+    .swipe-actions-left, .swipe-actions-right { display: none !important; }
+    .swipe-inner { transform: none !important; transition: none !important; cursor: pointer; }
+  }
   .swipe-wrap:last-child { border-bottom: none; }
   .swipe-actions-left { position: absolute; left: 0; top: 0; bottom: 0; width: 160px; display: flex; align-items: center; gap: 8px; padding: 0 10px; box-sizing: border-box; background: var(--bg); z-index: 1; }
   .swipe-actions-right { position: absolute; right: 0; top: 0; bottom: 0; width: 160px; display: flex; align-items: center; gap: 8px; padding: 0 10px; box-sizing: border-box; background: var(--bg); z-index: 1; }
