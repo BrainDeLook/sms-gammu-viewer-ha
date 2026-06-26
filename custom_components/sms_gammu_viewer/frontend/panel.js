@@ -1142,6 +1142,7 @@ class SmsGammuPanel extends HTMLElement {
   }
 
   async _selectContact(number) {
+    console.log("_selectContact called:", number, "activeNumber:", this._activeNumber);
     // Сохраняем черновик текущего чата перед переключением
     if (this._activeNumber && this._activeNumber !== number) {
       const ta = this.shadowRoot.getElementById("send-input");
