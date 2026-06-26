@@ -311,6 +311,35 @@ Add it via **Edit Dashboard → Add Card → Manual** with the YAML above, or se
 
 ---
 
+
+---
+
+## Sidebar Unread Badge (via custom-sidebar)
+
+Home Assistant doesn't natively support badges on sidebar panel icons. You can add one using the [custom-sidebar](https://github.com/elchininet/custom-sidebar) HACS frontend plugin.
+
+**1. Install custom-sidebar via HACS** → Frontend → custom-sidebar
+
+**2. Create `/config/custom_sidebar.yaml`:**
+
+```yaml
+order:
+  - new_item: false
+    item: sms-viewer
+    notification: "{{ states('sensor.sms_unread_count') }}"
+    hide_notification_on_zero: true
+```
+
+**3. Add to `configuration.yaml`:**
+
+```yaml
+custom_sidebar:
+```
+
+**4. Restart Home Assistant.**
+
+The SMS sidebar icon will now show a red badge with the number of unread messages. It disappears automatically when all messages are read.
+
 ## Credits & Inspiration
 
 This project builds on the work of several open-source projects:
