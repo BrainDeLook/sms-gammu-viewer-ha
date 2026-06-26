@@ -2674,11 +2674,16 @@ class SmsGammuPanel extends HTMLElement {
     }
 
     list.querySelectorAll(".swipe-inner").forEach((el) => {
-      el.addEventListener("click", () => {
+      el.addEventListener("click", (e) => {
+        if (e.target.closest(".swipe-btn")) return;
         const wrap = el.closest(".swipe-wrap");
-        const snapVal = this._swipeState?.get(wrap);
-        if (wrap && snapVal !== undefined && snapVal !== 0) return;
-        this._selectContact(el.closest(".swipe-wrap").dataset.number);
+        const snapVal = this._swipeState?.get(wrap) || 0;
+        if (snapVal !== 0) {
+          // Свайп открыт — закрываем по клику
+          this._swipeClose(wrap);
+          return;
+        }
+        this._selectContact(wrap.dataset.number);
       });
     });
 
