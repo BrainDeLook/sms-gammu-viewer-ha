@@ -2673,8 +2673,8 @@ class SmsGammuPanel extends HTMLElement {
         } else if (action === "mute") {
           const c = this._contacts.find(x => x.number === number);
           const isMuted = c?.is_muted || false;
-          await this._api(`mute/${encodeURIComponent(number)}`, "POST", { muted: !isMuted }).catch(() => {});
-          // Обновляем локальное состояние до перерендера
+          const endpoint = isMuted ? `unmute/${encodeURIComponent(number)}` : `mute/${encodeURIComponent(number)}`;
+          await this._api(endpoint, "POST").catch(() => {});
           if (c) c.is_muted = !isMuted;
           this._renderContacts();
         } else if (action === "delete") {
