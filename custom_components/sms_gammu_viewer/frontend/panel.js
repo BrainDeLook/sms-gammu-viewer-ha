@@ -147,6 +147,13 @@ const CSS = `
   }
   .contact-item:hover { background: rgba(0,0,0,.03); }
   .contact-item.active { background: rgba(3,169,244,.1); }
+  .pin-static-icon {
+    position: absolute;
+    top: 4px; left: 4px;
+    color: var(--accent);
+    display: flex; z-index: 3;
+    pointer-events: none;
+  }
   .pin-hover-btn {
     position: absolute;
     top: 4px; left: 4px;
@@ -2654,7 +2661,8 @@ class SmsGammuPanel extends HTMLElement {
             <div class="contact-row1">
               <span class="contact-number">${c.is_muted ? "🔇 " : ""}${this._esc(c.contact_name || c.number)}</span>
               <span class="contact-date">${this._formatShort(c.last_date)}</span>
-              <button class="pin-hover-btn" style="${c.is_pinned ? 'opacity:1;color:var(--accent)' : ''}" data-action="pin-hover" data-number="${this._esc(c.number)}" data-pinned="${c.is_pinned ? '1' : '0'}" title="${c.is_pinned ? this._t('unpin') : this._t('pin')}">
+              ${c.is_pinned ? '<span class="pin-static-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M16 12V4h1a1 1 0 0 0 0-2H7a1 1 0 0 0 0 2h1v8l-2 2v2h5v5l1 1 1-1v-5h5v-2l-2-2z"/></svg></span>' : ''}
+              <button class="pin-hover-btn" data-action="pin-hover" data-number="${this._esc(c.number)}" data-pinned="${c.is_pinned ? '1' : '0'}" title="${c.is_pinned ? this._t('unpin') : this._t('pin')}">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="${c.is_pinned ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M16 12V4h1a1 1 0 0 0 0-2H7a1 1 0 0 0 0 2h1v8l-2 2v2h5v5l1 1 1-1v-5h5v-2l-2-2z"/></svg>
               </button>
             </div>
