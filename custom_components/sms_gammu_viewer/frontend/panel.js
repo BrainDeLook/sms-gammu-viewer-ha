@@ -154,7 +154,9 @@ const CSS = `
     color: var(--accent);
     display: flex; align-items: center; justify-content: center;
     z-index: 3; pointer-events: none;
+    transition: opacity .3s ease;
   }
+  .swipe-inner:hover .pin-static-icon { opacity: 0; }
   .pin-hover-btn {
     position: absolute;
     top: 6px; left: 2px;
