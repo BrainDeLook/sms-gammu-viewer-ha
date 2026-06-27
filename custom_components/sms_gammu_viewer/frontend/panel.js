@@ -123,6 +123,7 @@ const CSS = `
   @media (max-width: 580px) {
     .swipe-wrap { border-bottom: none; margin-bottom: 6px; }
     .swipe-wrap:last-child { margin-bottom: 0; }
+    .swipe-inner { border: 1px solid var(--line); }
   }
   @media (min-width: 581px) {
     .swipe-actions-left, .swipe-actions-right { display: none !important; }
