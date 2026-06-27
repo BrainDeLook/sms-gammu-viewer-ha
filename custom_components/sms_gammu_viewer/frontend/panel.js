@@ -2819,7 +2819,13 @@ class SmsGammuPanel extends HTMLElement {
         const snap = prevSnap.get(wrap.dataset.number);
         if (snap) {
           const inner = wrap.querySelector(".swipe-inner");
-          if (inner) { inner.style.transform = `translateX(${snap}px)`; }
+          if (inner) {
+            inner.style.transform = `translateX(${snap}px)`;
+            const actL = wrap.querySelector(".swipe-actions-left");
+            const actR = wrap.querySelector(".swipe-actions-right");
+            if (actL) actL.style.opacity = snap > 0 ? "1" : "0";
+            if (actR) actR.style.opacity = snap < 0 ? "1" : "0";
+          }
           this._swipeState.set(wrap, snap);
         }
       });
