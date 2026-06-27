@@ -404,14 +404,22 @@ const CSS = `
 
   /* ─── Send bar ─── */
   .send-bar {
-    display: flex; gap: 8px; padding: 10px 14px;
-    border-top: 1px solid var(--line);
-    background: var(--card); align-items: flex-end;
+    display: flex; gap: 8px; padding: 10px 14px 14px;
+    background: transparent;
+    align-items: flex-end;
     flex-shrink: 0;
+    position: relative;
+  }
+  .send-bar::before {
+    content: '';
+    position: absolute;
+    top: -40px; left: 0; right: 0; height: 40px;
+    background: linear-gradient(to top, var(--card) 0%, transparent 100%);
+    pointer-events: none;
   }
   .send-input {
-    flex: 1; padding: 9px 14px;
-    border: 1px solid var(--line); border-radius: 20px;
+    flex: 1; padding: 10px 16px;
+    border: 1px solid var(--line); border-radius: 24px;
     background: var(--bg); color: var(--text);
     font-size: 14px; font-family: inherit;
     outline: none; resize: none;
