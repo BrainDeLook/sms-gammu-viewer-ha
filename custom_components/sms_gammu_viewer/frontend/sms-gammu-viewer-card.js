@@ -325,11 +325,13 @@ class SmsGammuViewerCard extends HTMLElement {
       </style>
       <ha-card>
         <div class="sgv-header">
-          <span class="sgv-title">${this._esc(this._config.title)}</span>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="sgv-title">${this._esc(this._config.title)}</span>
+            ${this._config.show_modem_info ? '<span style="display:flex;align-items:center;gap:4px"><span id="sgv-signal-dot" style="width:7px;height:7px;border-radius:50%;background:#4caf50;flex-shrink:0;display:inline-block"></span><span id="sgv-modem-text" style="font-size:11px;color:var(--secondary-text-color)">…</span></span>' : ''}
+          </div>
           <span class="sgv-badge" id="sgv-badge" style="display:none"></span>
         </div>
             <div class="sgv-list" id="sgv-list"></div>
-        ${this._config.show_modem_info ? '<div class="sgv-modem-info"><span class="sgv-signal-dot" id="sgv-signal-dot"></span><span id="sgv-modem-text">…</span></div>' : ''}
         <div class="sgv-footer">
           <a id="sgv-open-panel">Открыть все сообщения →</a>
         </div>
