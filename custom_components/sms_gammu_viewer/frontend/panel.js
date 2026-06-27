@@ -326,6 +326,8 @@ const CSS = `
     display: flex;
     flex-direction: column;
     gap: 10px;
+    -webkit-mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
+    mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
   }
 
   .msg-ctx-menu {
@@ -418,20 +420,8 @@ const CSS = `
     bottom: 0; left: 0; right: 0;
     z-index: 10;
   }
-  .send-bar-wrap::before {
-    content: '';
-    position: absolute;
-    top: -56px; left: 0; right: 0; height: 56px;
-    background: linear-gradient(to bottom, transparent 0%, var(--bg) 100%);
-    pointer-events: none;
-  }
-  .send-bar-wrap::before {
-    content: '';
-    position: absolute;
-    top: -56px; left: 0; right: 0; height: 56px;
-    background: linear-gradient(to bottom, transparent 0%, var(--bg) 100%);
-    pointer-events: none;
-  }
+
+
   .send-bar-wrap::before {
     content: '';
     position: absolute;
