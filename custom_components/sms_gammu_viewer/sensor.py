@@ -28,6 +28,8 @@ async def async_setup_entry(
             SmsUnreadSensor(hass, entry),
             SmsLastNumberSensor(hass, entry),
             SmsLastTextSensor(hass, entry),
+            SmsSignalSensor(hass, entry),
+            SmsNetworkSensor(hass, entry),
         ],
         update_before_add=True,
     )
@@ -187,3 +189,77 @@ class SmsLastTextSensor(_BaseSmsSensor):
             text if len(text) <= LAST_SMS_TEXT_MAXLEN
             else text[: LAST_SMS_TEXT_MAXLEN - 1] + "…"
         )
+
+class SmsSignalSensor(_BaseSmsSensor):
+    """Качество сигнала модема в процентах."""
+    _attr_icon = "mdi:signal"
+    _attr_name = "Signal Quality"
+    _attr_native_unit_of_measurement = "%"
+
+    def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
+        super().__init__(hass, entry)
+        self._attr_unique_id = f"{entry.entry_id}_signal"
+        self._signal = None
+        self._unsub = None
+
+    async def async_added_to_hass(self) -> None:
+        self._unsub = async_track_time_interval(
+            self.hass, self._update, SCAN_INTERVAL
+        )
+        await self._update()
+
+    async def async_will_remove_from_hass(self) -> None:
+        if self._unsub:
+            self._unsub()
+
+    async def _update(self, _now=None) -> None:
+        coord = self._coord()
+        if not coord:
+            return
+        try:
+            s = await coord.client.get_signal()
+            self._signal = s.get("percent") if s else None
+        except Exception:
+            pass
+        self.async_write_ha_state()
+
+    @property
+    def native_value(self):
+        return self._signal
+
+
+class SmsNetworkSensor(_BaseSmsSensor):
+    """Название оператора сети."""
+    _attr_icon = "mdi:sim"
+    _attr_name = "Network Operator"
+
+    def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
+        super().__init__(hass, entry)
+        self._attr_unique_id = f"{entry.entry_id}_network"
+        self._operator = None
+        self._unsub = None
+
+    async def async_added_to_hass(self) -> None:
+        self._unsub = async_track_time_interval(
+            self.hass, self._update, SCAN_INTERVAL
+        )
+        await self._update()
+
+    async def async_will_remove_from_hass(self) -> None:
+        if self._unsub:
+            self._unsub()
+
+    async def _update(self, _now=None) -> None:
+        coord = self._coord()
+        if not coord:
+            return
+        try:
+            n = await coord.client.get_network()
+            self._operator = n.get("operator") if n else None
+        except Exception:
+            pass
+        self.async_write_ha_state()
+
+    @property
+    def native_value(self):
+        return self._operator
