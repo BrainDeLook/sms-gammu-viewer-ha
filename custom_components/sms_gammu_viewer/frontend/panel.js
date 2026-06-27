@@ -117,6 +117,7 @@ const CSS = `
   .contact-list {
     flex: 1;
     overflow-y: auto;
+    padding-bottom: 80px;
   }
 
   .swipe-wrap { position: relative; overflow: hidden; border-bottom: 0.5px solid var(--line); background: var(--card); }
