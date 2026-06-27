@@ -187,6 +187,12 @@ const CSS = `
     width: 3px;
     background: var(--unread-border);
   }
+  @media (max-width: 580px) {
+    .contact-item.has-unread::before { display: none; }
+    .swipe-inner.has-unread-wrap {
+      border-left: 3px solid var(--unread-border) !important;
+    }
+  }
 
   .avatar {
     width: 42px; height: 42px;
