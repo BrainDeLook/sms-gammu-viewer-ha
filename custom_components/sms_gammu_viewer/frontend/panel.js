@@ -1065,13 +1065,16 @@ class SmsGammuPanel extends HTMLElement {
   }
 
   async _loadStatus() {
-    const hadStatusBefore = !!this._status;
     this._statusLoading = true;
-    if (hadStatusBefore) this._renderStatusBar();
     try {
       const s = await this._api("status");
       this._status = s;
       this._pollInterval = s.poll_interval_hint || 30;
+      // Если ответ из кеша — рендерим сразу со спиннером, потом ждём фоновое обновление
+      if (s.cached) {
+        this._renderStatusBar();
+        await new Promise(r => setTimeout(r, 2000));
+      }
     } catch (_) {}
     this._statusLoading = false;
 
