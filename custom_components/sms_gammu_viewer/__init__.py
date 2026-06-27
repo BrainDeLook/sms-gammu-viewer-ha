@@ -862,6 +862,16 @@ class SmsApiView(HomeAssistantView):
             coord.push_event("contact_read", {"number": number})
             return self._json({"ok": True})
 
+        if action.startswith("star/"):
+            msg_id = int(action[len("star/"):])
+            await self.hass.async_add_executor_job(store.star_message, msg_id)
+            return self._json({"ok": True})
+
+        if action.startswith("unstar/"):
+            msg_id = int(action[len("unstar/"):])
+            await self.hass.async_add_executor_job(store.unstar_message, msg_id)
+            return self._json({"ok": True})
+
         if action.startswith("pin/"):
             from urllib.parse import unquote as _uq
             number = _uq(action[len("pin/"):])
