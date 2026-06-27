@@ -3014,6 +3014,17 @@ class SmsGammuPanel extends HTMLElement {
             const ep = isStarred ? `unstar/${msgId}` : `star/${msgId}`;
             await this._api(ep, "POST").catch(() => {});
             bubble.dataset.starred = isStarred ? "0" : "1";
+            // Обновляем звёздочку визуально
+            const meta = bubble.querySelector(".msg-meta");
+            const existing = meta?.querySelector(".star-icon");
+            if (isStarred && existing) {
+              existing.remove();
+            } else if (!isStarred && meta && !existing) {
+              const s = document.createElement("span");
+              s.className = "star-icon"; s.style.fontSize = "11px"; s.style.marginRight = "2px";
+              s.textContent = "⭐";
+              meta.insertBefore(s, meta.firstChild);
+            }
           } else if (action === "delete") {
             if (!confirm(this._t("delete_msg") + "?")) return;
             await this._api(`delete/${msgId}`, "POST").catch(() => {});
@@ -3099,7 +3110,7 @@ class SmsGammuPanel extends HTMLElement {
           <div class="msg-text">${this._esc(m.text)}</div>
           <div class="msg-meta">
             ${!isOut && !m.is_read ? '<span class="msg-unread-dot"></span>' : ""}
-            <span class="msg-date">${this._formatFull(m.date)}</span>
+            ${m.is_starred ? '<span style="font-size:11px;margin-right:2px">⭐</span>' : ''}<span class="msg-date">${this._formatFull(m.date)}</span>
             ${isOut ? '<span style="font-size:11px;color:rgba(255,255,255,.7)">✓</span>' : ""}
           </div>
         </div>`;
