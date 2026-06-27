@@ -63,6 +63,8 @@ export default {
   storage: "Storage",
   db_size: "Database size",
   msg_count: "Total messages",
+  clear_storage: "Clear all messages",
+  clear_storage_confirm: "This will permanently delete all messages and conversation history. Are you sure?",
   mute_chat: "Mute",
   unmute_chat: "Unmute",
   call_number: "Call",
