@@ -3106,7 +3106,7 @@ class SmsGammuPanel extends HTMLElement {
       }
       const isOut = m.direction === "out";
       html += `
-        <div class="msg-bubble ${isOut ? "outgoing" : (!m.is_read ? "unread" : "")}">
+        <div class="msg-bubble ${isOut ? "outgoing" : (!m.is_read ? "unread" : "")}" data-id="${m.id}" data-starred="${m.is_starred ? '1' : '0'}">
           <div class="msg-text">${this._esc(m.text)}</div>
           <div class="msg-meta">
             ${!isOut && !m.is_read ? '<span class="msg-unread-dot"></span>' : ""}
