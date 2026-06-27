@@ -124,6 +124,7 @@ const CSS = `
     .swipe-wrap { border-bottom: none; margin-bottom: 6px; }
     .swipe-wrap:last-child { margin-bottom: 0; }
     .swipe-inner { border: 1px solid var(--line); border-radius: 22px; }
+    .contact-list { padding-bottom: 90px; }
   }
   @media (min-width: 581px) {
     .swipe-actions-left, .swipe-actions-right { display: none !important; }
