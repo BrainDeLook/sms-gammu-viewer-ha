@@ -299,6 +299,12 @@ const CSS = `
   @keyframes pulse-call { 0%,100%{opacity:1} 50%{opacity:.5} }
   .icon-btn.spin svg { animation: spin 1s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
+  .status-refresh-spin {
+    display: inline-block; width: 8px; height: 8px;
+    border: 1.5px solid rgba(255,255,255,.2); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin .7s linear infinite;
+    margin-left: 6px; vertical-align: middle; flex-shrink: 0;
+  }
 
   .messages-area {
     flex: 1;
@@ -1060,11 +1066,14 @@ class SmsGammuPanel extends HTMLElement {
 
   async _loadStatus() {
     const hadStatusBefore = !!this._status;
+    this._statusLoading = true;
+    if (hadStatusBefore) this._renderStatusBar();
     try {
       const s = await this._api("status");
       this._status = s;
       this._pollInterval = s.poll_interval_hint || 30;
     } catch (_) {}
+    this._statusLoading = false;
 
     // Первая загрузка статуса — только теперь известна настройка языка
     // из конфигурации интеграции. Если пользователь не выбирал язык
@@ -2657,16 +2666,19 @@ class SmsGammuPanel extends HTMLElement {
       return;
     }
     if (!s?.signal) {
-      bar.innerHTML = `<span class="signal-dot bad"></span><span>${this._t("no_modem")}</span>`;
+      const _sp = this._statusLoading ? '<span class="status-refresh-spin"></span>' : "";
+      bar.innerHTML = `<span class="signal-dot bad"></span><span>${this._t("no_modem")}</span>${_sp}`;
       return;
     }
     const pct = s.signal?.SignalPercent ?? "?";
     const net = s.network?.NetworkName ?? "";
     const interval = this._pollInterval;
     const dotClass = pct >= 50 ? "" : pct >= 20 ? "mid" : "bad";
+    const _spin = this._statusLoading ? '<span class="status-refresh-spin"></span>' : "";
     bar.innerHTML = `
       <span class="signal-dot ${dotClass}"></span>
       <span>${net ? net + " · " : ""}${pct}% · ${this._t("poll_every", interval)}</span>
+      ${_spin}
     `;
   }
 
