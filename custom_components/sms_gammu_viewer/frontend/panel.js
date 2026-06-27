@@ -3111,25 +3111,29 @@ class SmsGammuPanel extends HTMLElement {
 
 
 
-    area.querySelectorAll(".msg-text").forEach((el) => {
-      const bubble = el.closest(".msg-bubble");
+    area.querySelectorAll(".msg-bubble").forEach((bubble) => {
       let ltimer = null, startX = 0, startY = 0, longPressed = false;
 
-      el.addEventListener("pointerdown", (e) => {
+      bubble.addEventListener("pointerdown", (e) => {
         startX = e.clientX; startY = e.clientY; longPressed = false;
         ltimer = setTimeout(() => {
           longPressed = true;
           navigator.vibrate?.(30);
-          if (bubble) this._showMsgCtxMenu(e, bubble);
+          this._showMsgCtxMenu(e, bubble);
         }, 600);
       });
-      el.addEventListener("pointermove", (e) => {
+      bubble.addEventListener("pointermove", (e) => {
         if (Math.abs(e.clientX - startX) > 10 || Math.abs(e.clientY - startY) > 10) clearTimeout(ltimer);
       });
-      el.addEventListener("pointerup", () => clearTimeout(ltimer));
-      el.addEventListener("pointercancel", () => clearTimeout(ltimer));
-      el.addEventListener("click", async () => {
-        if (longPressed) return; // не копируем если было долгое нажатие
+      bubble.addEventListener("pointerup", () => clearTimeout(ltimer));
+      bubble.addEventListener("pointercancel", () => clearTimeout(ltimer));
+      bubble.addEventListener("contextmenu", (e) => { e.preventDefault(); this._showMsgCtxMenu(e, bubble); });
+    });
+
+    area.querySelectorAll(".msg-text").forEach((el) => {
+      const bubble = el.closest(".msg-bubble");
+      el.addEventListener("click", async (e) => {
+        if (e._longPressed) return;
         const text = el.textContent;
         try {
           if (navigator.clipboard && location.protocol === "https:") {
@@ -3145,7 +3149,6 @@ class SmsGammuPanel extends HTMLElement {
           this._showToast(this._t("copied"));
         } catch { this._showToast(this._t("copy_failed")); }
       });
-      el.addEventListener("contextmenu", (e) => { e.preventDefault(); this._showMsgCtxMenu(e, bubble || el.parentElement); });
     });
 
     area.scrollTop = area.scrollHeight;
