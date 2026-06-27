@@ -1070,10 +1070,15 @@ class SmsGammuPanel extends HTMLElement {
       const s = await this._api("status");
       this._status = s;
       this._pollInterval = s.poll_interval_hint || 30;
-      // Если ответ из кеша — рендерим сразу со спиннером, потом ждём фоновое обновление
       if (s.cached) {
+        // Показываем кеш со спиннером, делаем второй запрос за свежими данными
         this._renderStatusBar();
-        await new Promise(r => setTimeout(r, 2000));
+        await new Promise(r => setTimeout(r, 800));
+        try {
+          const s2 = await this._api("status");
+          this._status = s2;
+          this._pollInterval = s2.poll_interval_hint || 30;
+        } catch (_) {}
       }
     } catch (_) {}
     this._statusLoading = false;
