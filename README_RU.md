@@ -57,9 +57,11 @@
 ## Требования
 
 - Home Assistant 2024.3+
-- Запущенный [gammu-gateway](https://github.com/pajikos/sms-gammu-gateway), доступный по HTTP
-- USB GSM модем, поддерживаемый Gammu
+- **[Аддон SMS Gammu Gateway](https://github.com/pavelivanov00/sms-gammu-gateway)** от Pavel Ivanov — установить через магазин дополнений Home Assistant, это шлюз который общается с модемом
+- USB GSM модем, поддерживаемый Gammu (например Huawei E1550, E3372, ZTE MF823)
 - Для push-уведомлений: приложение [Home Assistant Companion](https://companion.home-assistant.io/)
+
+> Аддон предоставляет REST API к которому подключается интеграция. Без него интеграция не работает.
 
 ---
 
