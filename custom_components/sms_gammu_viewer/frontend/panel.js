@@ -334,6 +334,8 @@ const CSS = `
   .msg-ctx-item svg { flex-shrink: 0; }
   .msg-starred-icon { position: absolute; top: 4px; right: 4px; opacity: 0.7; }
   .msg-bubble {
+    -webkit-user-select: none; user-select: none;
+    -webkit-touch-callout: none;
     max-width: 72%;
     align-self: flex-start;
     background: var(--card);
@@ -350,11 +352,6 @@ const CSS = `
     white-space: pre-wrap;
     word-break: break-word;
     cursor: pointer;
-    user-select: text;
-    -webkit-touch-callout: none;
-  }
-  @media (max-width: 580px) {
-    .msg-text { user-select: none; -webkit-user-select: none; }
   }
   .msg-text:active { opacity: .7; }
   .msg-bubble.copied {
