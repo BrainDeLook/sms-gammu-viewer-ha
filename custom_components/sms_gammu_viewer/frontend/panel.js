@@ -2981,28 +2981,24 @@ class SmsGammuPanel extends HTMLElement {
 
     // Позиционируем как в Telegram — под пузырьком
     const rect = bubble.getBoundingClientRect();
-    const hostRect = this.shadowRoot.host.getBoundingClientRect();
-    menu.style.position = "absolute";
+    // fixed позиция по window координатам — без offset
+    menu.style.position = "fixed";
     menu.style.visibility = "hidden";
     this.shadowRoot.appendChild(menu);
-    console.log("menu appended, rect:", rect, "hostRect:", hostRect);
     const mw = menu.offsetWidth, mh = menu.offsetHeight;
     menu.style.visibility = "";
     const vw = window.innerWidth, vh = window.innerHeight;
 
     let x, y;
-    // Всегда под пузырьком с выносом в сторону
-    y = rect.bottom - hostRect.top - (mh * 0.25);
+    y = rect.bottom - (mh * 0.25);
     if (isOut) {
-      // Исходящее (справа) — меню влево от правого края пузырька
-      x = rect.right - hostRect.left - mw;
+      x = rect.right - mw;
     } else {
-      // Входящее (слева) — меню от левого края пузырька
-      x = rect.left - hostRect.left;
+      x = rect.left;
     }
     if (x < 4) x = 4;
     if (x + mw > vw - 4) x = vw - mw - 4;
-    if (y + mh > vh - 4) y = rect.top - hostRect.top - mh + (mh * 0.25);
+    if (y + mh > vh - 4) y = rect.top - mh + (mh * 0.25);
 
     menu.style.left = x + "px";
     menu.style.top = y + "px";
@@ -3139,7 +3135,7 @@ class SmsGammuPanel extends HTMLElement {
       });
       el.addEventListener("pointerup", () => clearTimeout(ltimer));
       el.addEventListener("pointercancel", () => clearTimeout(ltimer));
-      el.addEventListener("contextmenu", (e) => { e.preventDefault(); console.log("contextmenu bubble:", bubble, "el:", el); this._showMsgCtxMenu(e, bubble || el.parentElement); });
+      el.addEventListener("contextmenu", (e) => { e.preventDefault(); this._showMsgCtxMenu(e, bubble || el.parentElement); });
     });
 
     area.scrollTop = area.scrollHeight;
