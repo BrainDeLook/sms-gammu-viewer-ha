@@ -3013,13 +3013,13 @@ class SmsGammuPanel extends HTMLElement {
           } else if (action === "star") {
             const ep = isStarred ? `unstar/${msgId}` : `star/${msgId}`;
             await this._api(ep, "POST").catch(() => {});
-            bubble.dataset.starred = isStarred ? "0" : "1";
+            const newStarred = !isStarred;
+            bubble.dataset.starred = newStarred ? "1" : "0";
             // Обновляем звёздочку визуально
             const meta = bubble.querySelector(".msg-meta");
-            const existing = meta?.querySelector(".star-icon");
-            if (isStarred && existing) {
-              existing.remove();
-            } else if (!isStarred && meta && !existing) {
+            // Удаляем старую звёздочку если есть
+            meta?.querySelector(".star-icon")?.remove();
+            if (newStarred && meta) {
               const s = document.createElement("span");
               s.className = "star-icon"; s.style.fontSize = "11px"; s.style.marginRight = "2px";
               s.textContent = "⭐";
