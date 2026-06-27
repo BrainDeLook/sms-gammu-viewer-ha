@@ -315,6 +315,22 @@ const CSS = `
     gap: 10px;
   }
 
+  .msg-ctx-menu {
+    position: fixed; z-index: 999;
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 14px; overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0,0,0,.3);
+    min-width: 180px;
+  }
+  .msg-ctx-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 16px; font-size: 14px; color: var(--text);
+    cursor: pointer; transition: background .1s;
+  }
+  .msg-ctx-item:hover { background: rgba(255,255,255,.06); }
+  .msg-ctx-item.danger { color: #e53935; }
+  .msg-ctx-item svg { flex-shrink: 0; }
+  .msg-starred-icon { position: absolute; top: 4px; right: 4px; opacity: 0.7; }
   .msg-bubble {
     max-width: 72%;
     align-self: flex-start;
@@ -2930,6 +2946,69 @@ class SmsGammuPanel extends HTMLElement {
       inner.addEventListener("touchmove", e => { if (dragging) onMove(e.touches[0].clientX); }, {passive: true});
       inner.addEventListener("touchend", onEnd);
     });
+  }
+
+  _showMsgCtxMenu(e, bubble) {
+    // Убираем предыдущее меню
+    this.shadowRoot.querySelector(".msg-ctx-menu")?.remove();
+    const msgId = parseInt(bubble.dataset.id);
+    const isStarred = bubble.dataset.starred === "1";
+    const text = bubble.querySelector(".msg-text")?.textContent || "";
+
+    const menu = document.createElement("div");
+    menu.className = "msg-ctx-menu";
+    menu.innerHTML = `
+      <div class="msg-ctx-item" data-action="copy">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        ${this._t("copy")}
+      </div>
+      <div class="msg-ctx-item" data-action="star">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="${isStarred ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        ${isStarred ? this._t("unstar") : this._t("star")}
+      </div>
+      <div class="msg-ctx-item danger" data-action="delete">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+        ${this._t("delete_msg")}
+      </div>
+    `;
+
+    // Позиционируем
+    const vw = window.innerWidth, vh = window.innerHeight;
+    let x = e.clientX, y = e.clientY;
+    this.shadowRoot.appendChild(menu);
+    const mw = menu.offsetWidth, mh = menu.offsetHeight;
+    if (x + mw > vw) x = vw - mw - 8;
+    if (y + mh > vh) y = vh - mh - 8;
+    menu.style.left = x + "px"; menu.style.top = y + "px";
+
+    menu.querySelectorAll(".msg-ctx-item").forEach(item => {
+      item.addEventListener("click", async () => {
+        menu.remove();
+        const action = item.dataset.action;
+        if (action === "copy") {
+          await navigator.clipboard.writeText(text).catch(() => {});
+        } else if (action === "star") {
+          const ep = isStarred ? `unstar/${msgId}` : `star/${msgId}`;
+          await this._api(ep, "POST").catch(() => {});
+          bubble.dataset.starred = isStarred ? "0" : "1";
+          const icon = bubble.querySelector(".msg-starred-icon");
+          if (isStarred && icon) icon.remove();
+          else if (!isStarred) {
+            const s = document.createElement("span");
+            s.className = "msg-starred-icon"; s.textContent = "⭐";
+            bubble.appendChild(s);
+          }
+        } else if (action === "delete") {
+          if (!confirm(this._t("delete_msg") + "?")) return;
+          await this._api(`delete/${msgId}`, "POST").catch(() => {});
+          bubble.closest(".msg-row")?.remove();
+        }
+      });
+    });
+
+    // Закрытие по клику вне меню
+    const close = (ev) => { if (!menu.contains(ev.target)) { menu.remove(); document.removeEventListener("click", close); } };
+    setTimeout(() => document.addEventListener("click", close), 10);
   }
 
   _renderMessages() {
