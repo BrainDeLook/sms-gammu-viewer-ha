@@ -2106,7 +2106,7 @@ class SmsGammuPanel extends HTMLElement {
         <h3>${this._t("storage")}</h3>
         <div class="stat-row"><span class="stat-key">${this._t("db_size")}</span><span class="stat-val db-size-val">...</span></div>
         <div class="stat-row"><span class="stat-key">${this._t("msg_count")}</span><span class="stat-val db-msg-val">...</span></div>
-        <button class="reset-btn" id="clear-storage-btn" style="margin-top:10px;background:#e53935">${this._t("clear_storage")}</button>
+        <button class="reset-btn" id="clear-storage-btn" style="margin-top:10px;color:#e53935">${this._t("clear_storage")}</button>
       </div>`;
 
     const simCapacity = s.capacity;
