@@ -35,6 +35,7 @@ class SmsGammuViewerCard extends HTMLElement {
       this._load();
       this._startTimer();
     }
+    this._updateModemInfo();
   }
 
   set editMode(value) {
@@ -106,6 +107,21 @@ class SmsGammuViewerCard extends HTMLElement {
         await this._refreshToken();
       }
     } catch (_) {}
+  }
+
+  _updateModemInfo() {
+    if (!this._config.show_modem_info || !this._hass) return;
+    const dot = this.querySelector("#sgv-signal-dot");
+    const text = this.querySelector("#sgv-modem-text");
+    if (!dot || !text) return;
+    const signal = this._hass.states["sensor.signal_quality"]?.state;
+    const network = this._hass.states["sensor.network_operator"]?.state;
+    const pct = parseInt(signal) || 0;
+    dot.style.background = pct >= 50 ? "#4caf50" : pct >= 20 ? "#ff9800" : "#f44336";
+    const parts = [];
+    if (network && network !== "unknown") parts.push(network);
+    if (signal && signal !== "unknown") parts.push(pct + "%");
+    text.textContent = parts.length ? parts.join(" · ") : "…";
   }
 
   async _load() {
