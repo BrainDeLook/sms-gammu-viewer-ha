@@ -3140,8 +3140,7 @@ class SmsGammuPanel extends HTMLElement {
       });
       el.addEventListener("pointerup", () => clearTimeout(ltimer));
       el.addEventListener("pointercancel", () => clearTimeout(ltimer));
-      // contextmenu только на мобиле
-      if (window.innerWidth <= 580) el.addEventListener("contextmenu", (e) => { e.preventDefault(); if (bubble) this._showMsgCtxMenu(e, bubble); });
+      el.addEventListener("contextmenu", (e) => { e.preventDefault(); if (bubble) this._showMsgCtxMenu(e, bubble); });
     });
 
     area.scrollTop = area.scrollHeight;
