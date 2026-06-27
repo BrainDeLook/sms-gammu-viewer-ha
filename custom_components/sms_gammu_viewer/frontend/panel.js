@@ -2106,6 +2106,7 @@ class SmsGammuPanel extends HTMLElement {
         <h3>${this._t("storage")}</h3>
         <div class="stat-row"><span class="stat-key">${this._t("db_size")}</span><span class="stat-val db-size-val">...</span></div>
         <div class="stat-row"><span class="stat-key">${this._t("msg_count")}</span><span class="stat-val db-msg-val">...</span></div>
+        <button class="reset-btn" id="clear-storage-btn" style="margin-top:10px;background:#e53935">${this._t("clear_storage")}</button>
       </div>`;
 
     const simCapacity = s.capacity;
@@ -2169,6 +2170,21 @@ class SmsGammuPanel extends HTMLElement {
         dbCard.querySelector(".db-msg-val").textContent = db.msg_count;
       }
     }).catch(() => {});
+
+    page.querySelector("#clear-storage-btn")?.addEventListener("click", async () => {
+      if (!confirm(this._t("clear_storage_confirm"))) return;
+      try {
+        await this._api("clear_storage", "POST");
+        this._contacts = [];
+        this._messages = [];
+        this._activeNumber = null;
+        await this._load();
+        this._renderContacts();
+        this._renderStatusPage();
+      } catch (e) {
+        alert(this._t("error") + ": " + e.message);
+      }
+    });
 
     page.querySelector("#reset-modem-btn")?.addEventListener("click", async () => {
       if (!confirm(this._t("reset_confirm"))) return;
