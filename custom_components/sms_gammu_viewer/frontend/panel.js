@@ -2956,6 +2956,8 @@ class SmsGammuPanel extends HTMLElement {
         moved = Math.abs(delta) > 5;
         inner.style.transition = "";
         inner.style.transform = `translateX(${curX}px)`;
+        if (actLeft) actLeft.style.opacity = curX > 0 ? "1" : "0";
+        if (actRight) actRight.style.opacity = curX < 0 ? "1" : "0";
       };
       const onEnd = () => {
         if (!dragging) return;
