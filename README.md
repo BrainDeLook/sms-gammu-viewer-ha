@@ -6,7 +6,11 @@
 
 > 🇷🇺 [Русская версия](README_RU.md)
 
-A native SMS panel for Home Assistant — chat-style messaging, voice calls, phonebook and modem monitoring. Works with any [gammu-gateway](https://github.com/pajikos/sms-gammu-gateway) compatible gateway.
+A native panel for **SMS messaging and voice calls** directly in Home Assistant. Works with the [sms-gammu-gateway](https://github.com/PavelVe/home-assistant-addons/tree/main/sms-gammu-gateway) add-on and any compatible gateway based on [pajikos/sms-gammu-gateway](https://github.com/pajikos/sms-gammu-gateway).
+
+> 💬 **Send & receive SMS** · 📞 **Outgoing voice calls** · 📇 **Phonebook** · 🔔 **Push notifications** · 🚪 **Call entities for gates & intercoms**
+
+After installation, an **SMS** tab appears in the sidebar. Messages are stored in an internal SQLite database and are automatically deleted from the modem after being received.
 
 <p align="center">
   <img src="screenshots/desktop.jpg" alt="Desktop view" width="70%"><br>
@@ -15,112 +19,300 @@ A native SMS panel for Home Assistant — chat-style messaging, voice calls, pho
 
 ---
 
+
 ## Features
 
-### 💬 Messaging
-- Chat-style threads — all messages from one sender in one conversation
-- Send SMS from any chat or start a new one with the `+` button
-- Character counter with GSM limits (160 latin / 70 cyrillic), shows SMS parts count
-- Search by phone number or message text
-- **Long press** on a message (mobile) or **right click** (desktop) — copy, star ⭐, delete
-- **Swipe actions** (mobile ≤580px) — swipe left: mute / delete, swipe right: mark as read / pin
-- **Star filter** — button in chat header to show only starred messages
-
-### 📞 Calls
-- Outgoing voice calls via AT interface (modems with multiple serial ports, e.g. Huawei)
-- `sms_gammu_viewer.call` / `sms_gammu_viewer.hangup` services for automations
-- **Call entities** — `cover`/`button` entities that dial a fixed number, for gates and intercoms
-
-### 📇 Contacts
-- Phonebook — contact names shown in chat list, call history and chat header
-- **Pin conversations** — pinned chats stay at the top; hover button on desktop, swipe on mobile
-- **Mute** — disable push notifications per contact, messages still saved
-
-### 📡 Modem & Monitoring
-- Modem status page — signal, network, SIM, memory, firmware, IMEI
-- Storage block — database size and total message count, with a clear-all button
-- Automatic modem recovery — resets after repeated failures with a live warning in status bar
-- Instant status on page load — cached response, spinner while refreshing
-
-### 🏠 HA Integration
-- Push notifications on new SMS with tap-to-open (iOS & Android), grouped by sender
-- English / Russian UI, switchable independently of HA language
-
-### 📱 Mobile UI
-- Rounded chat bubbles with border, no dividers
-- Scroll padding so last chat is never hidden behind FABs
-- Swipe gestures from edge only (40px) to avoid accidental triggers
-- Optimistic UI — pin, mute, read apply instantly without waiting for server
-
----
+- 💬 **Chat-style SMS** — all messages from one sender grouped in one thread
+- 📤 **Send SMS** from any conversation or start a new one with the `+` button
+- 🔢 **Character counter** with GSM limits (160 latin / 70 cyrillic), shows SMS parts count
+- 🔍 **Search** by phone number or message text
+- 📌 **Pin conversations** — pinned chats stay at the top
+- 🔕 **Mute** contacts — disable notifications per contact
+- ⭐ **Starred messages** — mark messages as favourite, filter by star in chat header
+- 👆 **Long press** (mobile) / **right click** (desktop) — copy, star, delete message
+- 👈 **Swipe actions** (mobile) — swipe left: mute/delete, swipe right: mark read/pin
+- 📞 **Outgoing voice calls** via AT interface
+- 📖 **Phonebook** — contact names shown in chat list and headers
+- 📡 **Modem status page** — signal, network, SIM, memory, firmware, IMEI
+- 💾 **Storage stats** — DB size and message count, with clear-all button
+- 🏠 **HA sensors** — unread count, last SMS, signal quality %, network operator
+- 🔔 **Push notifications** on new SMS with tap-to-open (iOS & Android)
+- 🃏 **Lovelace card** — compact widget for your dashboard
+- 🌍 **English / Russian** UI
 
 ## Requirements
 
 - Home Assistant 2024.3+
-- **[SMS Gammu Gateway add-on](https://github.com/pavelivanov00/sms-gammu-gateway)** by Pavel Ivanov — install via Home Assistant Add-on Store, this is the gateway that communicates with your modem
+- One of the compatible SMS gateway add-ons (see **Compatible Add-ons** below)
 - USB GSM modem supported by Gammu (e.g. Huawei E1550, E3372, ZTE MF823)
 - For push notifications: [Home Assistant Companion](https://companion.home-assistant.io/) app
 
-> The add-on exposes a REST API that this integration connects to. Without it the integration will not work.
-
----
-
 ## Installation
 
-### HACS (recommended)
-1. Add this repo as a **Custom Repository** in HACS → Integrations
-2. Install **SMS Gammu Viewer**
+### Via HACS (recommended)
+
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=BrainDeLook&repository=sms-gammu-viewer-ha&category=integration)
+
+Or manually:
+
+1. Open **HACS** in Home Assistant
+2. Click ⋮ → **Custom repositories**
+3. Paste: `https://github.com/BrainDeLook/sms-gammu-viewer-ha` — Category: **Integration**
+4. Find **SMS Gammu Viewer** → **Download**
+5. Restart Home Assistant
+
+### Manual installation
+
+1. Download the [latest release](https://github.com/BrainDeLook/sms-gammu-viewer-ha/releases)
+2. Copy `custom_components/sms_gammu_viewer/` to `<config>/custom_components/`
 3. Restart Home Assistant
-4. Settings → Integrations → Add → **SMS Gammu Viewer**
 
-### Manual
-```bash
-cp -r custom_components/sms_gammu_viewer /config/custom_components/
+---
+
+## Initial Setup
+
+1. Go to **Settings → Devices & Services → + Add Integration**
+2. Search for **SMS Gammu Viewer**
+3. Fill in the form:
+
+| Field | Description | Example |
+|---|---|---|
+| **Host** | IP or hostname where the add-on runs | `localhost` or `192.168.1.100` |
+| **Port** | REST API port | `5000` |
+| **Username** | Add-on login | `admin` |
+| **Password** | Add-on password | `password` |
+
+4. Click **Submit** — the integration will verify the connection
+5. The **SMS** icon (💬) will appear in the sidebar
+
+---
+
+## Using the panel
+
+- **Open a conversation** — tap any contact in the list
+- **Reply** — type in the box at the bottom of an open chat, `Enter` to send, `Shift+Enter` for a new line
+- **Start a new conversation** — tap the **"New message"** button at the bottom of the contacts list, enter a number and text
+- **Copy a message** — tap its text
+- **Delete a message** — hover/tap the 🗑 icon next to it
+- **Delete a whole conversation** — tap the trash icon in the chat header
+- **Change language** — tap the 🌐 icon in the header
+- **View modem status** — tap the 📱 icon in the header
+
+---
+
+## Services for Automations
+
+All available under **Developer Tools → Services**, under the `sms_gammu_viewer` domain:
+
+| Service | Fields | Description |
+|---|---|---|
+| `sms_gammu_viewer.send_sms` | `number`, `message` | Sends an SMS |
+| `sms_gammu_viewer.call` | `number` | Dials a number (requires voice port configured) |
+| `sms_gammu_viewer.hangup` | — | Force-ends the current call |
+
+### Events fired on the HA event bus
+
+| Event | Data | Description |
+|---|---|---|
+| `sms_gammu_viewer_sms_sent` | `number`, `message` | Fired after every outgoing SMS |
+| `sms_gammu_viewer_call_ended` | `phone_number`, `reason` | Fired when a call ends (`answered` / `not_answered` / `declined` / `error`) |
+
+Example:
+```yaml
+service: sms_gammu_viewer.send_sms
+data:
+  number: "+79001234567"
+  message: "The garage door was left open"
 ```
-Restart Home Assistant, then add the integration.
 
 ---
 
-## Configuration
+## Settings (polling interval & notifications)
 
-| Field | Description |
-|-------|-------------|
-| Host | gammu-gateway IP/hostname |
-| Port | gammu-gateway port (default 5000) |
-| Username / Password | HTTP Basic Auth credentials |
-| Poll interval | How often to check for new SMS (seconds) |
-| Call device | Serial device for AT commands (optional) |
+Go to **Settings → Devices & Services → SMS Gammu Viewer → Configure** (⚙️):
+
+### Polling Interval
+
+How often the integration checks for new SMS. Minimum 5 seconds, recommended 20–30 seconds.
+
+> When an SMS arrives, the integration automatically enters **active collection mode**: polls every 3 seconds until the SIM is empty for 5 consecutive polls (~15 seconds of silence). The regular timer is paused during this time. If a long message arrives in multiple waves within a 2-minute window, the parts are automatically merged into one message.
+
+### Push Notifications
+
+Select devices from the dropdown list of all available `notify.*` services. Multiple devices supported.
+
+Tapping the notification opens the SMS panel directly.
+
+**How to find your device name** if it's not in the list:
+- Go to **Developer Tools → Services** and start typing `notify.mobile_app_`
+- Or check **Settings → Devices & Services → Mobile App**
 
 ---
 
-## Sensors
+## Modem Status & Auto-Recovery
 
-| Entity | Description | Update |
-|--------|-------------|--------|
-| `sensor.sms_unread_count` | Number of unread messages | On new SMS |
-| `sensor.sms_last_sms_number` | Sender of last received SMS | On new SMS |
-| `sensor.sms_last_sms_text` | Text of last received SMS | On new SMS |
-| `sensor.signal_quality` | Modem signal strength, % | Every 10s |
-| `sensor.network_operator` | Current network name (Beeline, MTS…) | Every 10s |
+Click the 📱 button in the SMS panel header to open the modem status page:
+
+- 📶 Signal strength with visual bar
+- 🌐 Network operator and registration state
+- 📟 Modem manufacturer, model, firmware, IMEI
+- 💾 SIM and phone memory usage + IMSI
+- 🔄 Manual modem reset button
+
+If the modem stops responding (5 consecutive failed polls), the integration **automatically calls the reset endpoint** and waits 15 seconds for recovery, with a cooldown of 2 minutes between automatic resets. A live warning (`⚠ Modem unavailable`) appears in the sidebar status bar while this is happening.
+
+---
+
+## Voice Calls (Dial-Only)
+
+Some USB GSM modems (notably Huawei) expose **multiple serial interfaces** over a single USB connection — typically one for data/SMS and a separate one for voice AT commands (e.g. `/dev/serial/by-id/...-if00-port0` for data, `...-if02-port0` for voice). When that's the case, this integration can dial calls directly over the voice interface, completely independent of sms-gammu-gateway's REST API, with **no risk of port conflicts**.
+
+> This feature is **dial-only** — the call connects and rings on the recipient's end, but no audio is routed through Home Assistant. Useful for "ring my phone" style automations (doorbell-style notifications, alerts) rather than two-way conversations.
+
+### Setup
+
+1. Identify your modem's voice interface, e.g.:
+   ```
+   ls -la /dev/serial/by-id/
+   ```
+   Look for a second device path alongside the one used by sms-gammu-gateway.
+2. Go to **Settings → Devices & Services → SMS Gammu Viewer → Configure**
+3. Fill in the **voice call serial port** field with that path
+4. Save and restart Home Assistant
+
+Leave the field empty to keep this feature fully disabled — it has zero effect on SMS functionality either way.
+
+### Usage
+
+- **Standalone call button** — a green floating button (📞) appears next to "New message" in the contacts sidebar once a voice port is configured. Tap it to open a dropdown with your call history (last 30 calls, with outcome icons), showing the 4 most recent and scrollable for the rest, plus a field to dial a new number — no existing conversation required.
+- **Call button in chat** — also available in an open conversation's header.
+- **Automations** — call the `sms_gammu_viewer.call` service with a phone number:
+  ```yaml
+  service: sms_gammu_viewer.call
+  data:
+    number: "+79001234567"
+  ```
+  Use `sms_gammu_viewer.hangup` (no fields) to force-end the current call.
+- **Event** — `sms_gammu_viewer_call_ended` fires with `phone_number` and `reason` (`answered`, `not_answered`, `declined`, `error`) for use in automations.
+
+### Compatibility
+
+Requires a modem with hardware flow control support on its voice AT interface (`dsrdtr`/`rtscts`). Confirmed working on Huawei USB modems at baudrate 75600. If your modem only exposes a single serial port, this feature can't be used — leave the field empty.
+
+---
+
+## Call Entities (Cover / Button)
+
+Beyond the panel's call button, you can create dedicated Home Assistant entities that dial a fixed phone number when triggered — useful for a gate, garage door, or intercom that opens via an incoming call. These behave like any other `cover`/`button` entity, so they work with dashboards, automations, and voice assistants (Alexa, Google Home, Yandex Alice) out of the box.
+
+### Setup
+
+1. **Settings → SMS Gammu Viewer → Configure** — opens a menu now, choose **Call entities**
+2. **➕ Add entity**
+3. Choose type:
+   - **Cover** — `open_cover` dials the number immediately; the entity shows as "open" right away (no stuck "opening" state) while the call happens in the background. If **Auto-close** is enabled, it returns to "closed" once the call ends, regardless of outcome
+   - **Button** — a simple one-tap dial button, no state
+4. Set name, phone number, dial timeout, and max call duration
+5. Save
+
+> ⚠️ **Restart Home Assistant after adding, editing, or deleting a call entity.** These entities are created when the integration starts up, so changes made through the config flow won't appear (or disappear) until the next restart — saving the form alone is not enough.
+
+Cover entities use the `gate` device class by default; you can change the displayed icon/type (garage door, door, gate, etc.) per-entity from the entity's own settings in Home Assistant. Requires a voice call device to be configured (see Voice Calls above) — entities won't be created without one.
+
+---
+
+## How It Works
+
+```
+Sender's phone
+       ↓ SMS
+USB GSM modem
+       ↓
+sms-gammu-gateway (REST API :5000)
+       ↓ GET /sms  (every N sec, or every 3 sec in collect mode)
+SMS Gammu Viewer (custom component)
+       ↓ DELETE /sms/deleteall
+SQLite database (/config/sms_gammu_viewer.db)
+       ↓
+SMS panel in sidebar  +  Push notification  +  sensor.sms_unread_count
+```
+
+### Long SMS Assembly
+
+Messages over 160 Latin / 70 Cyrillic characters are split by the carrier into multiple parts. How Gammu's gateway actually exposes this matters: rather than returning each part as a separate record to concatenate, it returns the **same SMS record growing over time** — each poll of `/sms` gives a progressively longer snapshot of the same message as more radio parts arrive.
+
+The integration handles this by:
+
+1. Detecting the first snapshot → entering active collection mode
+2. Polling the modem every **N seconds** (configurable, default 2s), deleting each snapshot from the SIM immediately after reading
+3. Tracking the **longest text seen** for each sender — a new poll either confirms the same length (ignored) or replaces the stored text with a longer, more complete version
+4. After **M empty polls in a row** (configurable, default 5) — considers the message complete and saves the longest version seen
+5. If parts arrive in separate waves more than the empty-poll window apart but within 2 minutes — automatically merges them as a fallback safety net
+6. Sends the notification with the full assembled text
+
+Both the polling delay and the empty-poll threshold are configurable in **Settings → SMS Gammu Viewer → Configure** — tune them to find the right balance of speed vs. reliability for your carrier and signal conditions.
+
+### Multi-language UI
+
+The panel UI text (not just config flow) is fully translatable, independent of HA's own language setting. Translations live in `frontend/locales/{code}.js` as plain JS modules exporting a key-value object. To add a language:
+
+1. Copy `frontend/locales/en.js` to `frontend/locales/{your-code}.js`
+2. Translate the values
+3. Add your language code to `AVAILABLE_LOCALES` in `panel.js`
+4. Open a pull request
+
+---
+
+## Compatible Add-ons
+
+| Project | Compatibility |
+|---|---|
+| [PavelVe/home-assistant-addons sms-gammu-gateway](https://github.com/PavelVe/home-assistant-addons) | ✅ |
+| [pajikos/sms-gammu-gateway](https://github.com/pajikos/sms-gammu-gateway) | ✅ |
+
+---
+
+## Dashboard Card
+
+Want recent conversations visible right on your dashboard, not just in the sidebar panel? A compact Lovelace card is **built directly into this integration** — no separate install needed.
+
+```yaml
+type: custom:sms-gammu-viewer-card
+title: SMS
+max_items: 5
+show_unread_only: false
+```
+
+Add it via **Edit Dashboard → Add Card → Manual** with the YAML above, or search for "SMS Gammu Viewer Card" in the card picker. The card becomes available automatically once the integration is set up — Home Assistant loads its JS the same way it loads the sidebar panel's assets.
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `title` | string | `SMS` | Card header text |
+| `max_items` | number | `5` | Number of conversations to show |
+| `show_unread_only` | boolean | `false` | Only show conversations with unread messages |
+
+📄 See **[CARD.md](CARD.md)** for the full configuration reference — every key explained, with full and minimal examples plus common configurations (compact unread-only widget, full overview, etc).
+
+> Older installs may still have the standalone [sms-gammu-viewer-card](https://github.com/BrainDeLook/sms-gammu-viewer-card) repository added via HACS — it's no longer needed and can be removed; this integration now provides the same card under the same name.
 
 ---
 
 ## Sidebar Unread Badge (via custom-sidebar)
 
-Home Assistant doesn't natively support notification badges on sidebar icons. You can add one using the [custom-sidebar](https://github.com/elchininet/custom-sidebar) HACS frontend plugin.
+Add an unread count badge to the SMS sidebar icon using [elchininet/custom-sidebar](https://github.com/elchininet/custom-sidebar).
 
-> ⚠️ **Important:** once you define any item in custom-sidebar config, it takes over sidebar ordering and you lose the ability to reorder via HA UI. You'll need to define all items manually to preserve order.
+> ⚠️ **Important:** custom-sidebar takes over sidebar ordering. You lose the ability to reorder via HA UI — you'll need to define all items manually.
 
-**1. Install custom-sidebar** via HACS → Frontend.
+**1.** Install `custom-sidebar` via HACS → Frontend.
 
-**2. Add to `configuration.yaml`:**
+**2.** Add to `configuration.yaml`:
 ```yaml
 frontend:
   extra_module_url:
     - /hacsfiles/custom-sidebar/custom-sidebar-plugin.js
 ```
 
-**3. Create `/config/www/custom-sidebar-config.yaml`:**
+**3.** Create `/config/www/custom-sidebar-config.yaml`:
 ```yaml
 order:
   - item: /sms-viewer
@@ -132,20 +324,38 @@ order:
       ]]]
 ```
 
-> To find the exact `href` of your SMS panel, add `?cs_debug` to your HA URL and check the browser console → `custom-sidebar debug: Top Native sidebar items`.
+> To find the exact `href`, add `?cs_debug` to your HA URL and check DevTools console.
 
-**4. Restart Home Assistant.**
-
----
-
-## Changelog
-
-See [Releases](https://github.com/BrainDeLook/sms-gammu-viewer-ha/releases).
+**4.** Restart Home Assistant.
 
 ---
 
-## Credits & Related Projects
+## Credits & Inspiration
 
-- **[pajikos/sms-gammu-gateway](https://github.com/pajikos/sms-gammu-gateway)** — the original gammu-gateway REST API that this integration is built on top of
-- **[pavelivanov00/sms-gammu-gateway](https://github.com/pavelivanov00/sms-gammu-gateway)** — Home Assistant add-on version of the gateway (install this to use the integration)
-- **[elchininet/custom-sidebar](https://github.com/elchininet/custom-sidebar)** — used for adding unread badge to the sidebar icon
+This project builds on the work of several open-source projects:
+
+- **[pajikos/sms-gammu-gateway](https://github.com/pajikos/sms-gammu-gateway)** and **[PavelVe/home-assistant-addons](https://github.com/PavelVe/home-assistant-addons)** — the underlying SMS gateway add-on this integration connects to via REST API.
+- **[Daring-Designs/meshtastic-ui-ha](https://github.com/Daring-Designs/meshtastic-ui-ha)** — the native HA sidebar panel architecture (custom panel registration via `async_register_built_in_panel`, static path serving) was modeled after this project.
+- **[black-roland/homeassistant-gsm-call](https://github.com/black-roland/homeassistant-gsm-call)** — the original voice call dialing logic (AT command sequences, `AT+CLCC` polling for call state, serial connection parameters) that this integration's call feature is closely based on. All credit for figuring out the working AT dialing approach for GSM modems goes to this project.
+- **[frenck/home-assistant-doom](https://github.com/frenck/home-assistant-doom)** — the technique for bundling a Lovelace dashboard card directly inside an integration (registering frontend JS globally via `add_extra_js_url`, the same way static assets are served for the sidebar panel) is based on this project's approach.
+
+---
+
+## License
+
+MIT
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
