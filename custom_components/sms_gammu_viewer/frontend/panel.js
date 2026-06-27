@@ -3089,18 +3089,12 @@ class SmsGammuPanel extends HTMLElement {
             ${!isOut && !m.is_read ? '<span class="msg-unread-dot"></span>' : ""}
             <span class="msg-date">${this._formatFull(m.date)}</span>
             ${isOut ? '<span style="font-size:11px;color:rgba(255,255,255,.7)">✓</span>' : ""}
-            <button class="msg-delete" data-id="${m.id}" title="Удалить">🗑</button>
           </div>
         </div>`;
     }
     area.innerHTML = html;
 
-    area.querySelectorAll(".msg-delete").forEach((btn) => {
-      btn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        this._deleteMsg(parseInt(btn.dataset.id));
-      });
-    });
+
 
     area.querySelectorAll(".msg-text").forEach((el) => {
       const bubble = el.closest(".msg-bubble");
