@@ -3127,14 +3127,9 @@ class SmsGammuPanel extends HTMLElement {
       });
       bubble.addEventListener("pointerup", () => clearTimeout(ltimer));
       bubble.addEventListener("pointercancel", () => clearTimeout(ltimer));
-      bubble.addEventListener("contextmenu", (e) => { e.preventDefault(); this._showMsgCtxMenu(e, bubble); });
-    });
-
-    area.querySelectorAll(".msg-text").forEach((el) => {
-      const bubble = el.closest(".msg-bubble");
-      el.addEventListener("click", async (e) => {
-        if (e._longPressed) return;
-        const text = el.textContent;
+      bubble.addEventListener("click", async () => {
+        if (longPressed) return;
+        const text = bubble.querySelector(".msg-text")?.textContent || "";
         try {
           if (navigator.clipboard && location.protocol === "https:") {
             await navigator.clipboard.writeText(text);
@@ -3144,12 +3139,15 @@ class SmsGammuPanel extends HTMLElement {
             ta.style.cssText = "position:fixed;top:-999px;left:-999px";
             document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove();
           }
-          bubble?.classList.add("copied");
-          setTimeout(() => bubble?.classList.remove("copied"), 800);
+          bubble.classList.add("copied");
+          setTimeout(() => bubble.classList.remove("copied"), 800);
           this._showToast(this._t("copied"));
         } catch { this._showToast(this._t("copy_failed")); }
       });
+      bubble.addEventListener("contextmenu", (e) => { e.preventDefault(); this._showMsgCtxMenu(e, bubble); });
     });
+
+
 
     area.scrollTop = area.scrollHeight;
   }
