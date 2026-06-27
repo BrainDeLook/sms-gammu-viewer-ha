@@ -403,28 +403,12 @@ const CSS = `
   }
   .msg-bubble:hover .msg-delete { color: var(--sub); }
 
-  .msg-fade {
-    position: absolute;
-    bottom: 0; left: 0; right: 0;
-    height: 60px;
-    background: linear-gradient(to top, var(--bg) 0%, transparent 100%);
-    pointer-events: none;
-    z-index: 5;
-  }
   /* ─── Send bar ─── */
   .send-bar {
-    display: flex; gap: 8px; padding: 10px 14px 14px;
-    background: transparent;
-    align-items: flex-end;
+    display: flex; gap: 8px; padding: 10px 14px;
+    border-top: 1px solid var(--line);
+    background: var(--card); align-items: flex-end;
     flex-shrink: 0;
-    position: relative;
-  }
-  .send-bar::before {
-    content: '';
-    position: absolute;
-    top: -40px; left: 0; right: 0; height: 40px;
-    background: linear-gradient(to top, var(--card) 0%, transparent 100%);
-    pointer-events: none;
   }
   .send-input {
     flex: 1; padding: 10px 16px;
@@ -2485,7 +2469,6 @@ class SmsGammuPanel extends HTMLElement {
             </div>
           </div>
           <div class="status-main" id="status-main" style="display:none"></div>
-          <div class="msg-fade"></div>
           <div class="send-bar" id="send-bar" style="display:none; flex-wrap:wrap">
             <div class="char-counter" id="char-counter" style="width:100%; display:none"></div>
             <textarea class="send-input" id="send-input" rows="1" placeholder="Написать сообщение…"></textarea>
@@ -3669,28 +3652,12 @@ const CSS = `
   }
   .msg-bubble:hover .msg-delete { color: var(--sub); }
 
-  .msg-fade {
-    position: absolute;
-    bottom: 0; left: 0; right: 0;
-    height: 60px;
-    background: linear-gradient(to top, var(--bg) 0%, transparent 100%);
-    pointer-events: none;
-    z-index: 5;
-  }
   /* ─── Send bar ─── */
   .send-bar {
-    display: flex; gap: 8px; padding: 10px 14px 14px;
-    background: transparent;
-    align-items: flex-end;
+    display: flex; gap: 8px; padding: 10px 14px;
+    border-top: 1px solid var(--line);
+    background: var(--card); align-items: flex-end;
     flex-shrink: 0;
-    position: relative;
-  }
-  .send-bar::before {
-    content: '';
-    position: absolute;
-    top: -40px; left: 0; right: 0; height: 40px;
-    background: linear-gradient(to top, var(--card) 0%, transparent 100%);
-    pointer-events: none;
   }
   .send-input {
     flex: 1; padding: 10px 16px;
@@ -5751,7 +5718,6 @@ class SmsGammuPanel extends HTMLElement {
             </div>
           </div>
           <div class="status-main" id="status-main" style="display:none"></div>
-          <div class="msg-fade"></div>
           <div class="send-bar" id="send-bar" style="display:none; flex-wrap:wrap">
             <div class="char-counter" id="char-counter" style="width:100%; display:none"></div>
             <textarea class="send-input" id="send-input" rows="1" placeholder="Написать сообщение…"></textarea>
