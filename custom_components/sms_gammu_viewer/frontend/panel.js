@@ -3139,7 +3139,7 @@ class SmsGammuPanel extends HTMLElement {
       });
       el.addEventListener("pointerup", () => clearTimeout(ltimer));
       el.addEventListener("pointercancel", () => clearTimeout(ltimer));
-      el.addEventListener("contextmenu", (e) => { e.preventDefault(); console.log("contextmenu", e.clientX, e.clientY, bubble); if (bubble) this._showMsgCtxMenu(e, bubble); });
+      el.addEventListener("contextmenu", (e) => { e.preventDefault(); console.log("contextmenu bubble:", bubble, "el:", el); this._showMsgCtxMenu(e, bubble || el.parentElement); });
     });
 
     area.scrollTop = area.scrollHeight;
