@@ -63,6 +63,8 @@ export default {
   storage: "Хранилище",
   db_size: "Размер базы данных",
   msg_count: "Всего сообщений",
+  clear_storage: "Очистить все сообщения",
+  clear_storage_confirm: "Это безвозвратно удалит все сообщения и историю переписок. Вы уверены?",
   mute_chat: "Без звука",
   unmute_chat: "Включить звук",
   call_number: "Позвонить",
