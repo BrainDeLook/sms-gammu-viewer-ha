@@ -57,9 +57,11 @@ A native SMS panel for Home Assistant — chat-style messaging, voice calls, pho
 ## Requirements
 
 - Home Assistant 2024.3+
-- [gammu-gateway](https://github.com/pajikos/sms-gammu-gateway) running and accessible over HTTP
-- USB GSM modem supported by Gammu
+- **[SMS Gammu Gateway add-on](https://github.com/pavelivanov00/sms-gammu-gateway)** by Pavel Ivanov — install via Home Assistant Add-on Store, this is the gateway that communicates with your modem
+- USB GSM modem supported by Gammu (e.g. Huawei E1550, E3372, ZTE MF823)
 - For push notifications: [Home Assistant Companion](https://companion.home-assistant.io/) app
+
+> The add-on exposes a REST API that this integration connects to. Without it the integration will not work.
 
 ---
 
