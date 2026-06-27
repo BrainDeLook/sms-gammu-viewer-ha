@@ -332,8 +332,6 @@ const CSS = `
   .msg-ctx-item svg { flex-shrink: 0; }
   .msg-starred-icon { position: absolute; top: 4px; right: 4px; opacity: 0.7; }
   .msg-bubble {
-    -webkit-user-select: none; user-select: none;
-    -webkit-touch-callout: none;
     max-width: 72%;
     align-self: flex-start;
     background: var(--card);
@@ -351,6 +349,10 @@ const CSS = `
     word-break: break-word;
     cursor: pointer;
     user-select: text;
+    -webkit-touch-callout: none;
+  }
+  @media (max-width: 580px) {
+    .msg-text { user-select: none; -webkit-user-select: none; }
   }
   .msg-text:active { opacity: .7; }
   .msg-bubble.copied {
@@ -3096,18 +3098,21 @@ class SmsGammuPanel extends HTMLElement {
     });
 
     area.querySelectorAll(".msg-text").forEach((el) => {
-      el.addEventListener("click", async () => {
-        const text = el.textContent;
-        const bubble = el.closest(".msg-bubble");
-        const ok = await this._copyToClipboard(text);
-        if (ok) {
-          bubble?.classList.add("copied");
-          setTimeout(() => bubble?.classList.remove("copied"), 800);
-          this._showToast(this._t("copied"));
-        } else {
-          this._showToast(this._t("copy_failed"));
-        }
+      const bubble = el.closest(".msg-bubble");
+      let ltimer = null, startX = 0, startY = 0;
+
+      el.addEventListener("pointerdown", (e) => {
+        startX = e.clientX; startY = e.clientY;
+        ltimer = setTimeout(() => {
+          if (bubble) this._showMsgCtxMenu(e, bubble);
+        }, 500);
       });
+      el.addEventListener("pointermove", (e) => {
+        if (Math.abs(e.clientX - startX) > 10 || Math.abs(e.clientY - startY) > 10) clearTimeout(ltimer);
+      });
+      el.addEventListener("pointerup", () => clearTimeout(ltimer));
+      el.addEventListener("pointercancel", () => clearTimeout(ltimer));
+      el.addEventListener("contextmenu", (e) => { e.preventDefault(); if (bubble) this._showMsgCtxMenu(e, bubble); });
     });
 
     area.scrollTop = area.scrollHeight;
