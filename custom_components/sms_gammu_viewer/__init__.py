@@ -783,6 +783,10 @@ class SmsApiView(HomeAssistantView):
             coord.push_event("message_read", {"id": msg_id})
             return self._json({"ok": True})
 
+        if action == "clear_storage":
+            await self.hass.async_add_executor_job(store.clear_all)
+            return self._json({"ok": True})
+
         if action.startswith("mark_read/"):
             from urllib.parse import unquote as _uq
             number = _uq(action[len("mark_read/"):])
