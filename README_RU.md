@@ -144,6 +144,8 @@ order:
 
 ---
 
-## Благодарности
+## Используемые проекты
 
-Построено на базе [pajikos/sms-gammu-gateway](https://github.com/pajikos/sms-gammu-gateway). Создано из желания иметь нормальный SMS-интерфейс прямо в Home Assistant без внешних приложений.
+- **[pajikos/sms-gammu-gateway](https://github.com/pajikos/sms-gammu-gateway)** — оригинальный gammu-gateway REST API на котором построена интеграция
+- **[pavelivanov00/sms-gammu-gateway](https://github.com/pavelivanov00/sms-gammu-gateway)** — версия шлюза в виде аддона для Home Assistant (нужно установить для работы интеграции)
+- **[elchininet/custom-sidebar](https://github.com/elchininet/custom-sidebar)** — используется для добавления badge с непрочитанными на иконку в сайдбаре
