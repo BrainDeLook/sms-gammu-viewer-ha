@@ -2986,8 +2986,8 @@ class SmsGammuPanel extends HTMLElement {
     const vw = window.innerWidth, vh = window.innerHeight;
 
     let x, y;
-    // Чуть ниже сообщения
-    y = rect.bottom - sRect.top + 6;
+    // Половина меню перекрывает низ сообщения
+    y = rect.bottom - sRect.top - (mh / 2);
     if (isOut) {
       x = rect.right - sRect.left - mw;
     } else {
