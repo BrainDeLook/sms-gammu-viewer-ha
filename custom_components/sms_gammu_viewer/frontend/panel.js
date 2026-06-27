@@ -2982,7 +2982,8 @@ class SmsGammuPanel extends HTMLElement {
       document.body.appendChild(menu);
       const mw = menu.offsetWidth, mh = menu.offsetHeight;
 
-      let x = isOut ? rect.right - mw : rect.left;
+      // Чужие — правый край пузырька, свои — левый край пузырька
+      let x = isOut ? rect.left : rect.right - mw;
       let y = rect.bottom - 10;
       if (x < 4) x = 4;
       if (x + mw > vw - 4) x = vw - mw - 4;
