@@ -144,6 +144,8 @@ See [Releases](https://github.com/BrainDeLook/sms-gammu-viewer-ha/releases).
 
 ---
 
-## Credits
+## Credits & Related Projects
 
-Built on top of [pajikos/sms-gammu-gateway](https://github.com/pajikos/sms-gammu-gateway). Inspired by the need to have a proper SMS interface inside Home Assistant without external apps.
+- **[pajikos/sms-gammu-gateway](https://github.com/pajikos/sms-gammu-gateway)** — the original gammu-gateway REST API that this integration is built on top of
+- **[pavelivanov00/sms-gammu-gateway](https://github.com/pavelivanov00/sms-gammu-gateway)** — Home Assistant add-on version of the gateway (install this to use the integration)
+- **[elchininet/custom-sidebar](https://github.com/elchininet/custom-sidebar)** — used for adding unread badge to the sidebar icon
