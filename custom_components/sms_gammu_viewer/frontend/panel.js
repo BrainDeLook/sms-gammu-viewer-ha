@@ -2996,8 +2996,23 @@ class SmsGammuPanel extends HTMLElement {
           menu.remove();
           const action = item.dataset.action;
           if (action === "copy") {
-            await navigator.clipboard.writeText(text).catch(() => {});
-            this._showToast(this._t("copied"));
+            try {
+              if (navigator.clipboard && location.protocol === "https:") {
+                await navigator.clipboard.writeText(text);
+              } else {
+                // fallback для http
+                const ta = document.createElement("textarea");
+                ta.value = text;
+                ta.style.cssText = "position:fixed;top:-999px;left:-999px";
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand("copy");
+                ta.remove();
+              }
+              this._showToast(this._t("copied"));
+            } catch(err) {
+              this._showToast(this._t("copy_failed"));
+            }
           } else if (action === "star") {
             const ep = isStarred ? `unstar/${msgId}` : `star/${msgId}`;
             await this._api(ep, "POST").catch(() => {});
