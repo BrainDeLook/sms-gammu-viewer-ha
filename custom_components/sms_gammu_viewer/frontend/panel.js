@@ -1065,6 +1065,7 @@ class SmsGammuPanel extends HTMLElement {
   }
 
   async _loadStatus() {
+    const hadStatusBefore = !!this._status;
     this._statusLoading = true;
     try {
       const s = await this._api("status");
