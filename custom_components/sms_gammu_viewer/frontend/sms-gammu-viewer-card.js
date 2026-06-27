@@ -401,7 +401,7 @@ class SmsGammuViewerCard extends HTMLElement {
   }
 
   static getStubConfig() {
-    return { title: "SMS", max_items: 5, show_unread_only: false };
+    return { title: "SMS", max_items: 5, show_unread_only: false, show_modem_info: false };
   }
 }
 
@@ -439,6 +439,7 @@ class SmsGammuViewerCardEditor extends HTMLElement {
         selector: { number: { mode: "box", min: 1, max: 50, step: 1 } },
       },
       { name: "show_unread_only", selector: { boolean: {} } },
+      { name: "show_modem_info", selector: { boolean: {} } },
     ];
   }
 
@@ -447,6 +448,7 @@ class SmsGammuViewerCardEditor extends HTMLElement {
       title: "Заголовок карточки",
       max_items: "Количество диалогов",
       show_unread_only: "Показывать только непрочитанные",
+      show_modem_info: "Показывать оператор и сигнал",
     };
     return labels[schema.name] || schema.name;
   }
