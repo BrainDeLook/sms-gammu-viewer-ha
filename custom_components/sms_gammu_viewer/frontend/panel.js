@@ -2955,7 +2955,6 @@ class SmsGammuPanel extends HTMLElement {
   }
 
   _showMsgCtxMenu(e, bubble) {
-    console.log("_showMsgCtxMenu called", bubble);
     document.querySelector(".msg-ctx-menu")?.remove();
     const msgId = parseInt(bubble.dataset.id);
     const isStarred = bubble.dataset.starred === "1";
@@ -2981,25 +2980,22 @@ class SmsGammuPanel extends HTMLElement {
 
     // Позиционируем как в Telegram — под пузырьком
     const rect = bubble.getBoundingClientRect();
-    // Добавляем в body с fixed позиционированием
-    menu.style.position = "fixed";
+    const hostRect = this.shadowRoot.host.getBoundingClientRect();
+    // Добавляем в shadowRoot — стили применяются
+    menu.style.position = "absolute";
     menu.style.visibility = "hidden";
-    document.body.appendChild(menu);
+    this.shadowRoot.appendChild(menu);
     const mw = menu.offsetWidth, mh = menu.offsetHeight;
     menu.style.visibility = "";
     const vw = window.innerWidth, vh = window.innerHeight;
 
-    let x, y;
-    // Меню чуть выезжает за нижний край пузырька
-    y = rect.bottom - (mh * 0.25);
-    if (isOut) {
-      x = rect.right - mw;
-    } else {
-      x = rect.left;
-    }
+    // Координаты относительно shadowRoot host
+    let x = rect.left - hostRect.left;
+    let y = rect.bottom - hostRect.top - (mh * 0.25);
+    if (isOut) x = rect.right - hostRect.left - mw;
     if (x < 4) x = 4;
     if (x + mw > vw - 4) x = vw - mw - 4;
-    if (y + mh > vh - 4) y = rect.bottom - mh - 4;
+    if (y + mh > vh - 4) y = rect.bottom - hostRect.top - mh - 4;
 
     menu.style.left = x + "px";
     menu.style.top = y + "px";
@@ -3031,14 +3027,12 @@ class SmsGammuPanel extends HTMLElement {
 
     // Закрытие по pointerdown вне меню — с задержкой чтобы не закрылось сразу
     const close = (ev) => {
-      if (!menu.contains(ev.target)) {
+      if (!menu.contains(ev.composedPath()[0])) {
         menu.remove();
         document.removeEventListener("pointerdown", close);
       }
     };
-    setTimeout(() => {
-      document.addEventListener("pointerdown", close);
-    }, 300);
+    setTimeout(() => document.addEventListener("pointerdown", close), 300);
   }
 
   _renderMessages() {
@@ -3130,7 +3124,7 @@ class SmsGammuPanel extends HTMLElement {
       el.addEventListener("pointerdown", (e) => {
         startX = e.clientX; startY = e.clientY;
         ltimer = setTimeout(() => {
-          if (bubble) { console.log("long press fired"); navigator.vibrate?.(30); this._showMsgCtxMenu(e, bubble); }
+          if (bubble) { navigator.vibrate?.(30); this._showMsgCtxMenu(e, bubble); }
         }, 600);
       });
       el.addEventListener("pointermove", (e) => {
