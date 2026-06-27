@@ -28,7 +28,7 @@ After installation, an **SMS** tab appears in the sidebar. Messages are stored i
 - 📇 **Phonebook** — save contact names, shown across conversations, call history, and chat headers
 - 🔔 **Push notifications** — on new SMS with tap-to-open (iOS & Android), grouped by sender
 - 🩺 **Automatic modem recovery** — resets the modem after repeated failures, with a live warning in the status bar
-- 📨 **Sensors** — `sensor.sms_unread_count`, `sensor.sms_last_sms_number`, `sensor.sms_last_sms_text` for automations
+- 📨 **Sensors** — `sensor.sms_unread_count`, `sensor.sms_last_sms_number`, `sensor.sms_last_sms_text`, `sensor.signal_quality`, `sensor.network_operator` for automations
 - 🌐 **English / Russian UI** — switchable independently of HA's language
 - 🔍 **Search** by phone number or message text
 - 📱 **Mobile-friendly** — responsive layout with bottom sheet menus and back navigation
