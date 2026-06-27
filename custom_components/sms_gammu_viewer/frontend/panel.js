@@ -418,8 +418,8 @@ const CSS = `
   .send-bar-wrap::before {
     content: '';
     position: absolute;
-    top: -48px; left: 0; right: 0; height: 48px;
-    background: linear-gradient(to top, var(--bg) 0%, transparent 100%);
+    top: -32px; left: 0; right: 0; height: 32px;
+    background: linear-gradient(to top, var(--bg) 30%, rgba(0,0,0,0) 100%);
     pointer-events: none;
     z-index: 1;
   }
