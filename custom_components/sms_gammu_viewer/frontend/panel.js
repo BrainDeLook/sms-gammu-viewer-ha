@@ -2988,15 +2988,14 @@ class SmsGammuPanel extends HTMLElement {
     let x, y;
     y = rect.bottom - sRect.top + 4;
     if (isOut) {
-      // Своё сообщение — меню слева от правого края
-      x = rect.right - sRect.left - mw;
+      // Своё сообщение (справа) — меню левее пузырька
+      x = rect.left - sRect.left - mw - 4;
+      if (x < 4) x = 4;
     } else {
-      // Чужое сообщение — меню от левого края
-      x = rect.left - sRect.left;
+      // Чужое сообщение (слева) — меню правее пузырька
+      x = rect.right - sRect.left + 4;
+      if (x + mw > vw - 4) x = vw - mw - 4;
     }
-    // Не выходим за экран
-    if (x < 4) x = 4;
-    if (x + mw > vw - 4) x = vw - mw - 4;
     if (y + mh > vh - 4) y = rect.top - sRect.top - mh - 4;
 
     menu.style.left = x + "px";
