@@ -118,6 +118,16 @@ const CSS = `
     flex: 1;
     overflow-y: auto;
     padding-bottom: 80px;
+    position: relative;
+  }
+  .sidebar::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 80px;
+    background: linear-gradient(to top, var(--bg) 0%, transparent 100%);
+    pointer-events: none;
+    z-index: 10;
   }
 
   .swipe-wrap { position: relative; overflow: hidden; border-bottom: 0.5px solid var(--line); background: var(--card); }
