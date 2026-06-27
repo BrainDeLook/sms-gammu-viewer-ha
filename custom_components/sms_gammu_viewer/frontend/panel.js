@@ -2955,6 +2955,7 @@ class SmsGammuPanel extends HTMLElement {
   }
 
   _showMsgCtxMenu(e, bubble) {
+    if (window.innerWidth > 580) return;
     document.querySelector(".msg-ctx-menu")?.remove();
     const msgId = parseInt(bubble.dataset.id);
     const isStarred = bubble.dataset.starred === "1";
@@ -3132,7 +3133,8 @@ class SmsGammuPanel extends HTMLElement {
       });
       el.addEventListener("pointerup", () => clearTimeout(ltimer));
       el.addEventListener("pointercancel", () => clearTimeout(ltimer));
-      el.addEventListener("contextmenu", (e) => { e.preventDefault(); if (bubble) this._showMsgCtxMenu(e, bubble); });
+      // contextmenu только на мобиле
+      if (window.innerWidth <= 580) el.addEventListener("contextmenu", (e) => { e.preventDefault(); if (bubble) this._showMsgCtxMenu(e, bubble); });
     });
 
     area.scrollTop = area.scrollHeight;
