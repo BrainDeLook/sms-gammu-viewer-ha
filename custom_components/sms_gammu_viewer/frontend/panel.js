@@ -119,8 +119,8 @@ const CSS = `
     overflow-y: auto;
     padding-bottom: 80px;
     position: relative;
-    -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 80px), transparent 100%);
-    mask-image: linear-gradient(to bottom, black calc(100% - 80px), transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 60px), transparent 100%);
+    mask-image: linear-gradient(to bottom, black calc(100% - 60px), transparent 100%);
   }
 
 
@@ -326,8 +326,8 @@ const CSS = `
     display: flex;
     flex-direction: column;
     gap: 10px;
-    -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 80px), transparent 100%);
-    mask-image: linear-gradient(to bottom, black calc(100% - 80px), transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 60px), transparent 100%);
+    mask-image: linear-gradient(to bottom, black calc(100% - 60px), transparent 100%);
   }
 
   .msg-ctx-menu {
