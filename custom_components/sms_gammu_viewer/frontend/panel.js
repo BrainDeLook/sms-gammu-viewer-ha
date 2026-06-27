@@ -2936,6 +2936,7 @@ class SmsGammuPanel extends HTMLElement {
       const setPos = (x, animate) => {
         inner.classList.toggle("snapping", animate);
         inner.style.transform = `translateX(${x}px)`;
+        inner.classList.toggle("is-swiping", x !== 0);
         this._swipeState.set(wrap, x);
         if (animate) setTimeout(() => inner.classList.remove("snapping"), 260);
       };
