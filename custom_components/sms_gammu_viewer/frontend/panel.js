@@ -132,8 +132,10 @@ const CSS = `
     .swipe-inner { transform: none !important; transition: none !important; cursor: pointer; }
   }
   .swipe-wrap:last-child { border-bottom: none; }
-  .swipe-actions-left { position: absolute; left: 0; top: 0; bottom: 0; width: 160px; display: flex; align-items: center; gap: 8px; padding: 0 10px; box-sizing: border-box; background: var(--card); z-index: 1; }
+  .swipe-actions-left { position: absolute; left: 0; top: 0; bottom: 0; width: 160px; display: flex; align-items: center; gap: 8px; padding: 0 10px; box-sizing: border-box; background: var(--card); z-index: 1; opacity: 0; }
   .swipe-actions-right { position: absolute; right: 0; top: 0; bottom: 0; width: 160px; display: flex; align-items: center; gap: 8px; padding: 0 10px; box-sizing: border-box; background: var(--card); z-index: 1; }
+  .swipe-wrap:has(.swipe-inner.is-swiping) .swipe-actions-left,
+  .swipe-wrap:has(.swipe-inner.is-swiping) .swipe-actions-right { opacity: 1; }
   .swipe-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 8px 4px; font-size: 11px; font-weight: 500; color: #fff; border: none; border-radius: 12px; cursor: pointer; }
   .swipe-btn.read { background: #378ADD; }
   .swipe-btn.pin { background: #1D9E75; }
