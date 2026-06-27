@@ -2990,20 +2990,18 @@ class SmsGammuPanel extends HTMLElement {
     const vw = window.innerWidth, vh = window.innerHeight;
 
     let x, y;
-    const isTouchEvent = e.pointerType === "touch" || e.type === "pointerdown";
-    if (isTouchEvent) {
-      // Мобиле — под пузырьком
-      y = rect.bottom - hostRect.top - (mh * 0.25);
-      x = isOut ? rect.right - hostRect.left - mw : rect.left - hostRect.left;
+    // Всегда под пузырьком с выносом в сторону
+    y = rect.bottom - hostRect.top - (mh * 0.25);
+    if (isOut) {
+      // Исходящее (справа) — меню влево от правого края пузырька
+      x = rect.right - hostRect.left - mw;
     } else {
-      // Десктоп (правый клик) — у курсора
-      x = e.clientX - hostRect.left;
-      y = e.clientY - hostRect.top;
-      if (x + mw > vw - 4) x = e.clientX - hostRect.left - mw;
+      // Входящее (слева) — меню от левого края пузырька
+      x = rect.left - hostRect.left;
     }
     if (x < 4) x = 4;
     if (x + mw > vw - 4) x = vw - mw - 4;
-    if (y + mh > vh - 4) y -= mh;
+    if (y + mh > vh - 4) y = rect.top - hostRect.top - mh + (mh * 0.25);
 
     menu.style.left = x + "px";
     menu.style.top = y + "px";
