@@ -321,7 +321,7 @@ const CSS = `
   .messages-area {
     flex: 1;
     overflow-y: auto;
-    padding: 16px 20px;
+    padding: 16px 20px 90px;
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -411,9 +411,18 @@ const CSS = `
     position: relative;
     z-index: 2;
   }
+  .chat-pane { position: relative; }
   .send-bar-wrap {
-    position: relative;
-    flex-shrink: 0;
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    z-index: 10;
+  }
+  .send-bar-wrap::before {
+    content: '';
+    position: absolute;
+    top: -56px; left: 0; right: 0; height: 56px;
+    background: linear-gradient(to top, var(--bg) 0%, transparent 100%);
+    pointer-events: none;
   }
   .send-bar-wrap::before {
     content: '';
