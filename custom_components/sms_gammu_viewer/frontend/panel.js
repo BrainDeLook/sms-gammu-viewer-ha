@@ -325,6 +325,9 @@ const CSS = `
     display: flex;
     flex-direction: column;
     gap: 10px;
+  
+    -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 80px), transparent 100%);
+    mask-image: linear-gradient(to bottom, black calc(100% - 80px), transparent 100%);
   }
 
   .msg-ctx-menu {
