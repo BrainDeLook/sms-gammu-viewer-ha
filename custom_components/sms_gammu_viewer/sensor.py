@@ -217,8 +217,12 @@ class SmsSignalSensor(_BaseSmsSensor):
         if not coord:
             return
         try:
-            s = await coord.client.get_signal()
-            self._signal = s.get("SignalPercent") if s else None
+            # Берём из кеша координатора если есть
+            cache = getattr(coord, "_status_cache", None)
+            s = cache.get("signal") if cache else None
+            if s is None:
+                s = await coord.client.get_signal()
+            self._signal = s.get("SignalPercent") if isinstance(s, dict) else None
         except Exception:
             pass
         self.async_write_ha_state()
@@ -254,8 +258,11 @@ class SmsNetworkSensor(_BaseSmsSensor):
         if not coord:
             return
         try:
-            n = await coord.client.get_network()
-            self._operator = n.get("NetworkName") if n else None
+            cache = getattr(coord, "_status_cache", None)
+            n = cache.get("network") if cache else None
+            if n is None:
+                n = await coord.client.get_network()
+            self._operator = n.get("NetworkName") if isinstance(n, dict) else None
         except Exception:
             pass
         self.async_write_ha_state()
