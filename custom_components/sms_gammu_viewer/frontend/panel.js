@@ -2485,6 +2485,7 @@ class SmsGammuPanel extends HTMLElement {
             </div>
           </div>
           <div class="status-main" id="status-main" style="display:none"></div>
+          <div class="msg-fade"></div>
           <div class="send-bar" id="send-bar" style="display:none; flex-wrap:wrap">
             <div class="char-counter" id="char-counter" style="width:100%; display:none"></div>
             <textarea class="send-input" id="send-input" rows="1" placeholder="Написать сообщение…"></textarea>
@@ -5750,6 +5751,7 @@ class SmsGammuPanel extends HTMLElement {
             </div>
           </div>
           <div class="status-main" id="status-main" style="display:none"></div>
+          <div class="msg-fade"></div>
           <div class="send-bar" id="send-bar" style="display:none; flex-wrap:wrap">
             <div class="char-counter" id="char-counter" style="width:100%; display:none"></div>
             <textarea class="send-input" id="send-input" rows="1" placeholder="Написать сообщение…"></textarea>
