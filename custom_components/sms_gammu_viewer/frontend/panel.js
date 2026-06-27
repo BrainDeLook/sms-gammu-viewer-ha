@@ -2955,6 +2955,7 @@ class SmsGammuPanel extends HTMLElement {
   }
 
   _showMsgCtxMenu(e, bubble) {
+    console.log("_showMsgCtxMenu called", bubble);
     document.querySelector(".msg-ctx-menu")?.remove();
     const msgId = parseInt(bubble.dataset.id);
     const isStarred = bubble.dataset.starred === "1";
@@ -3129,7 +3130,7 @@ class SmsGammuPanel extends HTMLElement {
       el.addEventListener("pointerdown", (e) => {
         startX = e.clientX; startY = e.clientY;
         ltimer = setTimeout(() => {
-          if (bubble) { navigator.vibrate?.(30); this._showMsgCtxMenu(e, bubble); }
+          if (bubble) { console.log("long press fired"); navigator.vibrate?.(30); this._showMsgCtxMenu(e, bubble); }
         }, 600);
       });
       el.addEventListener("pointermove", (e) => {
