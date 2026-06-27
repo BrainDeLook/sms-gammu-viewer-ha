@@ -268,6 +268,11 @@ class SmsStore:
             r["is_pinned"] = bool(r["is_pinned"])
         return result
 
+    def clear_all(self) -> None:
+        """Удаляет все сообщения из базы данных."""
+        with self._conn() as conn:
+            conn.execute("DELETE FROM messages")
+
     def get_message_count(self) -> int:
         with self._conn() as conn:
             row = conn.execute("SELECT COUNT(*) FROM messages").fetchone()
