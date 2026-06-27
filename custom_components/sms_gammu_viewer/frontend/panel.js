@@ -421,15 +421,15 @@ const CSS = `
   .send-bar-wrap::before {
     content: '';
     position: absolute;
-    top: -56px; left: 0; right: 0; height: 56px;
-    background: linear-gradient(to top, var(--bg) 0%, transparent 100%);
+    top: -44px; left: 0; right: 0; height: 44px;
+    background: linear-gradient(to top, var(--bg) 10%, transparent 100%);
     pointer-events: none;
   }
   .send-bar-wrap::before {
     content: '';
     position: absolute;
-    top: -56px; left: 0; right: 0; height: 56px;
-    background: linear-gradient(to top, var(--bg) 0%, transparent 100%);
+    top: -44px; left: 0; right: 0; height: 44px;
+    background: linear-gradient(to top, var(--bg) 10%, transparent 100%);
     pointer-events: none;
   }
   .send-bar-wrap::before {
