@@ -3114,7 +3114,8 @@ class SmsGammuPanel extends HTMLElement {
 
     let html = "";
     let lastLabel = "";
-    for (const m of this._messages) {
+    const _msgs = this._starFilterActive ? this._messages.filter(m => m.is_starred) : this._messages;
+    for (const m of _msgs) {
       const label = this._fmtDateLabel(m.date);
       if (label !== lastLabel) {
         html += `<div class="date-divider"><span>${this._esc(label)}</span></div>`;
