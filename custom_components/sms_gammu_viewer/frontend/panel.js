@@ -299,6 +299,7 @@ const CSS = `
   @keyframes pulse-call { 0%,100%{opacity:1} 50%{opacity:.5} }
   .icon-btn.spin svg { animation: spin 1s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes ctx-in { from { opacity:0; transform: scale(.92); } to { opacity:1; transform: scale(1); } }
   .status-refresh-spin {
     display: inline-block; width: 8px; height: 8px;
     border: 1.5px solid rgba(255,255,255,.2); border-top-color: var(--accent);
@@ -316,7 +317,8 @@ const CSS = `
   }
 
   .msg-ctx-menu {
-    position: fixed; z-index: 999;
+    position: absolute; z-index: 999;
+    animation: ctx-in .15s ease;
     background: var(--card); border: 1px solid var(--line);
     border-radius: 14px; overflow: hidden;
     box-shadow: 0 8px 32px rgba(0,0,0,.3);
@@ -2953,10 +2955,10 @@ class SmsGammuPanel extends HTMLElement {
   }
 
   _showMsgCtxMenu(e, bubble) {
-    // Убираем предыдущее меню
     this.shadowRoot.querySelector(".msg-ctx-menu")?.remove();
     const msgId = parseInt(bubble.dataset.id);
     const isStarred = bubble.dataset.starred === "1";
+    const isOut = bubble.classList.contains("outgoing");
     const text = bubble.querySelector(".msg-text")?.textContent || "";
 
     const menu = document.createElement("div");
@@ -2976,14 +2978,29 @@ class SmsGammuPanel extends HTMLElement {
       </div>
     `;
 
-    // Позиционируем
-    const vw = window.innerWidth, vh = window.innerHeight;
-    let x = e.clientX, y = e.clientY;
+    // Позиционируем как в Telegram — под пузырьком
+    const rect = bubble.getBoundingClientRect();
+    const sRect = this.shadowRoot.host.getBoundingClientRect();
     this.shadowRoot.appendChild(menu);
     const mw = menu.offsetWidth, mh = menu.offsetHeight;
-    if (x + mw > vw) x = vw - mw - 8;
-    if (y + mh > vh) y = vh - mh - 8;
-    menu.style.left = x + "px"; menu.style.top = y + "px";
+    const vw = window.innerWidth, vh = window.innerHeight;
+
+    let x, y;
+    y = rect.bottom - sRect.top + 4;
+    if (isOut) {
+      // Своё сообщение — меню слева от правого края
+      x = rect.right - sRect.left - mw;
+    } else {
+      // Чужое сообщение — меню от левого края
+      x = rect.left - sRect.left;
+    }
+    // Не выходим за экран
+    if (x < 4) x = 4;
+    if (x + mw > vw - 4) x = vw - mw - 4;
+    if (y + mh > vh - 4) y = rect.top - sRect.top - mh - 4;
+
+    menu.style.left = x + "px";
+    menu.style.top = y + "px";
 
     menu.querySelectorAll(".msg-ctx-item").forEach(item => {
       item.addEventListener("click", async () => {
@@ -3104,8 +3121,8 @@ class SmsGammuPanel extends HTMLElement {
       el.addEventListener("pointerdown", (e) => {
         startX = e.clientX; startY = e.clientY;
         ltimer = setTimeout(() => {
-          if (bubble) this._showMsgCtxMenu(e, bubble);
-        }, 500);
+          if (bubble) { navigator.vibrate?.(30); this._showMsgCtxMenu(e, bubble); }
+        }, 600);
       });
       el.addEventListener("pointermove", (e) => {
         if (Math.abs(e.clientX - startX) > 10 || Math.abs(e.clientY - startY) > 10) clearTimeout(ltimer);
