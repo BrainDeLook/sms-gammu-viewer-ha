@@ -2980,24 +2980,25 @@ class SmsGammuPanel extends HTMLElement {
 
     // Позиционируем как в Telegram — под пузырьком
     const rect = bubble.getBoundingClientRect();
-    const sRect = this.shadowRoot.host.getBoundingClientRect();
-
+    // Добавляем в body с fixed позиционированием
+    menu.style.position = "fixed";
+    menu.style.visibility = "hidden";
+    document.body.appendChild(menu);
     const mw = menu.offsetWidth, mh = menu.offsetHeight;
+    menu.style.visibility = "";
     const vw = window.innerWidth, vh = window.innerHeight;
 
     let x, y;
-    // Меню начинается на 2/3 высоты пузырька — чуть выносит за нижний край
-    y = rect.bottom - sRect.top - (mh * 0.25);
+    // Меню чуть выезжает за нижний край пузырька
+    y = rect.bottom - (mh * 0.25);
     if (isOut) {
-      // Исходящее (справа) — меню справа от пузырька
-      x = rect.right - sRect.left - mw;
+      x = rect.right - mw;
     } else {
-      // Входящее (слева) — меню слева от пузырька
-      x = rect.left - sRect.left;
+      x = rect.left;
     }
     if (x < 4) x = 4;
     if (x + mw > vw - 4) x = vw - mw - 4;
-    if (y + mh > vh - 4) y = rect.bottom - sRect.top - mh - 4;
+    if (y + mh > vh - 4) y = rect.bottom - mh - 4;
 
     menu.style.left = x + "px";
     menu.style.top = y + "px";
