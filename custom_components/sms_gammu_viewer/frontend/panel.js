@@ -2955,7 +2955,7 @@ class SmsGammuPanel extends HTMLElement {
   }
 
   _showMsgCtxMenu(e, bubble) {
-    this.shadowRoot.querySelector(".msg-ctx-menu")?.remove();
+    document.querySelector(".msg-ctx-menu")?.remove();
     const msgId = parseInt(bubble.dataset.id);
     const isStarred = bubble.dataset.starred === "1";
     const isOut = bubble.classList.contains("outgoing");
@@ -2981,7 +2981,7 @@ class SmsGammuPanel extends HTMLElement {
     // Позиционируем как в Telegram — под пузырьком
     const rect = bubble.getBoundingClientRect();
     const sRect = this.shadowRoot.host.getBoundingClientRect();
-    this.shadowRoot.appendChild(menu);
+
     const mw = menu.offsetWidth, mh = menu.offsetHeight;
     const vw = window.innerWidth, vh = window.innerHeight;
 
@@ -3031,12 +3031,10 @@ class SmsGammuPanel extends HTMLElement {
     const close = (ev) => {
       if (!menu.contains(ev.target)) {
         menu.remove();
-        this.shadowRoot.removeEventListener("pointerdown", close);
         document.removeEventListener("pointerdown", close);
       }
     };
     setTimeout(() => {
-      this.shadowRoot.addEventListener("pointerdown", close);
       document.addEventListener("pointerdown", close);
     }, 300);
   }
