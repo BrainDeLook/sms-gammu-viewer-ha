@@ -123,7 +123,7 @@ const CSS = `
   @media (max-width: 580px) {
     .swipe-wrap { border-bottom: none; margin-bottom: 6px; }
     .swipe-wrap:last-child { margin-bottom: 0; }
-    .swipe-inner { border: 1px solid var(--line); }
+    .swipe-inner { border: 1px solid var(--line); border-radius: 22px; }
   }
   @media (min-width: 581px) {
     .swipe-actions-left, .swipe-actions-right { display: none !important; }
@@ -137,7 +137,7 @@ const CSS = `
   .swipe-btn.pin { background: #1D9E75; }
   .swipe-btn.mute { background: #888780; }
   .swipe-btn.swipe-del { background: #E24B4A; }
-  .swipe-inner { position: relative; z-index: 2; background-color: var(--card) !important; will-change: transform; border-radius: 22px; }
+  .swipe-inner { position: relative; z-index: 2; background-color: var(--card) !important; will-change: transform; }
   .swipe-inner.active { background-color: rgba(3,169,244,.1) !important; }
   .swipe-inner.snapping { transition: transform 0.25s ease; }
   .contact-item {
