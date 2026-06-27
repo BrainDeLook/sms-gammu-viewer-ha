@@ -3113,12 +3113,14 @@ class SmsGammuPanel extends HTMLElement {
 
     area.querySelectorAll(".msg-text").forEach((el) => {
       const bubble = el.closest(".msg-bubble");
-      let ltimer = null, startX = 0, startY = 0;
+      let ltimer = null, startX = 0, startY = 0, longPressed = false;
 
       el.addEventListener("pointerdown", (e) => {
-        startX = e.clientX; startY = e.clientY;
+        startX = e.clientX; startY = e.clientY; longPressed = false;
         ltimer = setTimeout(() => {
-          if (bubble) { navigator.vibrate?.(30); this._showMsgCtxMenu(e, bubble); }
+          longPressed = true;
+          navigator.vibrate?.(30);
+          if (bubble) this._showMsgCtxMenu(e, bubble);
         }, 600);
       });
       el.addEventListener("pointermove", (e) => {
@@ -3126,6 +3128,23 @@ class SmsGammuPanel extends HTMLElement {
       });
       el.addEventListener("pointerup", () => clearTimeout(ltimer));
       el.addEventListener("pointercancel", () => clearTimeout(ltimer));
+      el.addEventListener("click", async () => {
+        if (longPressed) return; // не копируем если было долгое нажатие
+        const text = el.textContent;
+        try {
+          if (navigator.clipboard && location.protocol === "https:") {
+            await navigator.clipboard.writeText(text);
+          } else {
+            const ta = document.createElement("textarea");
+            ta.value = text;
+            ta.style.cssText = "position:fixed;top:-999px;left:-999px";
+            document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove();
+          }
+          bubble?.classList.add("copied");
+          setTimeout(() => bubble?.classList.remove("copied"), 800);
+          this._showToast(this._t("copied"));
+        } catch { this._showToast(this._t("copy_failed")); }
+      });
       el.addEventListener("contextmenu", (e) => { e.preventDefault(); this._showMsgCtxMenu(e, bubble || el.parentElement); });
     });
 
