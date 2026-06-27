@@ -190,8 +190,7 @@ const CSS = `
   @media (max-width: 580px) {
     .contact-item.has-unread::before { display: none; }
     .swipe-inner.has-unread-wrap {
-      border-color: var(--unread-border) !important;
-      border-left-width: 3px !important;
+      box-shadow: inset 3px 0 0 var(--unread-border) !important;
     }
   }
 
