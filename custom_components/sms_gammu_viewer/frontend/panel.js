@@ -404,18 +404,33 @@ const CSS = `
 
   /* ─── Send bar ─── */
   .send-bar {
-    display: flex; gap: 8px; padding: 10px 14px;
-    border-top: 1px solid var(--line);
-    background: var(--card); align-items: flex-end;
+    display: flex; gap: 8px; padding: 8px 12px 16px;
+    background: transparent;
+    align-items: flex-end;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 2;
+  }
+  .send-bar-wrap {
+    position: relative;
     flex-shrink: 0;
   }
+  .send-bar-wrap::before {
+    content: '';
+    position: absolute;
+    top: -48px; left: 0; right: 0; height: 48px;
+    background: linear-gradient(to top, var(--bg) 0%, transparent 100%);
+    pointer-events: none;
+    z-index: 1;
+  }
   .send-input {
-    flex: 1; padding: 9px 14px;
-    border: 1px solid var(--line); border-radius: 20px;
-    background: var(--bg); color: var(--text);
+    flex: 1; padding: 10px 16px;
+    border: 1.5px solid var(--line); border-radius: 24px;
+    background: var(--card); color: var(--text);
     font-size: 14px; font-family: inherit;
     outline: none; resize: none;
     max-height: 120px; line-height: 1.5;
+    box-shadow: 0 2px 12px rgba(0,0,0,.15);
     transition: border-color .2s;
   }
   .send-input:focus { border-color: var(--accent); }
@@ -2468,6 +2483,7 @@ class SmsGammuPanel extends HTMLElement {
             </div>
           </div>
           <div class="status-main" id="status-main" style="display:none"></div>
+          <div class="send-bar-wrap">
           <div class="send-bar" id="send-bar" style="display:none; flex-wrap:wrap">
             <div class="char-counter" id="char-counter" style="width:100%; display:none"></div>
             <textarea class="send-input" id="send-input" rows="1" placeholder="Написать сообщение…"></textarea>
@@ -2477,6 +2493,7 @@ class SmsGammuPanel extends HTMLElement {
                 <polygon points="22 2 15 22 11 13 2 9 22 2"/>
               </svg>
             </button>
+          </div>
           </div>
         </div>
       </div>
