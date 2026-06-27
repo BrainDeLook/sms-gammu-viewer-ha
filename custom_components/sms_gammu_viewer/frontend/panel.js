@@ -3029,9 +3029,11 @@ class SmsGammuPanel extends HTMLElement {
             await this._api(ep, "POST").catch(() => {});
             const newStarred = !isStarred;
             bubble.dataset.starred = newStarred ? "1" : "0";
+            // Обновляем локально в this._messages
+            const msg = this._messages.find(m => m.id === msgId);
+            if (msg) msg.is_starred = newStarred ? 1 : 0;
             // Обновляем звёздочку визуально
             const meta = bubble.querySelector(".msg-meta");
-            // Удаляем старую звёздочку если есть
             meta?.querySelector(".star-icon")?.remove();
             if (newStarred && meta) {
               const s = document.createElement("span");
@@ -3039,6 +3041,8 @@ class SmsGammuPanel extends HTMLElement {
               s.textContent = "⭐";
               meta.insertBefore(s, meta.firstChild);
             }
+            // Если фильтр активен — перерендерить
+            if (this._starFilterActive) this._renderMessages();
           } else if (action === "delete") {
             if (!confirm(this._t("delete_msg") + "?")) return;
             await this._api(`delete/${msgId}`, "POST").catch(() => {});
