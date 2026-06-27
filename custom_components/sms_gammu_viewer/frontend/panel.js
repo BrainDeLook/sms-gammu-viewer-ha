@@ -422,14 +422,7 @@ const CSS = `
   }
 
 
-  .send-bar-wrap::before {
-    content: '';
-    position: absolute;
-    top: -20px; left: 0; right: 0; height: 20px;
-    background: linear-gradient(to top, var(--bg) 0%, rgba(0,0,0,0) 100%);
-    pointer-events: none;
-    z-index: 1;
-  }
+
   .send-input {
     flex: 1; padding: 10px 16px;
     border: 1.5px solid var(--line); border-radius: 24px;
