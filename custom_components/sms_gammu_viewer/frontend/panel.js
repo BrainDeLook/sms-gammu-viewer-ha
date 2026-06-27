@@ -2633,6 +2633,17 @@ class SmsGammuPanel extends HTMLElement {
 
     this._initPbSheet();
 
+    this._starFilterActive = false;
+    this.shadowRoot.getElementById("star-filter-btn")?.addEventListener("click", () => {
+      this._starFilterActive = !this._starFilterActive;
+      const btn = this.shadowRoot.getElementById("star-filter-btn");
+      if (btn) {
+        btn.style.color = this._starFilterActive ? "var(--accent)" : "";
+        btn.querySelector("svg").setAttribute("fill", this._starFilterActive ? "currentColor" : "none");
+      }
+      this._renderMessages();
+    });
+
     this.shadowRoot.getElementById("back-btn").addEventListener("click", () => {
       if (this._activeTab === "status" || this._activeTab === "phonebook") {
         // Закрываем оверлей (модем/телефонная книга) — возврат к списку
