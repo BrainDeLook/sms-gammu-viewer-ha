@@ -719,8 +719,9 @@ class SmsApiView(HomeAssistantView):
             return self._json(data)
 
         if action.startswith("messages/"):
-            number = action[len("messages/"):]
-            data = await self.hass.async_add_executor_job(store.get_by_number, number)
+            from urllib.parse import unquote as _uq
+            number = _uq(action[len("messages/"):])
+            data = await self.hass.async_add_executor_job(store.get_messages_with_starred, number)
             return self._json(data)
 
         if action == "messages":
