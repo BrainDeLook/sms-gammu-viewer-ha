@@ -3041,8 +3041,8 @@ class SmsGammuPanel extends HTMLElement {
               s.textContent = "⭐";
               meta.insertBefore(s, meta.firstChild);
             }
-            // Если фильтр активен — перерендерить
-            if (this._starFilterActive) this._renderMessages();
+            // Перерендерим всегда чтобы звёздочка в шаблоне тоже обновилась
+            this._renderMessages();
           } else if (action === "delete") {
             if (!confirm(this._t("delete_msg") + "?")) return;
             await this._api(`delete/${msgId}`, "POST").catch(() => {});
