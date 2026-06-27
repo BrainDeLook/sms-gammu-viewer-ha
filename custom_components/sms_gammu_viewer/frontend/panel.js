@@ -1253,6 +1253,7 @@ class SmsGammuPanel extends HTMLElement {
     }
 
     this._activeNumber = number;
+    this._firstRender = true;
     try { localStorage.setItem("sms_gammu_active_number", number); } catch {}
     this.shadowRoot.querySelector(".root")?.classList.add("chat-open");
 
@@ -3219,10 +3220,11 @@ class SmsGammuPanel extends HTMLElement {
 
 
 
-    // Скроллим вниз только если пользователь уже был внизу
+    // Скроллим вниз при первом открытии чата или если пользователь уже внизу
     const isAtBottom = area.scrollHeight - area.scrollTop - area.clientHeight < 80;
-    if (isAtBottom) {
+    if (this._firstRender || isAtBottom) {
       area.scrollTop = area.scrollHeight;
+      this._firstRender = false;
     }
   }
 }
