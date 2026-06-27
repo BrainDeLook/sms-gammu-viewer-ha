@@ -3219,7 +3219,11 @@ class SmsGammuPanel extends HTMLElement {
 
 
 
-    area.scrollTop = area.scrollHeight;
+    // Скроллим вниз только если пользователь уже был внизу
+    const isAtBottom = area.scrollHeight - area.scrollTop - area.clientHeight < 80;
+    if (isAtBottom) {
+      area.scrollTop = area.scrollHeight;
+    }
   }
 }
 
