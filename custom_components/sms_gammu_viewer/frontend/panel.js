@@ -332,6 +332,8 @@ const CSS = `
   .msg-ctx-item svg { flex-shrink: 0; }
   .msg-starred-icon { position: absolute; top: 4px; right: 4px; opacity: 0.7; }
   .msg-bubble {
+    -webkit-user-select: none; user-select: none;
+    -webkit-touch-callout: none;
     max-width: 72%;
     align-self: flex-start;
     background: var(--card);
