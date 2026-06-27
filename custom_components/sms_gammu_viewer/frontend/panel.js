@@ -2955,88 +2955,69 @@ class SmsGammuPanel extends HTMLElement {
   }
 
   _showMsgCtxMenu(e, bubble) {
-    if (window.innerWidth > 580) return;
-    document.querySelector(".msg-ctx-menu")?.remove();
-    const msgId = parseInt(bubble.dataset.id);
-    const isStarred = bubble.dataset.starred === "1";
-    const isOut = bubble.classList.contains("outgoing");
-    const text = bubble.querySelector(".msg-text")?.textContent || "";
+    try {
+      document.querySelector(".msg-ctx-menu")?.remove();
+      if (!bubble) { console.error("no bubble"); return; }
+      const msgId = parseInt(bubble.dataset.id);
+      const isStarred = bubble.dataset.starred === "1";
+      const isOut = bubble.classList.contains("outgoing");
+      const text = bubble.querySelector(".msg-text")?.textContent || "";
 
-    const menu = document.createElement("div");
-    menu.className = "msg-ctx-menu";
-    menu.innerHTML = `
-      <div class="msg-ctx-item" data-action="copy">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-        ${this._t("copy")}
-      </div>
-      <div class="msg-ctx-item" data-action="star">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="${isStarred ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-        ${isStarred ? this._t("unstar") : this._t("star")}
-      </div>
-      <div class="msg-ctx-item danger" data-action="delete">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
-        ${this._t("delete_msg")}
-      </div>
-    `;
+      const menu = document.createElement("div");
+      menu.className = "msg-ctx-menu";
+      menu.style.cssText = `
+        position:fixed; z-index:9999;
+        background:#222; border:1px solid #444; border-radius:12px;
+        overflow:hidden; min-width:180px;
+        box-shadow:0 8px 32px rgba(0,0,0,.5);
+      `;
+      menu.innerHTML = `
+        <div class="msg-ctx-item" data-action="copy" style="display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:14px;color:#fff;cursor:pointer">📋 ${this._t("copy")}</div>
+        <div class="msg-ctx-item" data-action="star" style="display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:14px;color:#fff;cursor:pointer">${isStarred ? "★" : "☆"} ${isStarred ? this._t("unstar") : this._t("star")}</div>
+        <div class="msg-ctx-item" data-action="delete" style="display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:14px;color:#e53935;cursor:pointer">🗑 ${this._t("delete_msg")}</div>
+      `;
 
-    // Позиционируем как в Telegram — под пузырьком
-    const rect = bubble.getBoundingClientRect();
-    // fixed позиция по window координатам — без offset
-    menu.style.position = "fixed";
-    menu.style.visibility = "hidden";
-    this.shadowRoot.appendChild(menu);
-    const mw = menu.offsetWidth, mh = menu.offsetHeight;
-    menu.style.visibility = "";
-    const vw = window.innerWidth, vh = window.innerHeight;
+      const rect = bubble.getBoundingClientRect();
+      const vw = window.innerWidth, vh = window.innerHeight;
+      document.body.appendChild(menu);
+      const mw = menu.offsetWidth, mh = menu.offsetHeight;
 
-    let x, y;
-    y = rect.bottom - (mh * 0.25);
-    if (isOut) {
-      x = rect.right - mw;
-    } else {
-      x = rect.left;
-    }
-    if (x < 4) x = 4;
-    if (x + mw > vw - 4) x = vw - mw - 4;
-    if (y + mh > vh - 4) y = rect.top - mh + (mh * 0.25);
+      let x = isOut ? rect.right - mw : rect.left;
+      let y = rect.bottom - (mh * 0.25);
+      if (x < 4) x = 4;
+      if (x + mw > vw - 4) x = vw - mw - 4;
+      if (y + mh > vh - 4) y = rect.top - mh + (mh * 0.25);
+      menu.style.left = x + "px";
+      menu.style.top = y + "px";
 
-    menu.style.left = x + "px";
-    menu.style.top = y + "px";
-
-    menu.querySelectorAll(".msg-ctx-item").forEach(item => {
-      item.addEventListener("click", async () => {
-        menu.remove();
-        const action = item.dataset.action;
-        if (action === "copy") {
-          await navigator.clipboard.writeText(text).catch(() => {});
-        } else if (action === "star") {
-          const ep = isStarred ? `unstar/${msgId}` : `star/${msgId}`;
-          await this._api(ep, "POST").catch(() => {});
-          bubble.dataset.starred = isStarred ? "0" : "1";
-          const icon = bubble.querySelector(".msg-starred-icon");
-          if (isStarred && icon) icon.remove();
-          else if (!isStarred) {
-            const s = document.createElement("span");
-            s.className = "msg-starred-icon"; s.textContent = "⭐";
-            bubble.appendChild(s);
+      menu.querySelectorAll(".msg-ctx-item").forEach(item => {
+        item.addEventListener("click", async () => {
+          menu.remove();
+          const action = item.dataset.action;
+          if (action === "copy") {
+            await navigator.clipboard.writeText(text).catch(() => {});
+            this._showToast(this._t("copied"));
+          } else if (action === "star") {
+            const ep = isStarred ? `unstar/${msgId}` : `star/${msgId}`;
+            await this._api(ep, "POST").catch(() => {});
+            bubble.dataset.starred = isStarred ? "0" : "1";
+          } else if (action === "delete") {
+            if (!confirm(this._t("delete_msg") + "?")) return;
+            await this._api(`delete/${msgId}`, "POST").catch(() => {});
+            bubble.closest(".msg-row")?.remove();
           }
-        } else if (action === "delete") {
-          if (!confirm(this._t("delete_msg") + "?")) return;
-          await this._api(`delete/${msgId}`, "POST").catch(() => {});
-          bubble.closest(".msg-row")?.remove();
-        }
+        });
       });
-    });
 
-    // Закрытие по pointerdown вне меню — с задержкой чтобы не закрылось сразу
-    const close = (ev) => {
-      if (!menu.contains(ev.composedPath()[0])) {
-        menu.remove();
-        document.removeEventListener("pointerdown", close);
-      }
-    };
-    setTimeout(() => document.addEventListener("pointerdown", close), 300);
+      const close = (ev) => {
+        if (!menu.contains(ev.target)) { menu.remove(); document.removeEventListener("pointerdown", close); }
+      };
+      setTimeout(() => document.addEventListener("pointerdown", close), 300);
+    } catch(err) {
+      console.error("_showMsgCtxMenu error:", err);
+    }
   }
+
 
   _renderMessages() {
     // Защита от гонки: пока показан оверлей (статус модема/телефонная
