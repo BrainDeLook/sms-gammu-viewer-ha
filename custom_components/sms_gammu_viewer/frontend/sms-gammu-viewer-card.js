@@ -328,6 +328,7 @@ class SmsGammuViewerCard extends HTMLElement {
           <span class="sgv-title">${this._esc(this._config.title)}</span>
           <span class="sgv-badge" id="sgv-badge" style="display:none"></span>
         </div>
+        ${this._config.show_modem_info ? `<div class="sgv-modem-info"><span class="sgv-signal-dot" id="sgv-signal-dot"></span><span id="sgv-modem-text">…</span></div>` : ''}
         <div class="sgv-list" id="sgv-list"></div>
         <div class="sgv-footer">
           <a id="sgv-open-panel">Открыть все сообщения →</a>
