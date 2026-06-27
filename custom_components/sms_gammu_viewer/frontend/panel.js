@@ -120,6 +120,10 @@ const CSS = `
   }
 
   .swipe-wrap { position: relative; overflow: hidden; border-bottom: 0.5px solid var(--line); background: var(--card); }
+  @media (max-width: 580px) {
+    .swipe-wrap { border-bottom: none; margin-bottom: 6px; }
+    .swipe-wrap:last-child { margin-bottom: 0; }
+  }
   @media (min-width: 581px) {
     .swipe-actions-left, .swipe-actions-right { display: none !important; }
     .swipe-inner { transform: none !important; transition: none !important; cursor: pointer; }
