@@ -273,6 +273,28 @@ class SmsStore:
         with self._conn() as conn:
             conn.execute("DELETE FROM messages")
 
+    def star_message(self, msg_id: int) -> None:
+        with self._conn() as conn:
+            conn.execute("INSERT OR IGNORE INTO starred_messages (msg_id) VALUES (?)", (msg_id,))
+
+    def unstar_message(self, msg_id: int) -> None:
+        with self._conn() as conn:
+            conn.execute("DELETE FROM starred_messages WHERE msg_id=?", (msg_id,))
+
+    def is_starred(self, msg_id: int) -> bool:
+        with self._conn() as conn:
+            row = conn.execute("SELECT 1 FROM starred_messages WHERE msg_id=?", (msg_id,)).fetchone()
+            return row is not None
+
+    def get_messages_with_starred(self, number: str):
+        with self._conn() as conn:
+            conn.execute("CREATE TABLE IF NOT EXISTS starred_messages (msg_id INTEGER PRIMARY KEY)")
+            rows = conn.execute("""
+                SELECT m.*, EXISTS(SELECT 1 FROM starred_messages s WHERE s.msg_id = m.id) as is_starred
+                FROM messages m WHERE m.number=? ORDER BY date ASC, id ASC
+            """, (number,)).fetchall()
+        return [dict(r) for r in rows]
+
     def get_message_count(self) -> int:
         with self._conn() as conn:
             row = conn.execute("SELECT COUNT(*) FROM messages").fetchone()
