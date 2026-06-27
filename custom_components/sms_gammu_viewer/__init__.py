@@ -468,6 +468,21 @@ class SmsCoordinator:
                 else:
                     if messages is not None:
                         self._error_streak = 0
+                # Обновляем кеш статуса в фоне каждый цикл
+                try:
+                    _s, _n = await asyncio.gather(
+                        self.client.get_signal(),
+                        self.client.get_network(),
+                        return_exceptions=True,
+                    )
+                    if self._status_cache is None:
+                        self._status_cache = {}
+                    if not isinstance(_s, Exception):
+                        self._status_cache["signal"] = _s
+                    if not isinstance(_n, Exception):
+                        self._status_cache["network"] = _n
+                except Exception:
+                    pass
             except asyncio.CancelledError:
                 raise
             except Exception as e:
