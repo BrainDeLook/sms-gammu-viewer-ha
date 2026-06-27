@@ -2985,6 +2985,7 @@ class SmsGammuPanel extends HTMLElement {
     menu.style.position = "absolute";
     menu.style.visibility = "hidden";
     this.shadowRoot.appendChild(menu);
+    console.log("menu appended, rect:", rect, "hostRect:", hostRect);
     const mw = menu.offsetWidth, mh = menu.offsetHeight;
     menu.style.visibility = "";
     const vw = window.innerWidth, vh = window.innerHeight;
@@ -3138,7 +3139,7 @@ class SmsGammuPanel extends HTMLElement {
       });
       el.addEventListener("pointerup", () => clearTimeout(ltimer));
       el.addEventListener("pointercancel", () => clearTimeout(ltimer));
-      el.addEventListener("contextmenu", (e) => { e.preventDefault(); if (bubble) this._showMsgCtxMenu(e, bubble); });
+      el.addEventListener("contextmenu", (e) => { e.preventDefault(); console.log("contextmenu", e.clientX, e.clientY, bubble); if (bubble) this._showMsgCtxMenu(e, bubble); });
     });
 
     area.scrollTop = area.scrollHeight;
