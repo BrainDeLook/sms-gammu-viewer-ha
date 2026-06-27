@@ -2774,7 +2774,7 @@ class SmsGammuPanel extends HTMLElement {
           <button class="swipe-btn mute" data-action="mute" data-number="${this._esc(c.number)}">${svgMute}<span>${c.is_muted ? this._t("unmute_chat") : this._t("mute_chat")}</span></button>
           <button class="swipe-btn swipe-del" data-action="delete" data-number="${this._esc(c.number)}">${svgDel}<span>${this._t("delete_msg")}</span></button>
         </div>
-        <div class="swipe-inner contact-item ${c.unread > 0 ? "has-unread" : ""} ${
+        <div class="swipe-inner contact-item ${c.unread > 0 ? "has-unread has-unread-wrap" : ""} ${
           c.number === this._activeNumber ? "active" : ""
         } ${c.is_pinned ? "pinned-active" : ""}">
           <div class="avatar ${this._isAlphaTag(c.number) ? 'alpha' : ''}">${this._esc(c.contact_name ? c.contact_name.slice(0,1).toUpperCase() : this._avatar(c.number))}</div>
