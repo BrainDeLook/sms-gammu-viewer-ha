@@ -3027,9 +3027,18 @@ class SmsGammuPanel extends HTMLElement {
       });
     });
 
-    // Закрытие по клику вне меню
-    const close = (ev) => { if (!menu.contains(ev.target)) { menu.remove(); document.removeEventListener("click", close); } };
-    setTimeout(() => document.addEventListener("click", close), 10);
+    // Закрытие по pointerdown вне меню — с задержкой чтобы не закрылось сразу
+    const close = (ev) => {
+      if (!menu.contains(ev.target)) {
+        menu.remove();
+        this.shadowRoot.removeEventListener("pointerdown", close);
+        document.removeEventListener("pointerdown", close);
+      }
+    };
+    setTimeout(() => {
+      this.shadowRoot.addEventListener("pointerdown", close);
+      document.addEventListener("pointerdown", close);
+    }, 300);
   }
 
   _renderMessages() {
