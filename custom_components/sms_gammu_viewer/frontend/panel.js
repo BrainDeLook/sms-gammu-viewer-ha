@@ -3093,6 +3093,8 @@ class SmsGammuPanel extends HTMLElement {
     if (callBtn) {
       callBtn.style.display = this._status?.call_enabled ? "" : "none";
     }
+    const starFilterBtn = this.shadowRoot.getElementById("star-filter-btn");
+    if (starFilterBtn) starFilterBtn.style.display = "";
 
     if (this._messages.length === 0) {
       area.innerHTML = `<div class="empty"><p>Нет сообщений</p></div>`;
