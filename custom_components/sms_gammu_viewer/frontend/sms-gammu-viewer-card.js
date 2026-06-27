@@ -421,6 +421,7 @@ class SmsGammuViewerCardEditor extends HTMLElement {
         title: config.title ?? "SMS",
         max_items: config.max_items ?? 5,
         show_unread_only: config.show_unread_only ?? false,
+        show_modem_info: config.show_modem_info ?? false,
       };
     } else {
       this._render();
@@ -464,6 +465,7 @@ class SmsGammuViewerCardEditor extends HTMLElement {
       title: this._config.title ?? "SMS",
       max_items: this._config.max_items ?? 5,
       show_unread_only: this._config.show_unread_only ?? false,
+      show_modem_info: this._config.show_modem_info ?? false,
     };
     form.schema = SmsGammuViewerCardEditor._schema;
     form.computeLabel = this._computeLabel;
