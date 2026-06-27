@@ -218,7 +218,7 @@ class SmsSignalSensor(_BaseSmsSensor):
             return
         try:
             s = await coord.client.get_signal()
-            self._signal = s.get("percent") if s else None
+            self._signal = s.get("SignalPercent") if s else None
         except Exception:
             pass
         self.async_write_ha_state()
@@ -255,7 +255,7 @@ class SmsNetworkSensor(_BaseSmsSensor):
             return
         try:
             n = await coord.client.get_network()
-            self._operator = n.get("operator") if n else None
+            self._operator = n.get("NetworkName") if n else None
         except Exception:
             pass
         self.async_write_ha_state()
