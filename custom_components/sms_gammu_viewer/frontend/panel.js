@@ -503,6 +503,14 @@ const CSS = `
   .signal-label { font-size: 11px; color: var(--sub); margin-bottom: 5px; }
   .signal-bar-bg { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; }
   .signal-bar-fill { height: 100%; border-radius: 4px; transition: width .6s; }
+  .neutral-btn {
+    margin-top: 20px; padding: 10px 24px;
+    border: none; border-radius: 8px;
+    background: rgba(255,255,255,.07); color: var(--text);
+    cursor: pointer; font-size: 13px; font-weight: 500;
+    transition: background .15s;
+  }
+  .neutral-btn:hover { background: rgba(255,255,255,.12); }
   .reset-btn {
     margin-top: 20px; padding: 10px 24px;
     border: none; border-radius: 8px;
@@ -2167,7 +2175,7 @@ class SmsGammuPanel extends HTMLElement {
         <div class="stat-card">
           <h3>${this._t("voice_port")}</h3>
           <div id="voice-port-status" class="port-status-loading">${this._t("checking")}</div>
-          <button class="reset-btn port-check-btn" id="check-port-btn" style="margin-top:10px">
+          <button class="neutral-btn port-check-btn" id="check-port-btn" style="margin-top:10px">
             ${this._t("check_port")}
           </button>
         </div>`;
