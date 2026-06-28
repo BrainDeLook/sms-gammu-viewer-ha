@@ -215,7 +215,6 @@ Beyond the panel's call button, you can create dedicated Home Assistant entities
 4. Set name, phone number, dial timeout, and max call duration
 5. Save
 
-> ⚠️ **Restart Home Assistant after adding, editing, or deleting a call entity.** These entities are created when the integration starts up, so changes made through the config flow won't appear (or disappear) until the next restart — saving the form alone is not enough.
 
 Cover entities use the `gate` device class by default; you can change the displayed icon/type (garage door, door, gate, etc.) per-entity from the entity's own settings in Home Assistant. Requires a voice call device to be configured (see Voice Calls above) — entities won't be created without one.
 
