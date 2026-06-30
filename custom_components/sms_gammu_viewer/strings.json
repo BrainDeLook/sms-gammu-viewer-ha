@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "SMS Gammu Viewer Setup",
-        "description": "Enter the address and credentials for the sms-gammu-gateway add-on.\n\nDon't have it yet? Install [sms-gammu-gateway](https://github.com/PavelVe/home-assistant-addons/tree/main/sms-gammu-gateway) first.\n\n⚠️ Before continuing, disable these in the add-on's settings: SMS monitoring, auto-delete read SMS, call monitoring, and MQTT (if enabled). This integration handles all of that itself — leaving them on causes message loss and conflicts.",
+        "description": "Enter the address and credentials for the sms-gammu-gateway add-on.\n\nDon't have it yet? Install the \"sms-gammu-gateway\" add-on by PavelVe first (search the Add-on Store or check the integration's README for the link).\n\n⚠️ Before continuing, disable these in the add-on's settings: SMS monitoring, auto-delete read SMS, call monitoring, and MQTT (if enabled). This integration handles all of that itself — leaving them on causes message loss and conflicts.",
         "data": {
           "host": "Host (IP or hostname)",
           "port": "REST API port",
