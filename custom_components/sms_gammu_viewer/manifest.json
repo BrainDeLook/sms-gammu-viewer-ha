@@ -1,7 +1,9 @@
 {
   "domain": "sms_gammu_viewer",
   "name": "SMS Gammu Viewer",
-  "codeowners": [],
+  "codeowners": [
+    "@BrainDeLook"
+  ],
   "config_flow": true,
   "dependencies": [
     "http",
