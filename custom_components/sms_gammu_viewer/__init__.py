@@ -82,28 +82,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     entry.async_on_unload(entry.add_update_listener(_options_updated))
 
     # Прогреваем кеш статуса при старте
-    try:
-        _s, _n, _m, _si, _cap = await asyncio.gather(
-            coordinator.client.get_signal(),
-            coordinator.client.get_network(),
-            coordinator.client.get_modem(),
-            coordinator.client.get_sim(),
-            coordinator.client.get_sms_capacity(),
-            return_exceptions=True,
-        )
-        coordinator._status_cache = {
-            "signal":   None if isinstance(_s,   Exception) else _s,
-            "network":  None if isinstance(_n,   Exception) else _n,
-            "modem":    None if isinstance(_m,   Exception) else _m,
-            "sim":      None if isinstance(_si,  Exception) else _si,
-            "capacity": None if isinstance(_cap, Exception) else _cap,
-            "call_enabled": bool(coordinator.entry.data.get("call_device", "").strip()),
-            "language":   coordinator.entry.data.get("language", "ru"),
-            "show_panel": coordinator.entry.data.get("show_panel", True),
-        }
-        _LOGGER.debug("Status cache warmed up")
-    except Exception as e:
-        _LOGGER.debug("Status cache warmup failed: %s", e)
+    await coordinator.refresh_status_cache()
 
     _LOGGER.info("SMS Gammu Viewer started: %s", entry.title)
     return True
@@ -112,26 +91,27 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def _register_services(hass: HomeAssistant) -> None:
     """Регистрирует sms_gammu_viewer.send_sms и sms_gammu_viewer.call."""
     import voluptuous as vol
+    from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
     from homeassistant.helpers import config_validation as cv
-    from .dialer import dial_number, hangup as hangup_call, CallEndedReason, DialError, validate_phone_number
+    from .dialer import hangup as hangup_call, DialError, validate_phone_number
     from .const import (
-        CONF_CALL_DEVICE, CONF_CALL_DIAL_TIMEOUT, CONF_CALL_DURATION,
+        CONF_CALL_DIAL_TIMEOUT, CONF_CALL_DURATION,
         DEFAULT_CALL_DIAL_TIMEOUT, DEFAULT_CALL_DURATION, EVENT_CALL_ENDED,
     )
 
     def _get_coord():
         entries = hass.data.get(DOMAIN, {})
         if not entries:
-            raise ValueError("Интеграция SMS Gammu Viewer не настроена")
+            raise ServiceValidationError("Интеграция SMS Gammu Viewer не настроена")
         return next(iter(entries.values()))
 
     async def _handle_send_sms(call) -> None:
         number = call.data.get("number", "").strip()
         message = call.data.get("message", "").strip()
         if not number:
-            raise ValueError("Поле number обязательно")
+            raise ServiceValidationError("Поле number обязательно")
         if not message:
-            raise ValueError("Поле message обязательно")
+            raise ServiceValidationError("Поле message обязательно")
 
         coord = _get_coord()
         coord.send_in_progress = True
@@ -140,13 +120,13 @@ async def _register_services(hass: HomeAssistant) -> None:
         finally:
             coord.send_in_progress = False
         if not ok:
-            raise ValueError(f"Не удалось отправить SMS на {number}")
+            raise HomeAssistantError(f"Не удалось отправить SMS на {number}")
         # Сохраняем исходящее в историю чата
         msg_id = await hass.async_add_executor_job(coord.store.add_outgoing, number, message)
         if msg_id:
             coord.push_event("new_message", {
                 "id": msg_id, "number": number, "text": message,
-                "date": __import__("datetime").datetime.now().isoformat(timespec="seconds"),
+                "date": datetime.now().isoformat(timespec="seconds"),
                 "is_read": 1, "direction": "out",
             })
         # Событие в шину HA для автоматизаций
@@ -156,30 +136,26 @@ async def _register_services(hass: HomeAssistant) -> None:
     async def _handle_call(call) -> None:
         number = call.data.get("number", "").strip()
         if not number:
-            raise ValueError("Поле number обязательно")
+            raise ServiceValidationError("Поле number обязательно")
 
         coord = _get_coord()
         call_device = coord.entry.data.get(CONF_CALL_DEVICE, "").strip()
         if not call_device:
-            raise ValueError("Голосовой порт не настроен в интеграции")
+            raise ServiceValidationError("Голосовой порт не настроен в интеграции")
 
         try:
             validate_phone_number(number)
         except DialError as e:
-            raise ValueError(str(e)) from e
+            raise ServiceValidationError(str(e)) from e
 
         dial_timeout = coord.entry.data.get(CONF_CALL_DIAL_TIMEOUT, DEFAULT_CALL_DIAL_TIMEOUT)
         call_duration = coord.entry.data.get(CONF_CALL_DURATION, DEFAULT_CALL_DURATION)
 
         _LOGGER.info("Calling +%s via call service...", number)
-        coord.call_in_progress = True
-        try:
-            reason = await dial_number(
-                call_device, number,
-                dial_timeout_sec=dial_timeout, call_duration_sec=call_duration,
-            )
-        finally:
-            coord.call_in_progress = False
+        reason = await coord.dial(
+            call_device, number,
+            dial_timeout_sec=dial_timeout, call_duration_sec=call_duration,
+        )
         hass.bus.async_fire(EVENT_CALL_ENDED, {"phone_number": number, "reason": reason.value})
         await hass.async_add_executor_job(coord.store.add_call, number, reason.value)
         coord.push_event("call_ended", {"number": number, "reason": reason.value})
@@ -189,7 +165,7 @@ async def _register_services(hass: HomeAssistant) -> None:
         coord = _get_coord()
         call_device = coord.entry.data.get(CONF_CALL_DEVICE, "").strip()
         if not call_device:
-            raise ValueError("Голосовой порт не настроен в интеграции")
+            raise ServiceValidationError("Голосовой порт не настроен в интеграции")
         await hangup_call(call_device)
 
     hass.services.async_register(
@@ -394,6 +370,9 @@ class SmsCoordinator:
         # Пока идёт отправка SMS — приостанавливаем опрос модема,
         # чтобы gateway не был занят двумя запросами одновременно
         self.send_in_progress: bool = False
+        # Serial-порт не переживает два параллельных звонка — все дозвоны
+        # (cover/button/сервис/API) идут через этот lock по очереди
+        self.dial_lock = asyncio.Lock()
 
     @property
     def _interval(self) -> int:
@@ -436,6 +415,54 @@ class SmsCoordinator:
         await self.stop()
         self.client = GatewayClient(self.hass, self.entry.data)
         await self.start()
+
+    @property
+    def status_cache(self) -> dict | None:
+        return self._status_cache
+
+    async def refresh_status_cache(self) -> None:
+        """Полное обновление кеша статуса (signal/network/modem/sim/capacity)."""
+        try:
+            _s, _n, _m, _si, _cap = await asyncio.gather(
+                self.client.get_signal(),
+                self.client.get_network(),
+                self.client.get_modem(),
+                self.client.get_sim(),
+                self.client.get_sms_capacity(),
+                return_exceptions=True,
+            )
+            self._status_cache = {
+                "signal":   None if isinstance(_s,   Exception) else _s,
+                "network":  None if isinstance(_n,   Exception) else _n,
+                "modem":    None if isinstance(_m,   Exception) else _m,
+                "sim":      None if isinstance(_si,  Exception) else _si,
+                "capacity": None if isinstance(_cap, Exception) else _cap,
+                "call_enabled": bool(self.entry.data.get(CONF_CALL_DEVICE, "").strip()),
+                "language":   self.entry.data.get(CONF_LANGUAGE, DEFAULT_LANGUAGE),
+                "show_panel": self.entry.data.get(CONF_SHOW_PANEL, DEFAULT_SHOW_PANEL),
+            }
+            _LOGGER.debug("Status cache refreshed")
+        except Exception as e:
+            _LOGGER.debug("Status cache refresh failed: %s", e)
+
+    async def dial(self, device_path: str, number: str, *,
+                   dial_timeout_sec: int, call_duration_sec: int):
+        """Дозвон через общий lock: параллельные звонки выстраиваются
+        в очередь вместо одновременного открытия serial-порта.
+        hangup намеренно идёт мимо lock — он должен уметь прервать
+        текущий звонок.
+        """
+        from .dialer import dial_number
+        async with self.dial_lock:
+            self.call_in_progress = True
+            try:
+                return await dial_number(
+                    device_path, number,
+                    dial_timeout_sec=dial_timeout_sec,
+                    call_duration_sec=call_duration_sec,
+                )
+            finally:
+                self.call_in_progress = False
 
     def push_event(self, event_type: str, data: dict) -> None:
         self._last_event_id += 1
@@ -740,6 +767,14 @@ class SmsApiView(HomeAssistantView):
         entries = self.hass.data.get(DOMAIN, {})
         return next(iter(entries.values())) if entries else None
 
+    @staticmethod
+    def _parse_int(value: str) -> int | None:
+        """id из URL: None вместо ValueError (иначе мусор в URL даёт 500)."""
+        try:
+            return int(value)
+        except ValueError:
+            return None
+
     async def get(self, request: web.Request, action: str) -> web.Response:
         coord = self._coord()
         if not coord:
@@ -775,28 +810,10 @@ class SmsApiView(HomeAssistantView):
             sim_phone_number = await self.hass.async_add_executor_job(
                 store.get_setting, "sim_phone_number"
             )
-            cache = coord._status_cache
+            cache = coord.status_cache
             if cache is not None:
-                async def _bg(c=coord):
-                    try:
-                        _s, _n, _m, _si, _cap = await asyncio.gather(
-                            c.client.get_signal(), c.client.get_network(),
-                            c.client.get_modem(), c.client.get_sim(),
-                            c.client.get_sms_capacity(), return_exceptions=True,
-                        )
-                        c._status_cache = {
-                            "signal":   None if isinstance(_s,   Exception) else _s,
-                            "network":  None if isinstance(_n,   Exception) else _n,
-                            "modem":    None if isinstance(_m,   Exception) else _m,
-                            "sim":      None if isinstance(_si,  Exception) else _si,
-                            "capacity": None if isinstance(_cap, Exception) else _cap,
-                            "call_enabled": bool(c.entry.data.get("call_device", "").strip()),
-                            "language":   c.entry.data.get("language", "ru"),
-                            "show_panel": c.entry.data.get("show_panel", True),
-                        }
-                    except Exception:
-                        pass
-                self.hass.async_create_task(_bg())
+                # Обновляем кеш в фоне, отвечаем сразу из текущего
+                self.hass.async_create_task(coord.refresh_status_cache())
                 return self._json({
                     "signal":        cache.get("signal"),
                     "network":       cache.get("network"),
@@ -862,7 +879,7 @@ class SmsApiView(HomeAssistantView):
             return self._json(result)
 
         if action.startswith("events"):
-            last_id = int(request.rel_url.query.get("since", "0"))
+            last_id = self._parse_int(request.rel_url.query.get("since", "0")) or 0
             events = coord.get_events_since(last_id)
             return self._json({"events": events, "last_id": coord._last_event_id})
 
@@ -879,7 +896,9 @@ class SmsApiView(HomeAssistantView):
         store = coord.store
 
         if action.startswith("read/"):
-            msg_id = int(action[len("read/"):])
+            msg_id = self._parse_int(action[len("read/"):])
+            if msg_id is None:
+                return self._error("Invalid message id", 400)
             await self.hass.async_add_executor_job(store.mark_read, msg_id)
             coord.push_event("message_read", {"id": msg_id})
             return self._json({"ok": True})
@@ -896,12 +915,16 @@ class SmsApiView(HomeAssistantView):
             return self._json({"ok": True})
 
         if action.startswith("star/"):
-            msg_id = int(action[len("star/"):])
+            msg_id = self._parse_int(action[len("star/"):])
+            if msg_id is None:
+                return self._error("Invalid message id", 400)
             await self.hass.async_add_executor_job(store.star_message, msg_id)
             return self._json({"ok": True})
 
         if action.startswith("unstar/"):
-            msg_id = int(action[len("unstar/"):])
+            msg_id = self._parse_int(action[len("unstar/"):])
+            if msg_id is None:
+                return self._error("Invalid message id", 400)
             await self.hass.async_add_executor_job(store.unstar_message, msg_id)
             return self._json({"ok": True})
 
@@ -918,7 +941,9 @@ class SmsApiView(HomeAssistantView):
             return self._json({"ok": True})
 
         if action.startswith("delete/"):
-            msg_id = int(action[len("delete/"):])
+            msg_id = self._parse_int(action[len("delete/"):])
+            if msg_id is None:
+                return self._error("Invalid message id", 400)
             await self.hass.async_add_executor_job(store.delete, msg_id)
             coord.push_event("message_deleted", {"id": msg_id})
             return self._json({"ok": True})
@@ -957,12 +982,11 @@ class SmsApiView(HomeAssistantView):
                 coord.send_in_progress = False
             if ok:
                 # Сохраняем исходящее в историю чата
-                import datetime as _dt
                 msg_id = await self.hass.async_add_executor_job(store.add_outgoing, number, text)
                 if msg_id:
                     coord.push_event("new_message", {
                         "id": msg_id, "number": number, "text": text,
-                        "date": _dt.datetime.now().isoformat(timespec="seconds"),
+                        "date": datetime.now().isoformat(timespec="seconds"),
                         "is_read": 1, "direction": "out",
                     })
                 self.hass.bus.async_fire(f"{DOMAIN}_sms_sent", {"number": number, "message": text})
@@ -973,7 +997,7 @@ class SmsApiView(HomeAssistantView):
             call_device = coord.entry.data.get("call_device", "").strip()
             if not call_device:
                 return self._error("Call device not configured", 503)
-            from .dialer import dial_number, DialError, validate_phone_number
+            from .dialer import DialError, validate_phone_number
             from .const import (
                 CONF_CALL_DIAL_TIMEOUT, CONF_CALL_DURATION,
                 DEFAULT_CALL_DIAL_TIMEOUT, DEFAULT_CALL_DURATION,
@@ -987,14 +1011,10 @@ class SmsApiView(HomeAssistantView):
             call_duration = coord.entry.data.get(CONF_CALL_DURATION, DEFAULT_CALL_DURATION)
 
             async def _do_call():
-                coord.call_in_progress = True
-                try:
-                    reason = await dial_number(
-                        call_device, number,
-                        dial_timeout_sec=dial_timeout, call_duration_sec=call_duration,
-                    )
-                finally:
-                    coord.call_in_progress = False
+                reason = await coord.dial(
+                    call_device, number,
+                    dial_timeout_sec=dial_timeout, call_duration_sec=call_duration,
+                )
                 await self.hass.async_add_executor_job(
                     coord.store.add_call, number, reason.value
                 )
@@ -1012,7 +1032,9 @@ class SmsApiView(HomeAssistantView):
             return self._json({"ok": ok})
 
         if action.startswith("delete_call/"):
-            call_id = int(action[len("delete_call/"):])
+            call_id = self._parse_int(action[len("delete_call/"):])
+            if call_id is None:
+                return self._error("Invalid call id", 400)
             await self.hass.async_add_executor_job(store.delete_call, call_id)
             return self._json({"ok": True})
 
