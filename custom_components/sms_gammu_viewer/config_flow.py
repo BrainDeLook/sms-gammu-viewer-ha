@@ -61,7 +61,7 @@ class SmsGammuConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            client = GatewayClient(user_input)
+            client = GatewayClient(self.hass, user_input)
             error = await client.test_connection()
             if error:
                 errors["base"] = error

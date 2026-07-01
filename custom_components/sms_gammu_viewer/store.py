@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import sqlite3
 import logging
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from datetime import datetime
 from typing import Any
@@ -78,6 +80,11 @@ class SmsStore:
                 )
             """)
             conn.execute("CREATE INDEX IF NOT EXISTS idx_phonebook_name ON phonebook(name)")
+            # Эти таблицы раньше создавались лениво в get_contacts /
+            # get_messages_with_starred — из-за этого pin_number/star_message
+            # падали с "no such table", если вызывались раньше первого чтения
+            conn.execute("CREATE TABLE IF NOT EXISTS pinned_numbers (number TEXT PRIMARY KEY)")
+            conn.execute("CREATE TABLE IF NOT EXISTS starred_messages (msg_id INTEGER PRIMARY KEY)")
 
             # Миграция: чистим номера с переводами строк/лишними пробелами
             try:
@@ -108,10 +115,21 @@ class SmsStore:
                 except sqlite3.IntegrityError:
                     conn.execute("DELETE FROM messages WHERE id=?", (r[0],))
 
-    def _conn(self) -> sqlite3.Connection:
+    @contextmanager
+    def _conn(self) -> Iterator[sqlite3.Connection]:
+        """Соединение с автокоммитом (rollback при исключении) и гарантированным close.
+
+        Голый ``with sqlite3.connect(...)`` управляет только транзакцией и
+        НЕ закрывает соединение — без явного close файловые дескрипторы
+        копились бы до срабатывания GC.
+        """
         conn = sqlite3.connect(self._path)
         conn.row_factory = sqlite3.Row
-        return conn
+        try:
+            with conn:
+                yield conn
+        finally:
+            conn.close()
 
     @staticmethod
     def _sanitize_number(number: str) -> str:
@@ -233,10 +251,6 @@ class SmsStore:
         
         unread считает только входящие непрочитанные (direction='in').
         """
-        # Миграция: создаём pinned_numbers если нет (для старых БД)
-        import sqlite3 as _sq
-        with _sq.connect(str(self._path)) as _c:
-            _c.execute("CREATE TABLE IF NOT EXISTS pinned_numbers (number TEXT PRIMARY KEY)")
         with self._conn() as conn:
             rows = conn.execute("""
                 SELECT
@@ -288,7 +302,6 @@ class SmsStore:
 
     def get_messages_with_starred(self, number: str):
         with self._conn() as conn:
-            conn.execute("CREATE TABLE IF NOT EXISTS starred_messages (msg_id INTEGER PRIMARY KEY)")
             rows = conn.execute("""
                 SELECT m.*, EXISTS(SELECT 1 FROM starred_messages s WHERE s.msg_id = m.id) as is_starred
                 FROM messages m WHERE m.number=? ORDER BY date ASC, id ASC
@@ -405,7 +418,6 @@ class SmsStore:
 
     def get_all_contacts(self) -> list[dict[str, Any]]:
         with self._conn() as conn:
-            conn.execute("CREATE TABLE IF NOT EXISTS pinned_numbers (number TEXT PRIMARY KEY)")
             rows = conn.execute("""
                 SELECT pb.*,
                     (SELECT 1 FROM muted_numbers mn WHERE mn.number = pb.number) as is_muted,

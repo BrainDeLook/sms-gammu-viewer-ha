@@ -8,6 +8,9 @@ from typing import Any
 
 import aiohttp
 
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
+
 from .const import CONF_HOST, CONF_PASSWORD, CONF_PORT, CONF_USERNAME
 
 _LOGGER = logging.getLogger(__name__)
@@ -19,7 +22,8 @@ SEND_RETRY_DELAY = 3  # секунд перед повтором
 
 
 class GatewayClient:
-    def __init__(self, cfg: dict) -> None:
+    def __init__(self, hass: HomeAssistant, cfg: dict) -> None:
+        self._session = async_get_clientsession(hass)
         self._base = f"http://{cfg[CONF_HOST]}:{cfg[CONF_PORT]}"
         creds = base64.b64encode(
             f"{cfg[CONF_USERNAME]}:{cfg[CONF_PASSWORD]}".encode()
@@ -30,31 +34,26 @@ class GatewayClient:
 
     async def _request(self, method: str, path: str, timeout: int = 10, **kwargs) -> Any:
         t = aiohttp.ClientTimeout(total=timeout)
-        async with aiohttp.ClientSession(timeout=t) as s:
-            async with s.request(
-                method, f"{self._base}{path}", headers=self._headers, **kwargs
-            ) as r:
-                r.raise_for_status()
-                if r.content_length == 0 or r.status == 204:
-                    return None
-                return await r.json()
+        async with self._session.request(
+            method, f"{self._base}{path}",
+            headers=self._headers, timeout=t, **kwargs
+        ) as r:
+            r.raise_for_status()
+            if r.content_length == 0 or r.status == 204:
+                return None
+            return await r.json()
 
     async def get_all_sms(self) -> list[dict]:
-        """GET /sms — возвращает все SMS целиком."""
-        try:
-            data = await self._request("GET", "/sms")
-            if isinstance(data, list):
-                return data
-            return []
-        except aiohttp.ClientResponseError as e:
-            _LOGGER.debug("get_all_sms HTTP %s: %s", e.status, e.message)
-            return []
-        except aiohttp.ClientConnectorError as e:
-            _LOGGER.debug("get_all_sms connection error: %s", e)
-            return []
-        except Exception as e:
-            _LOGGER.debug("get_all_sms error: %s: %s", type(e).__name__, e)
-            return []
+        """GET /sms — возвращает все SMS целиком.
+
+        Ошибки соединения/HTTP пробрасываются наверх: на них опирается
+        подсчёт error_streak и авто-сброс модема в координаторе.
+        Пустой список означает именно «на SIM нет сообщений».
+        """
+        data = await self._request("GET", "/sms")
+        if isinstance(data, list):
+            return data
+        return []
 
     async def delete_sms(self, sms_id: int) -> bool:
         try:
@@ -103,10 +102,7 @@ class GatewayClient:
             return None
 
     async def reset_modem(self) -> dict | None:
-        try:
-            return await self._request("GET", "/status/reset", timeout=30)
-        except Exception as e:
-            raise
+        return await self._request("GET", "/status/reset", timeout=30)
 
     async def send_sms(self, number: str, text: str) -> bool:
         """Отправляет SMS. При таймауте делает один повтор через 3 секунды.
