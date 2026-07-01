@@ -32,6 +32,7 @@ from .const import (
     DEFAULT_COLLECT_INTERVAL,
     DEFAULT_POLL_INTERVAL,
     DOMAIN,
+    EVENT_SMS_RECEIVED,
     FRONTEND_PATH,
     PANEL_ICON,
     PANEL_TITLE,
@@ -60,7 +61,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     store = SmsStore(db_path)
     await hass.async_add_executor_job(store.init)
 
-    client = GatewayClient(entry.data)
+    client = GatewayClient(hass, entry.data)
     coordinator = SmsCoordinator(hass, entry, store, client)
     hass.data[DOMAIN][entry.entry_id] = coordinator
 
@@ -429,7 +430,7 @@ class SmsCoordinator:
 
     async def restart(self) -> None:
         await self.stop()
-        self.client = GatewayClient(self.entry.data)
+        self.client = GatewayClient(self.hass, self.entry.data)
         await self.start()
 
     def push_event(self, event_type: str, data: dict) -> None:
@@ -506,6 +507,12 @@ class SmsCoordinator:
 
         buffers: dict[tuple, NumberBuffer] = {}
         self._add_to_buffers(buffers, first_batch)
+        # Повторное чтение прямо перед удалением: сужаем окно, в котором
+        # SMS, пришедшая между опросом в _loop и delete_all, была бы
+        # стёрта с SIM непрочитанной
+        recheck = await self._safe_get_all()
+        if recheck:
+            self._add_to_buffers(buffers, recheck)
         await self._safe_delete_all()
 
         collect_interval = self._collect_interval
@@ -585,6 +592,9 @@ class SmsCoordinator:
                     "id": recent["id"], "number": number,
                     "text": full_text, "date": date, "is_read": 0
                 })
+                self.hass.bus.async_fire(EVENT_SMS_RECEIVED, {
+                    "number": number, "text": full_text, "date": date,
+                })
                 await self._notify(number, full_text)
                 return
 
@@ -596,6 +606,9 @@ class SmsCoordinator:
             self.push_event("new_message", {
                 "id": msg_id, "number": number,
                 "text": text, "date": date, "is_read": 0
+            })
+            self.hass.bus.async_fire(EVENT_SMS_RECEIVED, {
+                "number": number, "text": text, "date": date,
             })
         await self._notify(number, text)
 
