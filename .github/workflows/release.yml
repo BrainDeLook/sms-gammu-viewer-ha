@@ -1,0 +1,64 @@
+name: Release
+
+# Автоматическая публикация релизов по версии из manifest.json:
+#   - версия с "b" (3.13.0b1) → pre-release, можно с любой ветки
+#   - обычная версия (3.13.0)  → полный релиз, только с main
+# Уже существующий тег никогда не пересоздаётся.
+
+on:
+  push:
+    branches:
+      - main
+      - "claude/**"
+    paths:
+      - "custom_components/sms_gammu_viewer/manifest.json"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine version and release type
+        id: meta
+        run: |
+          VERSION="$(jq -r .version custom_components/sms_gammu_viewer/manifest.json)"
+          TAG="v${VERSION}"
+          PRERELEASE=false
+          [[ "$VERSION" == *b* ]] && PRERELEASE=true
+
+          SHOULD=true
+          if [[ "${GITHUB_REF_NAME}" != "main" && "${PRERELEASE}" != "true" ]]; then
+            echo "Non-beta version ${VERSION} on branch '${GITHUB_REF_NAME}' — skipping (stable releases only from main)"
+            SHOULD=false
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
+            echo "Tag ${TAG} already exists — skipping"
+            SHOULD=false
+          fi
+
+          {
+            echo "version=${VERSION}"
+            echo "tag=${TAG}"
+            echo "prerelease=${PRERELEASE}"
+            echo "should_release=${SHOULD}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create release
+        if: steps.meta.outputs.should_release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.meta.outputs.tag }}
+          PRERELEASE: ${{ steps.meta.outputs.prerelease }}
+        run: |
+          ARGS=(--target "${GITHUB_SHA}" --generate-notes)
+          if [[ "${PRERELEASE}" == "true" ]]; then
+            ARGS+=(--title "${TAG} — Beta" --prerelease)
+          else
+            ARGS+=(--title "${TAG}")
+          fi
+          gh release create "${TAG}" "${ARGS[@]}"
