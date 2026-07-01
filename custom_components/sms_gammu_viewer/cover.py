@@ -90,15 +90,21 @@ class CallCoverEntity(CoverEntity):
 
     async def _dial_in_background(self) -> None:
         coord = self.hass.data.get(DOMAIN, {}).get(self._entry.entry_id)
-        if coord:
-            coord.call_in_progress = True
         try:
-            reason = await dial_number(
-                self._device_path,
-                self._cfg["number"],
-                dial_timeout_sec=self._cfg.get("dial_timeout", 25),
-                call_duration_sec=self._cfg.get("call_duration", 30),
-            )
+            if coord:
+                # Через координатор — параллельные звонки выстраиваются в очередь
+                reason = await coord.dial(
+                    self._device_path, self._cfg["number"],
+                    dial_timeout_sec=self._cfg.get("dial_timeout", 25),
+                    call_duration_sec=self._cfg.get("call_duration", 30),
+                )
+            else:
+                reason = await dial_number(
+                    self._device_path,
+                    self._cfg["number"],
+                    dial_timeout_sec=self._cfg.get("dial_timeout", 25),
+                    call_duration_sec=self._cfg.get("call_duration", 30),
+                )
             _LOGGER.info(
                 "Call cover '%s' dialed %s: %s",
                 self._attr_name, self._cfg["number"], reason.value,
@@ -106,8 +112,6 @@ class CallCoverEntity(CoverEntity):
         except Exception as e:
             _LOGGER.error("Call cover '%s' dial error: %s", self._attr_name, e)
         finally:
-            if coord:
-                coord.call_in_progress = False
             if self._cfg.get("auto_close", True):
                 self._is_closed = True
             self.async_write_ha_state()

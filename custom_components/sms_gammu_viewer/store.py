@@ -215,6 +215,9 @@ class SmsStore:
     def find_recent(self, number: str, within_seconds: int = 120) -> dict | None:
         """Ищет последнее входящее сообщение от номера за последние N секунд."""
         from datetime import datetime, timedelta
+        # add() сохраняет санитизированный номер — ищем по такому же,
+        # иначе alpha-tag с переводами строк никогда не найдётся
+        number = self._sanitize_number(number)
         cutoff = (datetime.now() - timedelta(seconds=within_seconds)).isoformat(timespec="seconds")
         with self._conn() as conn:
             row = conn.execute(

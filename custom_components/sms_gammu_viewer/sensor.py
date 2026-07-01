@@ -70,7 +70,6 @@ class SmsUnreadSensor(_BaseSmsSensor):
             async_track_time_interval(self.hass, self._scheduled_update, SCAN_INTERVAL)
         )
 
-    @callback
     async def _scheduled_update(self, _now=None) -> None:
         await self._update()
 
@@ -216,11 +215,13 @@ class SmsSignalSensor(_BaseSmsSensor):
         coord = self._coord()
         if not coord:
             return
-        try:
-            s = await coord.client.get_signal()
+        # Читаем кеш координатора (обновляется каждый цикл опроса) вместо
+        # прямого запроса к модему — иначе сенсор дёргал gateway каждые
+        # 10 секунд, в том числе во время отправки SMS и звонков
+        cache = coord.status_cache
+        if cache is not None:
+            s = cache.get("signal")
             self._signal = s.get("SignalPercent") if isinstance(s, dict) else None
-        except Exception:
-            pass
         self.async_write_ha_state()
 
     @property
@@ -253,11 +254,11 @@ class SmsNetworkSensor(_BaseSmsSensor):
         coord = self._coord()
         if not coord:
             return
-        try:
-            n = await coord.client.get_network()
+        # Из кеша координатора — см. комментарий в SmsSignalSensor
+        cache = coord.status_cache
+        if cache is not None:
+            n = cache.get("network")
             self._operator = n.get("NetworkName") if isinstance(n, dict) else None
-        except Exception:
-            pass
         self.async_write_ha_state()
 
     @property
