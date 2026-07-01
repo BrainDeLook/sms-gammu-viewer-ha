@@ -61,3 +61,7 @@ CALL_ENTITY_TYPE_BUTTON = "button"
 # Показывать ли панель в сайдбаре HA
 CONF_SHOW_PANEL = "show_panel"
 DEFAULT_SHOW_PANEL = True
+
+# Префикс action в мобильном уведомлении для ответа на SMS:
+# полное имя action = префикс + номер отправителя
+NOTIFY_ACTION_REPLY_PREFIX = "SMS_GAMMU_REPLY_"

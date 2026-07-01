@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -37,7 +38,9 @@ from .const import (
     DEFAULT_POLL_INTERVAL,
     DOMAIN,
     EVENT_SMS_RECEIVED,
+    EVENT_SMS_SENT,
     FRONTEND_PATH,
+    NOTIFY_ACTION_REPLY_PREFIX,
     PANEL_ICON,
     PANEL_TITLE,
     PANEL_URL,
@@ -81,6 +84,25 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await hass.config_entries.async_forward_entry_setups(entry, ["sensor", "cover", "button"])
     entry.async_on_unload(entry.add_update_listener(_options_updated))
 
+    # Ответ на SMS прямо из мобильного уведомления: companion-приложение
+    # шлёт mobile_app_notification_action с введённым текстом (reply_text)
+    async def _on_notification_action(event) -> None:
+        action = event.data.get("action") or ""
+        if not action.startswith(NOTIFY_ACTION_REPLY_PREFIX):
+            return
+        number = action[len(NOTIFY_ACTION_REPLY_PREFIX):]
+        text = (event.data.get("reply_text") or "").strip()
+        if not number or not text:
+            return
+        if await coordinator.send_sms(number, text):
+            _LOGGER.info("Reply SMS sent to %s from notification", number)
+        else:
+            _LOGGER.warning("Reply SMS to %s from notification failed", number)
+
+    entry.async_on_unload(
+        hass.bus.async_listen("mobile_app_notification_action", _on_notification_action)
+    )
+
     # Прогреваем кеш статуса при старте
     await coordinator.refresh_status_cache()
 
@@ -114,23 +136,9 @@ async def _register_services(hass: HomeAssistant) -> None:
             raise ServiceValidationError("Поле message обязательно")
 
         coord = _get_coord()
-        coord.send_in_progress = True
-        try:
-            ok = await coord.client.send_sms(number, message)
-        finally:
-            coord.send_in_progress = False
+        ok = await coord.send_sms(number, message)
         if not ok:
             raise HomeAssistantError(f"Не удалось отправить SMS на {number}")
-        # Сохраняем исходящее в историю чата
-        msg_id = await hass.async_add_executor_job(coord.store.add_outgoing, number, message)
-        if msg_id:
-            coord.push_event("new_message", {
-                "id": msg_id, "number": number, "text": message,
-                "date": datetime.now().isoformat(timespec="seconds"),
-                "is_read": 1, "direction": "out",
-            })
-        # Событие в шину HA для автоматизаций
-        hass.bus.async_fire(f"{DOMAIN}_sms_sent", {"number": number, "message": message})
         _LOGGER.info("SMS sent to %s via send_sms service", number)
 
     async def _handle_call(call) -> None:
@@ -445,6 +453,30 @@ class SmsCoordinator:
         except Exception as e:
             _LOGGER.debug("Status cache refresh failed: %s", e)
 
+    async def send_sms(self, number: str, text: str) -> bool:
+        """Отправляет SMS и, при успехе, сохраняет исходящее в историю чата,
+        шлёт событие new_message фронтенду и sms_sent в шину HA.
+        Используется сервисом send_sms, API панели и ответом из уведомления.
+        """
+        self.send_in_progress = True
+        try:
+            ok = await self.client.send_sms(number, text)
+        finally:
+            self.send_in_progress = False
+        if not ok:
+            return False
+        msg_id = await self.hass.async_add_executor_job(
+            self.store.add_outgoing, number, text
+        )
+        if msg_id:
+            self.push_event("new_message", {
+                "id": msg_id, "number": number, "text": text,
+                "date": datetime.now().isoformat(timespec="seconds"),
+                "is_read": 1, "direction": "out",
+            })
+        self.hass.bus.async_fire(EVENT_SMS_SENT, {"number": number, "message": text})
+        return True
+
     async def dial(self, device_path: str, number: str, *,
                    dial_timeout_sec: int, call_duration_sec: int):
         """Дозвон через общий lock: параллельные звонки выстраиваются
@@ -726,6 +758,27 @@ class SmsCoordinator:
         safe_tag = "".join(c for c in number if c.isalnum())
         notif_tag = f"sms_gammu_{safe_tag}"
 
+        lang = self.entry.data.get(CONF_LANGUAGE, DEFAULT_LANGUAGE)
+        reply_title = "Ответить" if lang == "ru" else "Reply"
+        open_title = "Открыть SMS" if lang == "ru" else "Open SMS"
+
+        actions = []
+        # Поле ответа показываем только для настоящих номеров — на alpha-tag
+        # ("Bank", "Gov" и т.п.) отправить SMS всё равно нельзя
+        if re.match(r"^\+?\d", number.strip()):
+            actions.append({
+                "action": f"{NOTIFY_ACTION_REPLY_PREFIX}{number}",
+                "title": reply_title,
+                "behavior": "textInput",
+                "textInputButtonTitle": reply_title,
+                "textInputPlaceholder": "SMS",
+            })
+        actions.append({
+            "action": "URI",
+            "title": open_title,
+            "uri": "/sms-viewer",
+        })
+
         for target in targets:
             parts = target.split(".", 1)
             if len(parts) != 2:
@@ -740,13 +793,7 @@ class SmsCoordinator:
                             "url": "/sms-viewer",
                             "tag": notif_tag,
                             "group": "sms_gammu_viewer",
-                            "actions": [
-                                {
-                                    "action": "URI",
-                                    "title": "Открыть SMS",
-                                    "uri": "/sms-viewer",
-                                }
-                            ],
+                            "actions": actions,
                         },
                     },
                     blocking=False,
@@ -975,21 +1022,7 @@ class SmsApiView(HomeAssistantView):
             text   = body.get("text", "").strip()
             if not number or not text:
                 return self._error("number and text required", 400)
-            coord.send_in_progress = True
-            try:
-                ok = await coord.client.send_sms(number, text)
-            finally:
-                coord.send_in_progress = False
-            if ok:
-                # Сохраняем исходящее в историю чата
-                msg_id = await self.hass.async_add_executor_job(store.add_outgoing, number, text)
-                if msg_id:
-                    coord.push_event("new_message", {
-                        "id": msg_id, "number": number, "text": text,
-                        "date": datetime.now().isoformat(timespec="seconds"),
-                        "is_read": 1, "direction": "out",
-                    })
-                self.hass.bus.async_fire(f"{DOMAIN}_sms_sent", {"number": number, "message": text})
+            ok = await coord.send_sms(number, text)
             return self._json({"ok": ok})
 
         if action.startswith("call/"):
