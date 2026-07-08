@@ -6,7 +6,7 @@
  * https://github.com/BrainDeLook/sms-gammu-viewer-ha
  */
 
-const CARD_VERSION = "1.1.0";
+const CARD_VERSION = "2.0.0";
 
 console.info(
   `%c SMS-GAMMU-VIEWER-CARD %c v${CARD_VERSION} `,
@@ -25,30 +25,34 @@ class SmsGammuViewerCard extends HTMLElement {
     };
     this._contacts = [];
     this._error = null;
+    this._stateObj = undefined; // форсируем перечитывание сенсора
     this._render();
+    if (this._hass) this.hass = this._hass;
   }
 
   set hass(hass) {
+    // Никаких таймеров и запросов: данные лежат в атрибутах сенсора
+    // SMS Chats, а HA сам пушит сюда новый hass при каждом изменении
+    // состояния. Объекты состояний иммутабельны — сравнение по ссылке
+    // точно говорит, изменился ли наш сенсор.
     this._hass = hass;
-    if (!this._initialized) {
-      this._initialized = true;
-      this._load();
-      this._startTimer();
+    const entityId = this._chatsEntity();
+    const st = entityId ? hass.states[entityId] : null;
+    if (st === this._stateObj) return; // наш сенсор не менялся — не рендерим
+    this._stateObj = st;
+    if (st) {
+      this._contacts = st.attributes.chats || [];
+      this._error = null;
+    } else {
+      this._contacts = [];
+      this._error = "Сенсор SMS Chats не найден — обновите интеграцию и перезапустите HA";
     }
+    this._renderList();
     this._updateModemInfo();
   }
 
   set editMode(value) {
-    // HA выставляет это свойство когда карточка рендерится как live-превью
-    // внутри редактора настроек дашборда. Пока редактор открыт, останавливаем
-    // periodic polling — иначе обновление состояния карточки может сбрасывать
-    // фокус формы редактора во время набора текста.
     this._editMode = value;
-    if (value) {
-      this._stopTimer();
-    } else if (this._initialized) {
-      this._startTimer();
-    }
   }
 
   get editMode() {
@@ -59,60 +63,44 @@ class SmsGammuViewerCard extends HTMLElement {
     return 1 + Math.min(this._config.max_items || 5, 5);
   }
 
-  connectedCallback() {
-    if (this._hass && !this._initialized) {
-      this._initialized = true;
-      this._load();
-      if (!this._editMode) this._startTimer();
+  _chatsEntity() {
+    // Явно указанный сенсор в конфиге имеет приоритет
+    if (this._config.entity && this._hass.states[this._config.entity]) {
+      return this._config.entity;
     }
-  }
-
-  disconnectedCallback() {
-    this._stopTimer();
-  }
-
-  _startTimer() {
-    this._stopTimer();
-    if (this._editMode) return;
-    this._timer = setInterval(() => this._load(), 15000);
-  }
-
-  _stopTimer() {
-    if (this._timer) {
-      clearInterval(this._timer);
-      this._timer = null;
+    // Найденный ранее — если он ещё существует
+    if (this._entityId && this._hass.states[this._entityId]) {
+      return this._entityId;
     }
+    // Ищем по маркерам: у сенсора SMS Chats есть атрибуты chats + panel_url
+    for (const [id, st] of Object.entries(this._hass.states)) {
+      if (
+        id.startsWith("sensor.") &&
+        st.attributes &&
+        Array.isArray(st.attributes.chats) &&
+        st.attributes.panel_url === "/sms-viewer"
+      ) {
+        this._entityId = id;
+        return id;
+      }
+    }
+    return null;
   }
 
   _updateModemInfo() {
-    if (!this._config.show_modem_info || !this._hass) return;
+    if (!this._config.show_modem_info) return;
     const dot = this.querySelector("#sgv-signal-dot");
     const text = this.querySelector("#sgv-modem-text");
     if (!dot || !text) return;
-    const signal = this._hass.states["sensor.signal_quality"]?.state;
-    const network = this._hass.states["sensor.network_operator"]?.state;
+    const attrs = this._stateObj?.attributes || {};
+    const signal = attrs.signal_percent;
+    const network = attrs.network_name;
     const pct = parseInt(signal) || 0;
     dot.style.background = pct >= 50 ? "#4caf50" : pct >= 20 ? "#ff9800" : "#f44336";
     const parts = [];
-    if (network && network !== "unknown") parts.push(network);
-    if (signal && signal !== "unknown") parts.push(pct + "%");
+    if (network) parts.push(network);
+    if (signal !== null && signal !== undefined) parts.push(pct + "%");
     text.textContent = parts.length ? parts.join(" · ") : "…";
-  }
-
-  async _load() {
-    if (!this._hass) return;
-    try {
-      // hass.callApi сам управляет access token'ом (следит за истечением,
-      // обновляет, повторяет запрос) — ручная работа с токенами не нужна
-      this._contacts = await this._hass.callApi(
-        "GET",
-        "sms_gammu_viewer/contacts"
-      );
-      this._error = null;
-    } catch (e) {
-      this._error = e?.body?.message || e?.error || e?.message || String(e);
-    }
-    this._renderList();
   }
 
   _esc(s) {
@@ -452,16 +440,25 @@ class SmsGammuViewerCardEditor extends HTMLElement {
 }
 
 
-customElements.define("sms-gammu-viewer-card", SmsGammuViewerCard);
-customElements.define("sms-gammu-viewer-card-editor", SmsGammuViewerCardEditor);
+// Модуль может оказаться загружен дважды (старая ссылка в закешированном
+// index.html + Lovelace-ресурс) — повторный define кидает исключение и
+// валит весь модуль, поэтому регистрируем только если ещё не определён.
+if (!customElements.get("sms-gammu-viewer-card")) {
+  customElements.define("sms-gammu-viewer-card", SmsGammuViewerCard);
+}
+if (!customElements.get("sms-gammu-viewer-card-editor")) {
+  customElements.define("sms-gammu-viewer-card-editor", SmsGammuViewerCardEditor);
+}
 
 window.customCards = window.customCards || [];
-window.customCards.push({
-  type: "sms-gammu-viewer-card",
-  name: "SMS Gammu Viewer Card",
-  description: "Shows recent SMS conversations from SMS Gammu Viewer integration",
-  preview: true,
-});
+if (!window.customCards.some((c) => c.type === "sms-gammu-viewer-card")) {
+  window.customCards.push({
+    type: "sms-gammu-viewer-card",
+    name: "SMS Gammu Viewer Card",
+    description: "Shows recent SMS conversations from SMS Gammu Viewer integration",
+    preview: true,
+  });
+}
 
 
 

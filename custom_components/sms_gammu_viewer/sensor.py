@@ -15,7 +15,10 @@ from .const import DOMAIN
 _LOGGER = logging.getLogger(__name__)
 
 SCAN_INTERVAL = timedelta(seconds=10)
+MODEM_INFO_INTERVAL = timedelta(seconds=30)
 LAST_SMS_TEXT_MAXLEN = 255  # ограничение state в HA
+CHATS_LIMIT = 15            # сколько диалогов класть в атрибуты
+CHAT_PREVIEW_MAXLEN = 100   # обрезка превью текста в атрибутах
 
 
 async def async_setup_entry(
@@ -30,6 +33,7 @@ async def async_setup_entry(
             SmsLastTextSensor(hass, entry),
             SmsSignalSensor(hass, entry),
             SmsNetworkSensor(hass, entry),
+            SmsChatsSensor(hass, entry),
         ],
         update_before_add=True,
     )
@@ -227,6 +231,108 @@ class SmsSignalSensor(_BaseSmsSensor):
     @property
     def native_value(self):
         return self._signal
+
+
+class SmsChatsSensor(_BaseSmsSensor):
+    """Список диалогов в атрибутах — источник данных для Lovelace-карточки.
+
+    Карточка читает этот сенсор из hass.states и обновляется только когда
+    HA пушит изменение состояния: пришло/прочитано/отправлено SMS —
+    без собственных таймеров, fetch и токенов.
+
+    Атрибут chats исключён из recorder (_unrecorded_attributes), чтобы
+    история состояний не разбухала от JSON со списком диалогов.
+    """
+
+    _attr_icon = "mdi:message-text"
+    _attr_name = "SMS Chats"
+    _unrecorded_attributes = frozenset({"chats", "signal_percent", "network_name"})
+
+    def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
+        super().__init__(hass, entry)
+        self._attr_unique_id = f"{entry.entry_id}_chats"
+        self._chats: list[dict] = []
+        self._unread_total = 0
+        self._signal_percent = None
+        self._network_name = None
+
+    @property
+    def native_value(self) -> int:
+        return self._unread_total
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        return {
+            "chats": self._chats,
+            "signal_percent": self._signal_percent,
+            "network_name": self._network_name,
+            "panel_url": "/sms-viewer",
+        }
+
+    async def async_added_to_hass(self) -> None:
+        await self._refresh()
+        coord = self._coord()
+        if coord:
+            coord.register_sensor_listener(self._on_event)
+            self.async_on_remove(lambda: coord.unregister_sensor_listener(self._on_event))
+        # Сигнал/оператор меняются сами по себе, без событий — освежаем
+        # их из кеша координатора по таймеру (state пишется только если
+        # что-то реально изменилось)
+        self.async_on_remove(
+            async_track_time_interval(self.hass, self._modem_tick, MODEM_INFO_INTERVAL)
+        )
+
+    @callback
+    def _on_event(self, event_type: str, data: dict) -> None:
+        if event_type == "call_ended":
+            return  # звонки на список чатов не влияют
+        self.hass.async_create_task(self._refresh_and_write())
+
+    async def _modem_tick(self, _now=None) -> None:
+        if self._pull_modem_info():
+            self.async_write_ha_state()
+
+    def _pull_modem_info(self) -> bool:
+        coord = self._coord()
+        if not coord or coord.status_cache is None:
+            return False
+        cache = coord.status_cache
+        s = cache.get("signal")
+        n = cache.get("network")
+        signal = s.get("SignalPercent") if isinstance(s, dict) else None
+        network = n.get("NetworkName") if isinstance(n, dict) else None
+        changed = signal != self._signal_percent or network != self._network_name
+        self._signal_percent = signal
+        self._network_name = network
+        return changed
+
+    async def _refresh_and_write(self) -> None:
+        await self._refresh()
+        self.async_write_ha_state()
+
+    async def _refresh(self) -> None:
+        coord = self._coord()
+        if not coord:
+            return
+        try:
+            contacts = await self.hass.async_add_executor_job(coord.store.get_contacts)
+        except Exception as e:
+            _LOGGER.debug("Chats refresh error: %s", e)
+            return
+        self._unread_total = sum(c.get("unread") or 0 for c in contacts)
+        self._chats = [
+            {
+                "number": c.get("number"),
+                "contact_name": c.get("contact_name"),
+                "last_text": (c.get("last_text") or "")[:CHAT_PREVIEW_MAXLEN],
+                "last_date": c.get("last_date"),
+                "unread": c.get("unread") or 0,
+                "is_muted": c.get("is_muted", False),
+                "is_pinned": c.get("is_pinned", False),
+            }
+            for c in contacts[:CHATS_LIMIT]
+        ]
+        self._pull_modem_info()
 
 
 class SmsNetworkSensor(_BaseSmsSensor):
