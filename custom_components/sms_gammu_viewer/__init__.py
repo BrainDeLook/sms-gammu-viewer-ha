@@ -74,6 +74,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     is_first = len(hass.data[DOMAIN]) == 1
     if is_first:
+        # Карточка и статика регистрируются всегда, панель — по настройке
+        await _register_frontend(hass)
         show_panel = entry.data.get(CONF_SHOW_PANEL, DEFAULT_SHOW_PANEL)
         if show_panel:
             await _register_panel(hass)
@@ -243,21 +245,59 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         except KeyError:
             pass
         try:
-            remove_extra_js_url(hass, f"/{PANEL_URL}/{FRONTEND_PATH}/sms-gammu-viewer-card.js")
+            remove_extra_js_url(hass, await _card_url(hass))
         except (KeyError, ValueError):
             pass
+        hass.data.pop(_FRONTEND_REGISTERED, None)
     return True
 
 
-async def _register_panel(hass: HomeAssistant) -> None:
+_FRONTEND_REGISTERED = f"{DOMAIN}_frontend_registered"
+
+
+async def _integration_version(hass: HomeAssistant) -> str:
+    from homeassistant.loader import async_get_integration
+    integration = await async_get_integration(hass, DOMAIN)
+    return str(integration.version)
+
+
+async def _card_url(hass: HomeAssistant) -> str:
+    """URL карточки с версией интеграции — после каждого обновления фронтенд
+    видит новый URL и гарантированно перечитывает файл вместо кешированного.
+    """
+    version = await _integration_version(hass)
+    return f"/{PANEL_URL}/{FRONTEND_PATH}/sms-gammu-viewer-card.js?v={version}"
+
+
+async def _register_frontend(hass: HomeAssistant) -> None:
+    """Статика + Lovelace-карточка. Отдельно от панели: карточка должна
+    работать и при выключенной панели в сайдбаре.
+
+    Карточка регистрируется для всех пользователей автоматически — тот же
+    приём что у frenck/home-assistant-doom: подключаем JS глобально, без
+    необходимости вручную прописывать ресурс в Settings → Dashboards.
+    """
+    if hass.data.get(_FRONTEND_REGISTERED):
+        return
     frontend_dir = Path(__file__).parent / FRONTEND_PATH
-    await hass.http.async_register_static_paths([
-        StaticPathConfig(
-            f"/{PANEL_URL}/{FRONTEND_PATH}",
-            str(frontend_dir),
-            cache_headers=False,
-        )
-    ])
+    try:
+        await hass.http.async_register_static_paths([
+            StaticPathConfig(
+                f"/{PANEL_URL}/{FRONTEND_PATH}",
+                str(frontend_dir),
+                cache_headers=False,
+            )
+        ])
+    except Exception as e:
+        # Путь уже зарегистрирован (повторный setup без рестарта HA)
+        _LOGGER.debug("Static path already registered: %s", e)
+    add_extra_js_url(hass, await _card_url(hass))
+    hass.data[_FRONTEND_REGISTERED] = True
+
+
+async def _register_panel(hass: HomeAssistant) -> None:
+    await _register_frontend(hass)
+    version = await _integration_version(hass)
     try:
         async_remove_panel(hass, PANEL_URL)
     except KeyError:
@@ -271,17 +311,12 @@ async def _register_panel(hass: HomeAssistant) -> None:
         config={
             "_panel_custom": {
                 "name": "sms-gammu-panel",
-                "module_url": f"/{PANEL_URL}/{FRONTEND_PATH}/panel.js",
+                # ?v= — сброс кеша фронтенда при каждом обновлении интеграции
+                "module_url": f"/{PANEL_URL}/{FRONTEND_PATH}/panel.js?v={version}",
             }
         },
         require_admin=False,
     )
-
-    # Регистрируем Lovelace-карточку для всех пользователей автоматически —
-    # тот же приём что у frenck/home-assistant-doom: статика уже раздаётся
-    # из той же папки frontend/, просто подключаем JS глобально, без
-    # необходимости вручную прописывать ресурс в Settings → Dashboards.
-    add_extra_js_url(hass, f"/{PANEL_URL}/{FRONTEND_PATH}/sms-gammu-viewer-card.js")
 
 
 WAP_PUSH_MARKERS = (
