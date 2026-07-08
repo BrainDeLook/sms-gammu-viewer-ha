@@ -252,6 +252,25 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
+async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Интеграцию удалили совсем — подчищаем Lovelace-ресурс карточки,
+    иначе на дашбордах останется битая ссылка на несуществующий модуль."""
+    try:
+        resources = _lovelace_resources(hass)
+        if resources is None or not hasattr(resources, "async_delete_item"):
+            return
+        if not getattr(resources, "loaded", True):
+            await resources.async_load()
+            resources.loaded = True
+        base = f"/{PANEL_URL}/{FRONTEND_PATH}/sms-gammu-viewer-card.js"
+        for item in list(resources.async_items()):
+            if (item.get("url") or "").split("?")[0] == base:
+                await resources.async_delete_item(item["id"])
+                _LOGGER.info("Lovelace resource removed: %s", item.get("url"))
+    except Exception as e:
+        _LOGGER.debug("Lovelace resource cleanup failed: %s", e)
+
+
 _FRONTEND_REGISTERED = f"{DOMAIN}_frontend_registered"
 
 
@@ -272,10 +291,6 @@ async def _card_url(hass: HomeAssistant) -> str:
 async def _register_frontend(hass: HomeAssistant) -> None:
     """Статика + Lovelace-карточка. Отдельно от панели: карточка должна
     работать и при выключенной панели в сайдбаре.
-
-    Карточка регистрируется для всех пользователей автоматически — тот же
-    приём что у frenck/home-assistant-doom: подключаем JS глобально, без
-    необходимости вручную прописывать ресурс в Settings → Dashboards.
     """
     if hass.data.get(_FRONTEND_REGISTERED):
         return
@@ -291,8 +306,54 @@ async def _register_frontend(hass: HomeAssistant) -> None:
     except Exception as e:
         # Путь уже зарегистрирован (повторный setup без рестарта HA)
         _LOGGER.debug("Static path already registered: %s", e)
+    # Основной механизм — Lovelace-ресурс (как у HACS): список ресурсов
+    # фронтенд запрашивает через websocket при каждой загрузке дашборда,
+    # поэтому карточка грузится даже когда приложение держит закешированный
+    # index.html. extra_js_url оставляем как fallback для YAML-режима
+    # Lovelace, где программная запись ресурсов невозможна.
     add_extra_js_url(hass, await _card_url(hass))
+    await _register_card_resource(hass)
     hass.data[_FRONTEND_REGISTERED] = True
+
+
+def _lovelace_resources(hass: HomeAssistant):
+    """Коллекция Lovelace-ресурсов (storage-режим) или None."""
+    lovelace = hass.data.get("lovelace")
+    resources = getattr(lovelace, "resources", None)
+    if resources is None and isinstance(lovelace, dict):
+        resources = lovelace.get("resources")
+    return resources
+
+
+async def _register_card_resource(hass: HomeAssistant) -> None:
+    """Добавляет/обновляет карточку в Settings → Dashboards → Resources."""
+    desired = await _card_url(hass)
+    base = desired.split("?")[0]
+    try:
+        resources = _lovelace_resources(hass)
+        if resources is None:
+            _LOGGER.debug("Lovelace resources unavailable, skipping")
+            return
+        if not getattr(resources, "loaded", True):
+            await resources.async_load()
+            resources.loaded = True
+        if not hasattr(resources, "async_create_item"):
+            # YAML-режим Lovelace: ресурсы только руками, работает fallback
+            # через extra_js_url
+            _LOGGER.debug("Lovelace in YAML mode, resource not registered")
+            return
+        for item in resources.async_items():
+            if (item.get("url") or "").split("?")[0] == base:
+                if item.get("url") != desired:
+                    await resources.async_update_item(
+                        item["id"], {"url": desired}
+                    )
+                    _LOGGER.info("Lovelace resource updated: %s", desired)
+                return
+        await resources.async_create_item({"res_type": "module", "url": desired})
+        _LOGGER.info("Lovelace resource registered: %s", desired)
+    except Exception as e:
+        _LOGGER.warning("Could not register Lovelace resource: %s", e)
 
 
 async def _register_panel(hass: HomeAssistant) -> None:
