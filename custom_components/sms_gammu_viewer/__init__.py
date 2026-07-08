@@ -262,9 +262,8 @@ async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
         if not getattr(resources, "loaded", True):
             await resources.async_load()
             resources.loaded = True
-        base = f"/{PANEL_URL}/{FRONTEND_PATH}/sms-gammu-viewer-card.js"
         for item in list(resources.async_items()):
-            if (item.get("url") or "").split("?")[0] == base:
+            if _is_card_resource(item.get("url") or ""):
                 await resources.async_delete_item(item["id"])
                 _LOGGER.info("Lovelace resource removed: %s", item.get("url"))
     except Exception as e:
@@ -272,6 +271,33 @@ async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
 
 
 _FRONTEND_REGISTERED = f"{DOMAIN}_frontend_registered"
+
+# Карточка отдаётся через /api-путь, а не через кастомную статику:
+# 1) /api/* гарантированно проходит через любой reverse-proxy / Nabu Casa —
+#    иначе бы у пользователя не работал сам HA;
+# 2) ответ идёт с Cache-Control: no-cache — WebView companion-приложения
+#    обязан ревалидировать файл и не может залипнуть на старой копии.
+CARD_JS_BASE = "/api/sms_gammu_viewer_static/card.js"
+CARD_FILENAME = "sms-gammu-viewer-card.js"
+
+
+class CardJsView(HomeAssistantView):
+    """Раздача JS-модуля карточки без авторизации (публичный статический
+    ресурс, как /static или /hacsfiles)."""
+
+    url = CARD_JS_BASE
+    name = "api:sms_gammu_viewer:card_js"
+    requires_auth = False
+
+    async def get(self, request: web.Request) -> web.FileResponse:
+        card_path = Path(__file__).parent / FRONTEND_PATH / CARD_FILENAME
+        return web.FileResponse(
+            card_path,
+            headers={
+                "Cache-Control": "no-cache, must-revalidate",
+                "Content-Type": "application/javascript; charset=utf-8",
+            },
+        )
 
 
 async def _integration_version(hass: HomeAssistant) -> str:
@@ -285,7 +311,7 @@ async def _card_url(hass: HomeAssistant) -> str:
     видит новый URL и гарантированно перечитывает файл вместо кешированного.
     """
     version = await _integration_version(hass)
-    return f"/{PANEL_URL}/{FRONTEND_PATH}/sms-gammu-viewer-card.js?v={version}"
+    return f"{CARD_JS_BASE}?v={version}"
 
 
 async def _register_frontend(hass: HomeAssistant) -> None:
@@ -306,13 +332,16 @@ async def _register_frontend(hass: HomeAssistant) -> None:
     except Exception as e:
         # Путь уже зарегистрирован (повторный setup без рестарта HA)
         _LOGGER.debug("Static path already registered: %s", e)
+    hass.http.register_view(CardJsView())
+    card_url = await _card_url(hass)
     # Основной механизм — Lovelace-ресурс (как у HACS): список ресурсов
     # фронтенд запрашивает через websocket при каждой загрузке дашборда,
     # поэтому карточка грузится даже когда приложение держит закешированный
     # index.html. extra_js_url оставляем как fallback для YAML-режима
     # Lovelace, где программная запись ресурсов невозможна.
-    add_extra_js_url(hass, await _card_url(hass))
+    add_extra_js_url(hass, card_url)
     await _register_card_resource(hass)
+    _LOGGER.info("Card frontend registered: %s", card_url)
     hass.data[_FRONTEND_REGISTERED] = True
 
 
@@ -325,14 +354,25 @@ def _lovelace_resources(hass: HomeAssistant):
     return resources
 
 
+def _is_card_resource(url: str) -> bool:
+    """Любая форма ссылки на нашу карточку: старая статика, /api-путь,
+    ручные записи пользователя с произвольным ?v=."""
+    base = (url or "").split("?")[0]
+    return CARD_FILENAME in base or base == CARD_JS_BASE
+
+
 async def _register_card_resource(hass: HomeAssistant) -> None:
-    """Добавляет/обновляет карточку в Settings → Dashboards → Resources."""
+    """Добавляет/обновляет карточку в Settings → Dashboards → Resources.
+
+    Все прежние варианты записи (старый путь статики, ручные ресурсы)
+    мигрируются на актуальный URL, дубликаты удаляются — иначе модуль
+    грузится дважды и второй define падает.
+    """
     desired = await _card_url(hass)
-    base = desired.split("?")[0]
     try:
         resources = _lovelace_resources(hass)
         if resources is None:
-            _LOGGER.debug("Lovelace resources unavailable, skipping")
+            _LOGGER.warning("Lovelace resources unavailable, card resource not registered")
             return
         if not getattr(resources, "loaded", True):
             await resources.async_load()
@@ -340,18 +380,29 @@ async def _register_card_resource(hass: HomeAssistant) -> None:
         if not hasattr(resources, "async_create_item"):
             # YAML-режим Lovelace: ресурсы только руками, работает fallback
             # через extra_js_url
-            _LOGGER.debug("Lovelace in YAML mode, resource not registered")
+            _LOGGER.warning(
+                "Lovelace is in YAML mode — add the card resource manually: %s",
+                desired,
+            )
             return
-        for item in resources.async_items():
-            if (item.get("url") or "").split("?")[0] == base:
-                if item.get("url") != desired:
-                    await resources.async_update_item(
-                        item["id"], {"url": desired}
-                    )
-                    _LOGGER.info("Lovelace resource updated: %s", desired)
-                return
-        await resources.async_create_item({"res_type": "module", "url": desired})
-        _LOGGER.info("Lovelace resource registered: %s", desired)
+        found = False
+        for item in list(resources.async_items()):
+            url = item.get("url") or ""
+            if not _is_card_resource(url):
+                continue
+            if not found:
+                found = True
+                if url != desired:
+                    await resources.async_update_item(item["id"], {"url": desired})
+                    _LOGGER.info("Lovelace resource migrated: %s -> %s", url, desired)
+                else:
+                    _LOGGER.info("Lovelace resource already registered: %s", desired)
+            else:
+                await resources.async_delete_item(item["id"])
+                _LOGGER.info("Duplicate card resource removed: %s", url)
+        if not found:
+            await resources.async_create_item({"res_type": "module", "url": desired})
+            _LOGGER.info("Lovelace resource registered: %s", desired)
     except Exception as e:
         _LOGGER.warning("Could not register Lovelace resource: %s", e)
 

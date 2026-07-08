@@ -440,16 +440,25 @@ class SmsGammuViewerCardEditor extends HTMLElement {
 }
 
 
-customElements.define("sms-gammu-viewer-card", SmsGammuViewerCard);
-customElements.define("sms-gammu-viewer-card-editor", SmsGammuViewerCardEditor);
+// Модуль может оказаться загружен дважды (старая ссылка в закешированном
+// index.html + Lovelace-ресурс) — повторный define кидает исключение и
+// валит весь модуль, поэтому регистрируем только если ещё не определён.
+if (!customElements.get("sms-gammu-viewer-card")) {
+  customElements.define("sms-gammu-viewer-card", SmsGammuViewerCard);
+}
+if (!customElements.get("sms-gammu-viewer-card-editor")) {
+  customElements.define("sms-gammu-viewer-card-editor", SmsGammuViewerCardEditor);
+}
 
 window.customCards = window.customCards || [];
-window.customCards.push({
-  type: "sms-gammu-viewer-card",
-  name: "SMS Gammu Viewer Card",
-  description: "Shows recent SMS conversations from SMS Gammu Viewer integration",
-  preview: true,
-});
+if (!window.customCards.some((c) => c.type === "sms-gammu-viewer-card")) {
+  window.customCards.push({
+    type: "sms-gammu-viewer-card",
+    name: "SMS Gammu Viewer Card",
+    description: "Shows recent SMS conversations from SMS Gammu Viewer integration",
+    preview: true,
+  });
+}
 
 
 
