@@ -21,7 +21,21 @@ async function loadLocale(code) {
 const CSS = `
   :host {
     display: block;
-    height: 100%;
+    /*
+     * Do not rely on the custom-panel container having an explicit height.
+     * Since HA 2026.8 it is a block with safe-area padding, so a percentage
+     * height can become auto and let the contact list grow the whole panel.
+     */
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+    box-sizing: border-box;
+    padding:
+      var(--safe-area-inset-top, 0px)
+      var(--safe-area-content-inset-right, var(--safe-area-inset-right, 0px))
+      var(--safe-area-inset-bottom, 0px)
+      var(--safe-area-content-inset-left, var(--safe-area-inset-left, 0px));
     font-family: var(--paper-font-body1_-_font-family, Roboto, sans-serif);
     --accent:   var(--primary-color, #03a9f4);
     --bg:       var(--primary-background-color, #f0f2f5);
@@ -38,6 +52,7 @@ const CSS = `
   .root {
     display: flex;
     height: 100%;
+    min-height: 0;
     overflow: hidden;
     background: var(--bg);
   }
@@ -51,6 +66,7 @@ const CSS = `
     background: var(--card);
     border-right: 1px solid var(--line);
     position: relative;
+    min-height: 0;
     overflow: hidden;
   }
 

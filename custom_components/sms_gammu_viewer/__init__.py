@@ -425,6 +425,9 @@ async def _register_panel(hass: HomeAssistant) -> None:
                 "name": "sms-gammu-panel",
                 # ?v= — сброс кеша фронтенда при каждом обновлении интеграции
                 "module_url": f"/{PANEL_URL}/{FRONTEND_PATH}/panel.js?v={version}",
+                # The panel owns its viewport height and safe-area padding.
+                # This avoids HA's custom-panel wrapper changing its sizing.
+                "handle_safe_area": True,
             }
         },
         require_admin=False,
