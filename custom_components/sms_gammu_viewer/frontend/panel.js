@@ -46,6 +46,7 @@ const CSS = `
     --unread-bg:     rgba(3,169,244,.08);
     --unread-border: #03a9f4;
     --danger:   #e53935;
+    background: var(--card);
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
