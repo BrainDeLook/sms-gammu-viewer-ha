@@ -31,10 +31,11 @@ const CSS = `
     min-height: 0;
     overflow: hidden;
     box-sizing: border-box;
+    /* Content extends behind the bottom safe area; only controls avoid it. */
     padding:
       var(--safe-area-inset-top, 0px)
       var(--safe-area-content-inset-right, var(--safe-area-inset-right, 0px))
-      var(--safe-area-inset-bottom, 0px)
+      0
       var(--safe-area-content-inset-left, var(--safe-area-inset-left, 0px));
     font-family: var(--paper-font-body1_-_font-family, Roboto, sans-serif);
     --accent:   var(--primary-color, #03a9f4);
@@ -134,7 +135,7 @@ const CSS = `
   .contact-list {
     flex: 1;
     overflow-y: auto;
-    padding-bottom: 80px;
+    padding-bottom: calc(80px + var(--safe-area-inset-bottom, 0px));
     position: relative;
     -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 60px), transparent 100%);
     mask-image: linear-gradient(to bottom, black calc(100% - 60px), transparent 100%);
@@ -146,7 +147,7 @@ const CSS = `
     .swipe-wrap { border-bottom: none; margin-bottom: 6px; }
     .swipe-wrap:last-child { margin-bottom: 0; }
     .swipe-inner { border: 1px solid var(--line); border-radius: 22px; }
-    .contact-list { padding-bottom: 90px; }
+    .contact-list { padding-bottom: calc(90px + var(--safe-area-inset-bottom, 0px)); }
   }
   @media (min-width: 581px) {
     .swipe-actions-left, .swipe-actions-right { display: none !important; }
@@ -339,7 +340,7 @@ const CSS = `
   .messages-area {
     flex: 1;
     overflow-y: auto;
-    padding: 16px 20px 80px;
+    padding: 16px 20px calc(80px + var(--safe-area-inset-bottom, 0px));
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -424,7 +425,8 @@ const CSS = `
 
   /* ─── Send bar ─── */
   .send-bar {
-    display: flex; gap: 8px; padding: 8px 12px 16px;
+    display: flex; gap: 8px;
+    padding: 8px 12px calc(16px + var(--safe-area-inset-bottom, 0px));
     background: transparent;
     align-items: flex-end;
     flex-shrink: 0;
@@ -535,7 +537,8 @@ const CSS = `
 
   /* ─── Status page (main area) ─── */
   .status-main {
-    flex: 1; overflow-y: auto; padding: 24px;
+    flex: 1; overflow-y: auto;
+    padding: 24px 24px calc(24px + var(--safe-area-inset-bottom, 0px));
     background: var(--bg);
   }
   .status-grid {
@@ -622,7 +625,7 @@ const CSS = `
   /* ─── FAB new chat ─── */
   .fab {
     position: absolute;
-    bottom: 18px; left: 16px;
+    bottom: calc(18px + var(--safe-area-inset-bottom, 0px)); left: 16px;
     width: 50px; height: 50px;
     border-radius: 50%;
     background: var(--accent);
@@ -648,7 +651,8 @@ const CSS = `
   .new-chat-overlay.open { display: flex; }
   .new-chat-sheet {
     background: var(--card); border-radius: 18px 18px 0 0;
-    padding: 20px 20px 32px; width: 100%; max-width: 500px;
+    padding: 20px 20px calc(32px + var(--safe-area-inset-bottom, 0px));
+    width: 100%; max-width: 500px;
   }
   .new-chat-title {
     font-size: 16px; font-weight: 600; color: var(--text);
@@ -718,7 +722,7 @@ const CSS = `
   .ch-sheet {
     background: var(--card);
     border-radius: 18px 18px 0 0;
-    padding: 20px 20px 32px;
+    padding: 20px 20px calc(32px + var(--safe-area-inset-bottom, 0px));
     width: 100%;
     max-width: 500px;
   }
@@ -882,10 +886,11 @@ const CSS = `
     .status-grid { grid-template-columns: 1fr; }
     .fab {
       width: 60px; height: 60px;
-      bottom: 28px; left: 24px;
+      bottom: calc(28px + var(--safe-area-inset-bottom, 0px)); left: 24px;
     }
     #fab-call-anchor {
-      bottom: 28px !important; right: 24px !important;
+      bottom: calc(28px + var(--safe-area-inset-bottom, 0px)) !important;
+      right: 24px !important;
     }
     .fab-call {
       width: 60px; height: 60px;
@@ -2416,7 +2421,7 @@ class SmsGammuPanel extends HTMLElement {
             </svg>
           </button>
 
-          <div id="fab-call-anchor" style="position:absolute; bottom:18px; right:16px; z-index:10">
+          <div id="fab-call-anchor" style="position:absolute; bottom:calc(18px + var(--safe-area-inset-bottom, 0px)); right:16px; z-index:10">
             <button class="fab fab-call" id="fab-call" title="Call" style="position:static">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
