@@ -40,7 +40,8 @@
           "collect_interval": "Delay between scans while assembling a multipart SMS (seconds)",
           "collect_empty_max": "Number of empty scans before considering the SMS complete",
           "language": "Panel interface language",
-          "show_panel": "Show SMS panel in sidebar"
+          "show_panel": "Show SMS panel in sidebar",
+          "show_sidebar_badge": "Show unread SMS count in sidebar"
         }
       },
       "call_entities": {

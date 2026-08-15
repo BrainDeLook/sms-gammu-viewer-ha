@@ -296,36 +296,15 @@ Add it via **Edit Dashboard → Add Card → Manual** with the YAML above, or se
 
 ---
 
-## Sidebar Unread Badge (via custom-sidebar)
+## Sidebar Unread Badge
 
-Add an unread count badge to the SMS sidebar icon using [elchininet/custom-sidebar](https://github.com/elchininet/custom-sidebar).
+The integration displays a blue badge with the total unread SMS count next to
+the **SMS** sidebar icon. No additional frontend plugin or YAML is required.
+The count refreshes in the background and disappears when messages are read.
 
-> ⚠️ **Important:** custom-sidebar takes over sidebar ordering. You lose the ability to reorder via HA UI — you'll need to define all items manually.
-
-**1.** Install `custom-sidebar` via HACS → Frontend.
-
-**2.** Add to `configuration.yaml`:
-```yaml
-frontend:
-  extra_module_url:
-    - /hacsfiles/custom-sidebar/custom-sidebar-plugin.js
-```
-
-**3.** Create `/config/www/custom-sidebar-config.yaml`:
-```yaml
-order:
-  - item: /sms-viewer
-    match: href
-    notification: |
-      [[[
-        const count = parseInt(states['sensor.sms_unread_count']?.state) || 0;
-        return count > 0 ? String(count) : '';
-      ]]]
-```
-
-> To find the exact `href`, add `?cs_debug` to your HA URL and check DevTools console.
-
-**4.** Restart Home Assistant.
+Enable or disable it under **Settings → Devices & Services → SMS Gammu Viewer →
+Configure → General settings → Show unread SMS count in sidebar**. It is enabled
+by default.
 
 ---
 
@@ -337,6 +316,7 @@ This project builds on the work of several open-source projects:
 - **[Daring-Designs/meshtastic-ui-ha](https://github.com/Daring-Designs/meshtastic-ui-ha)** — the native HA sidebar panel architecture (custom panel registration via `async_register_built_in_panel`, static path serving) was modeled after this project.
 - **[black-roland/homeassistant-gsm-call](https://github.com/black-roland/homeassistant-gsm-call)** — the original voice call dialing logic (AT command sequences, `AT+CLCC` polling for call state, serial connection parameters) that this integration's call feature is closely based on. All credit for figuring out the working AT dialing approach for GSM modems goes to this project.
 - **[frenck/home-assistant-doom](https://github.com/frenck/home-assistant-doom)** — the technique for bundling a Lovelace dashboard card directly inside an integration (registering frontend JS globally via `add_extra_js_url`, the same way static assets are served for the sidebar panel) is based on this project's approach.
+- **[C3H3-AI/hacs-vision](https://github.com/C3H3-AI/hacs-vision)** — the authenticated Home Assistant WebSocket approach used for a dynamic sidebar badge.
 
 ---
 

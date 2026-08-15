@@ -62,6 +62,10 @@ CALL_ENTITY_TYPE_BUTTON = "button"
 CONF_SHOW_PANEL = "show_panel"
 DEFAULT_SHOW_PANEL = True
 
+# Показывать число непрочитанных SMS возле иконки панели в сайдбаре HA
+CONF_SHOW_SIDEBAR_BADGE = "show_sidebar_badge"
+DEFAULT_SHOW_SIDEBAR_BADGE = True
+
 # Префикс action в мобильном уведомлении для ответа на SMS:
 # полное имя action = префикс + номер отправителя
 NOTIFY_ACTION_REPLY_PREFIX = "SMS_GAMMU_REPLY_"

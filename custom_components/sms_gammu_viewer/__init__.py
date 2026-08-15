@@ -11,6 +11,7 @@ from pathlib import Path
 import aiohttp
 from aiohttp import web
 
+from homeassistant.components import websocket_api
 from homeassistant.components.frontend import (
     add_extra_js_url,
     async_register_built_in_panel,
@@ -27,8 +28,10 @@ from .const import (
     CONF_COLLECT_EMPTY_MAX,
     CONF_LANGUAGE,
     CONF_SHOW_PANEL,
+    CONF_SHOW_SIDEBAR_BADGE,
     DEFAULT_LANGUAGE,
     DEFAULT_SHOW_PANEL,
+    DEFAULT_SHOW_SIDEBAR_BADGE,
     CONF_COLLECT_INTERVAL,
     CONF_NOTIFY_TARGETS,
     CONF_POLL_INTERVAL,
@@ -58,7 +61,48 @@ MODEM_RESET_COOLDOWN = 120       # Пауза после сброса (секу�
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     hass.data.setdefault(DOMAIN, {})
+    _register_sidebar_badge_websocket(hass)
     return True
+
+
+def _register_sidebar_badge_websocket(hass: HomeAssistant) -> None:
+    """Expose the unread count to the authenticated HA frontend."""
+
+    @websocket_api.websocket_command({
+        "type": f"{DOMAIN}/sidebar_badge",
+    })
+    @websocket_api.async_response
+    async def websocket_sidebar_badge(
+        hass: HomeAssistant,
+        connection: websocket_api.ActiveConnection,
+        msg: dict,
+    ) -> None:
+        entries = hass.data.get(DOMAIN, {})
+        coord = next(iter(entries.values()), None)
+        if coord is None:
+            connection.send_result(msg["id"], {"enabled": False, "unread": 0})
+            return
+
+        enabled = (
+            coord.entry.data.get(
+                CONF_SHOW_SIDEBAR_BADGE, DEFAULT_SHOW_SIDEBAR_BADGE
+            )
+            and coord.entry.data.get(CONF_SHOW_PANEL, DEFAULT_SHOW_PANEL)
+        )
+        if not enabled:
+            connection.send_result(msg["id"], {"enabled": False, "unread": 0})
+            return
+
+        try:
+            unread = await hass.async_add_executor_job(coord.store.unread_count)
+        except Exception as exc:
+            _LOGGER.debug("Sidebar badge unread count failed: %s", exc)
+            unread = 0
+        connection.send_result(
+            msg["id"], {"enabled": True, "unread": max(0, int(unread or 0))}
+        )
+
+    websocket_api.async_register_command(hass, websocket_sidebar_badge)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -248,6 +292,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             remove_extra_js_url(hass, await _card_url(hass))
         except (KeyError, ValueError):
             pass
+        try:
+            remove_extra_js_url(hass, await _sidebar_badge_url(hass))
+        except (KeyError, ValueError):
+            pass
         hass.data.pop(_FRONTEND_REGISTERED, None)
     return True
 
@@ -279,6 +327,7 @@ _FRONTEND_REGISTERED = f"{DOMAIN}_frontend_registered"
 #    обязан ревалидировать файл и не может залипнуть на старой копии.
 CARD_JS_BASE = "/api/sms_gammu_viewer_static/card.js"
 CARD_FILENAME = "sms-gammu-viewer-card.js"
+SIDEBAR_BADGE_FILENAME = "sidebar-badge.js"
 
 
 class CardJsView(HomeAssistantView):
@@ -314,6 +363,11 @@ async def _card_url(hass: HomeAssistant) -> str:
     return f"{CARD_JS_BASE}?v={version}"
 
 
+async def _sidebar_badge_url(hass: HomeAssistant) -> str:
+    version = await _integration_version(hass)
+    return f"/{PANEL_URL}/{FRONTEND_PATH}/{SIDEBAR_BADGE_FILENAME}?v={version}"
+
+
 async def _register_frontend(hass: HomeAssistant) -> None:
     """Статика + Lovelace-карточка. Отдельно от панели: карточка должна
     работать и при выключенной панели в сайдбаре.
@@ -340,6 +394,7 @@ async def _register_frontend(hass: HomeAssistant) -> None:
     # index.html. extra_js_url оставляем как fallback для YAML-режима
     # Lovelace, где программная запись ресурсов невозможна.
     add_extra_js_url(hass, card_url)
+    add_extra_js_url(hass, await _sidebar_badge_url(hass))
     await _register_card_resource(hass)
     _LOGGER.info("Card frontend registered: %s", card_url)
     hass.data[_FRONTEND_REGISTERED] = True

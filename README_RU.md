@@ -296,36 +296,15 @@ show_unread_only: false
 
 ---
 
-## Счётчик непрочитанных в сайдбаре (через custom-sidebar)
+## Счётчик непрочитанных в сайдбаре
 
-Добавить badge с непрочитанными на иконку SMS можно через [elchininet/custom-sidebar](https://github.com/elchininet/custom-sidebar).
+Интеграция сама показывает синий badge с общим числом непрочитанных SMS возле
+иконки **SMS** — дополнительные frontend-плагины и YAML не нужны. Счётчик
+обновляется в фоне и исчезает после прочтения сообщений.
 
-> ⚠️ **Важно:** custom-sidebar берёт управление порядком сайдбара на себя — вы теряете возможность менять порядок через UI HA.
-
-**1.** Установить `custom-sidebar` через HACS → Frontend.
-
-**2.** Добавить в `configuration.yaml`:
-```yaml
-frontend:
-  extra_module_url:
-    - /hacsfiles/custom-sidebar/custom-sidebar-plugin.js
-```
-
-**3.** Создать `/config/www/custom-sidebar-config.yaml`:
-```yaml
-order:
-  - item: /sms-viewer
-    match: href
-    notification: |
-      [[[
-        const count = parseInt(states['sensor.sms_unread_count']?.state) || 0;
-        return count > 0 ? String(count) : '';
-      ]]]
-```
-
-> Точный `href` панели SMS: добавь `?cs_debug` к URL HA и проверь консоль DevTools.
-
-**4.** Перезапустить Home Assistant.
+Функцию можно включить или отключить в **Настройки → Устройства и службы →
+SMS Gammu Viewer → Настроить → Общие настройки → Показывать число
+непрочитанных SMS в боковом меню**. По умолчанию она включена.
 
 ---
 
@@ -337,6 +316,7 @@ order:
 - **[Daring-Designs/meshtastic-ui-ha](https://github.com/Daring-Designs/meshtastic-ui-ha)** — архитектура нативной панели в сайдбаре HA (регистрация кастомной панели через `async_register_built_in_panel`, раздача статических файлов) взята по образцу этого проекта.
 - **[black-roland/homeassistant-gsm-call](https://github.com/black-roland/homeassistant-gsm-call)** — оригинальная логика дозвона по AT-командам (последовательность AT-команд, опрос `AT+CLCC` для отслеживания статуса звонка, параметры serial-подключения), на которой основан функционал звонков в этой интеграции. Вся заслуга в подборе рабочего подхода к дозвону через GSM-модемы принадлежит этому проекту.
 - **[frenck/home-assistant-doom](https://github.com/frenck/home-assistant-doom)** — приём встраивания Lovelace-карточки прямо внутрь интеграции (глобальная регистрация frontend JS через `add_extra_js_url`, тем же способом что раздаются статические файлы панели) взят по образцу этого проекта.
+- **[C3H3-AI/hacs-vision](https://github.com/C3H3-AI/hacs-vision)** — подход к отображению динамического badge в сайдбаре через авторизованное WebSocket-соединение Home Assistant.
 
 ---
 

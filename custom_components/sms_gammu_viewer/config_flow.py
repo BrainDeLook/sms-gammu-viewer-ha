@@ -33,6 +33,7 @@ from .const import (
     CONF_LANGUAGE,
     CONF_NOTIFY_TARGETS,
     CONF_SHOW_PANEL,
+    CONF_SHOW_SIDEBAR_BADGE,
     CONF_PASSWORD,
     CONF_POLL_INTERVAL,
     CONF_PORT,
@@ -44,6 +45,7 @@ from .const import (
     DEFAULT_LANGUAGE,
     DEFAULT_PASSWORD,
     DEFAULT_SHOW_PANEL,
+    DEFAULT_SHOW_SIDEBAR_BADGE,
     DEFAULT_POLL_INTERVAL,
     DEFAULT_PORT,
     DEFAULT_USERNAME,
@@ -142,6 +144,9 @@ class SmsGammuOptionsFlow(OptionsFlow):
                     CONF_COLLECT_EMPTY_MAX: int(user_input.get(CONF_COLLECT_EMPTY_MAX, DEFAULT_COLLECT_EMPTY_MAX)),
                     CONF_LANGUAGE: user_input.get(CONF_LANGUAGE, DEFAULT_LANGUAGE),
                     CONF_SHOW_PANEL: bool(user_input.get(CONF_SHOW_PANEL, DEFAULT_SHOW_PANEL)),
+                    CONF_SHOW_SIDEBAR_BADGE: bool(
+                        user_input.get(CONF_SHOW_SIDEBAR_BADGE, DEFAULT_SHOW_SIDEBAR_BADGE)
+                    ),
                 },
             )
             # ВАЖНО: async_create_entry(data=...) для OptionsFlow ПОЛНОСТЬЮ
@@ -241,6 +246,13 @@ class SmsGammuOptionsFlow(OptionsFlow):
         schema_fields[vol.Optional(
             CONF_SHOW_PANEL,
             default=self._entry.data.get(CONF_SHOW_PANEL, DEFAULT_SHOW_PANEL),
+        )] = BooleanSelector()
+
+        schema_fields[vol.Optional(
+            CONF_SHOW_SIDEBAR_BADGE,
+            default=self._entry.data.get(
+                CONF_SHOW_SIDEBAR_BADGE, DEFAULT_SHOW_SIDEBAR_BADGE
+            ),
         )] = BooleanSelector()
 
         return self.async_show_form(
