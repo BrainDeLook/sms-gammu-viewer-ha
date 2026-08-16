@@ -10,6 +10,7 @@ import serial
 import serial_asyncio_fast as serial_asyncio
 
 from .call_modem import READ_LIMIT, CallModem
+from .call_state import parse_clcc
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -168,7 +169,7 @@ async def _wait_for_call_end(
     lines = await modem.execute_at(
         "AT+CLCC", timeout=2, end_markers=["OK", "ERROR", "+CME ERROR"]
     )
-    reply = " ".join(lines)
+    reply = "\n".join(lines)
     _LOGGER.debug("CLCC probe: %s", reply)
 
     if "+CLCC:" in reply or ("OK" in reply and len(lines) > 1):
@@ -181,28 +182,38 @@ async def _wait_for_call_end(
 async def _poll_clcc(
     modem: CallModem, initial_reply: str, dial_timeout_sec: int, call_duration_sec: int
 ) -> CallEndedReason:
+    has_outgoing_call = False
     is_ringing = False
     reply = initial_reply
 
     try:
         async with asyncio.timeout(dial_timeout_sec) as cm:
             while True:
-                if not is_ringing and "+CLCC: 1,0,3" in reply:
+                calls = parse_clcc(reply)
+                outgoing = tuple(call for call in calls if call.is_outgoing)
+
+                # ETSI TS 27.007: 0=active, 2=dialing, 3=alerting.
+                # The modem chooses <idx>; never assume that it is 1.
+                if any(call.status == 0 for call in outgoing):
+                    return CallEndedReason.ANSWERED
+
+                if outgoing:
+                    has_outgoing_call = True
+
+                if not is_ringing and any(call.status == 3 for call in outgoing):
                     is_ringing = True
                     _LOGGER.info("Ringing, waiting up to %ss for answer", call_duration_sec)
                     cm.reschedule(asyncio.get_running_loop().time() + call_duration_sec)
-                elif "+CLCC: 1,0,0" in reply:
-                    return CallEndedReason.ANSWERED
-                elif "ERROR" in reply:
+                elif "ERROR" in reply or "+CME ERROR" in reply:
                     return CallEndedReason.NOT_ANSWERED
-                elif "+CLCC:" not in reply:
+                elif not outgoing and has_outgoing_call:
                     return CallEndedReason.NOT_ANSWERED if is_ringing else CallEndedReason.DECLINED
 
                 await asyncio.sleep(1)
                 lines = await modem.execute_at(
                     "AT+CLCC", timeout=2, end_markers=["OK", "ERROR", "+CME ERROR"]
                 )
-                reply = " ".join(lines)
+                reply = "\n".join(lines)
     except TimeoutError:
         return CallEndedReason.NOT_ANSWERED
 

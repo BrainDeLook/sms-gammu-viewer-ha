@@ -49,6 +49,12 @@ from .const import (
     PANEL_URL,
 )
 from .gateway import GatewayClient
+from .sms_pipeline import (
+    LogicalSms,
+    SnapshotStabilizer,
+    parse_gateway_messages,
+    snapshots_equal,
+)
 from .store import SmsStore
 
 _LOGGER = logging.getLogger(__name__)
@@ -510,56 +516,6 @@ def _looks_like_wap_push(text: str) -> bool:
     return control_chars >= 5
 
 
-class NumberBuffer:
-    """Буфер для сборки SMS от одного номера за один цикл collect.
-
-    Gateway возвращает SMS по-разному в зависимости от ситуации:
-    - Одна запись которая растёт (multipart собирается постепенно по эфиру)
-    - Несколько записей — каждая часть своя запись, они могут иметь
-      одинаковую или разную дату
-
-    Стратегия: для каждой уникальной (date, text_prefix) пары храним
-    лучший текст. Если пришёл текст длиннее для той же записи — обновляем.
-    Если пришёл совсем другой текст с той же датой — это новая часть,
-    добавляем отдельно. В конце конкатенируем все части по порядку получения.
-    """
-
-    def __init__(self, number: str) -> None:
-        self.number = number
-        self.first_date: str = ""
-        self.seen_count: int = 0
-        # Список (date, text) в порядке получения — каждый элемент это часть SMS
-        self._parts: list[tuple[str, str]] = []
-
-    def add(self, text: str, date: str) -> bool:
-        self.seen_count += 1
-        if not self.first_date:
-            self.first_date = date
-
-        # Ищем существующую часть которую этот текст может обновить:
-        # текст является продолжением (начинается с сохранённого) или наоборот
-        for i, (d, existing) in enumerate(self._parts):
-            if d != date:
-                continue
-            if text.startswith(existing) or existing.startswith(text):
-                # Это та же запись — обновляем до более длинной версии
-                if len(text) > len(existing):
-                    self._parts[i] = (date, text)
-                    return True
-                return False  # Не новее
-
-        # Это новая часть — добавляем
-        self._parts.append((date, text))
-        return True
-
-    @property
-    def full_text(self) -> str:
-        result = "".join(text for _, text in self._parts)
-        if _looks_like_wap_push(result):
-            return "📎 Входящий MMS (не поддерживается)"
-        return result
-
-
 class SmsCoordinator:
     def __init__(self, hass, entry, store, client):
         self.hass = hass
@@ -758,143 +714,122 @@ class SmsCoordinator:
                 _LOGGER.error("Poll loop error: %s", e)
 
     async def _collect(self, first_batch: list[dict]) -> None:
-        """
-        Сборка multipart SMS таймером ожидания: после получения первой части
-        опрашиваем модем каждые COLLECT_INTERVAL секунд, пока не наберём
-        COLLECT_EMPTY_MAX пустых ответов подряд — тогда считаем что все части
-        собраны.
+        """Consume logical messages without re-linking Gammu's output.
 
-        Примечание: проверялась возможность использовать поле Complete из API
-        sms-gammu-gateway (введено в одном из коммитов автора аддона), но на
-        практике в установленных версиях аддона это поле в ответе /sms не
-        встречается — реальный JSON содержит только Date/Number/State/Text.
-        Поэтому таймер остаётся единственным рабочим механизмом сборки.
+        ``sms-gammu-gateway`` already runs ``gammu.LinkSMS`` and returns one
+        REST item per logical message.  We keep those items independent, wait
+        for either explicit ``Complete`` metadata or a stable snapshot, then
+        pop and save each message atomically through ``/sms/getsms``.
         """
         self.collecting = True
-        _LOGGER.info("Collect mode: %d messages on SIM", len(first_batch))
+        try:
+            batch = first_batch
+            while batch:
+                stable, disappeared = await self._wait_for_stable_snapshot(batch)
+                if not stable:
+                    return
 
-        buffers: dict[tuple, NumberBuffer] = {}
-        self._add_to_buffers(buffers, first_batch)
-        # Повторное чтение прямо перед удалением: сужаем окно, в котором
-        # SMS, пришедшая между опросом в _loop и delete_all, была бы
-        # стёрта с SIM непрочитанной
-        recheck = await self._safe_get_all()
-        if recheck:
-            self._add_to_buffers(buffers, recheck)
-        await self._safe_delete_all()
+                if disappeared:
+                    # Another gateway consumer removed the records. We cannot
+                    # prove that the last observed text was complete, so do
+                    # not persist or notify with a potentially truncated SMS.
+                    _LOGGER.warning(
+                        "SMS disappeared from gateway while collecting; "
+                        "discarding an unconfirmed snapshot (%d logical messages)",
+                        len(stable),
+                    )
+                    return
 
-        collect_interval = self._collect_interval
-        collect_empty_max = self._collect_empty_max
-
-        empty_streak = 0
-        while empty_streak < collect_empty_max:
-            await asyncio.sleep(collect_interval)
-
-            # Если начался звонок — приостанавливаем сборку до его завершения
-            if self.call_in_progress:
-                _LOGGER.debug("Collect: pausing — call in progress")
-                while self.call_in_progress:
-                    await asyncio.sleep(1)
-                # Сбрасываем счётчик — за время звонка могли прийти новые части
-                empty_streak = 0
-                _LOGGER.debug("Collect: resuming after call, resetting empty counter")
-                continue
-
-            messages = await self._safe_get_all()
-
-            if not messages:
-                empty_streak += 1
-                _LOGGER.debug("Collect: empty %d/%d", empty_streak, collect_empty_max)
-                continue
-
-            got_new = self._add_to_buffers(buffers, messages)
-            await self._safe_delete_all()
-            # Сбрасываем счётчик при ЛЮБОМ непустом ответе — раз на симке
-            # что-то есть, сборка ещё идёт (gammu может отдавать ту же запись
-            # пока части ещё не все собраны)
-            empty_streak = 0
-            if got_new:
-                _LOGGER.debug(
-                    "Collect: new part(s) received (%d msg on SIM), resetting empty counter",
-                    len(messages)
-                )
-            else:
-                _LOGGER.debug(
-                    "Collect: %d msg on SIM, no new content yet, waiting…",
-                    len(messages)
-                )
-
-        for number, buf in buffers.items():
-            full_text = buf.full_text
-            _LOGGER.info("SMS assembled from %s: %d updates seen, %d chars", number, buf.seen_count, len(full_text))
-            await self._save_one(number, full_text, buf.first_date)
-
-        self.collecting = False
-
-    async def _save_one(self, number: str, text: str, date: str) -> None:
-        """Сохраняет SMS в БД.
-
-        Если звонок прервал сборку — части SMS могут прийти в нескольких
-        отдельных collect-циклах. В этом случае ищем недавнее сообщение
-        от того же номера и дописываем к нему — но только если текст
-        реально новый (не пересекается с уже сохранённым).
-        """
-        recent = await self.hass.async_add_executor_job(
-            self.store.find_recent, number, 120
-        )
-        if recent:
-            saved = recent["text"]
-            # Дописываем только если текст реально новый:
-            # - не является подстрокой уже сохранённого
-            # - уже сохранённый не является подстрокой нового
-            if text not in saved and saved not in text:
                 _LOGGER.info(
-                    "Appending continuation to SMS id=%s from %s (+%d chars)",
-                    recent["id"], number, len(text)
+                    "SMS snapshot stable: consuming %d logical message(s)",
+                    len(stable),
                 )
-                await self.hass.async_add_executor_job(
-                    self.store.append_text, recent["id"], text
-                )
-                full_text = saved + text
-                self.push_event("new_message", {
-                    "id": recent["id"], "number": number,
-                    "text": full_text, "date": date, "is_read": 0
-                })
-                self.hass.bus.async_fire(EVENT_SMS_RECEIVED, {
-                    "number": number, "text": full_text, "date": date,
-                })
-                await self._notify(number, full_text)
-                return
+                # Pop exactly the number of messages in the confirmed snapshot.
+                # The gateway deletes the physical Locations belonging to the
+                # returned logical message inside the same request.
+                for _ in range(len(stable)):
+                    popped = await self.client.pop_first_sms()
+                    if not popped:
+                        _LOGGER.warning("Gateway returned no SMS while popping snapshot")
+                        break
+                    parsed = parse_gateway_messages([popped])
+                    if parsed:
+                        await self._save_logical_sms(parsed[0])
 
-        # Новое сообщение
+                # A message may have arrived while the confirmed snapshot was
+                # being consumed. Process the remainder as a new snapshot.
+                remainder = await self._safe_get_all()
+                if not remainder:
+                    return
+                batch = remainder
+        finally:
+            self.collecting = False
+
+    async def _wait_for_stable_snapshot(
+        self, first_batch: list[dict]
+    ) -> tuple[tuple[LogicalSms, ...], bool]:
+        """Return a confirmed snapshot and whether it vanished externally."""
+        stabilizer = SnapshotStabilizer(self._collect_empty_max)
+        raw_messages = first_batch
+
+        while True:
+            messages = parse_gateway_messages(raw_messages)
+            observation = stabilizer.observe(messages)
+            if observation.ready:
+                # Always confirm once more, even when the gateway explicitly
+                # reports Complete=true, to close the read/delete race window.
+                confirmation_raw = await self._safe_get_all()
+                if confirmation_raw is None:
+                    await asyncio.sleep(self._collect_interval)
+                    continue
+                confirmation = parse_gateway_messages(confirmation_raw)
+                if not confirmation:
+                    return observation.messages, True
+                confirmed = stabilizer.observe(confirmation)
+                if confirmed.ready and snapshots_equal(
+                    observation.messages, confirmation
+                ):
+                    return confirmation, False
+                raw_messages = confirmation_raw
+                continue
+
+            await asyncio.sleep(self._collect_interval)
+            await self._wait_for_modem_idle()
+            next_raw = await self._safe_get_all()
+            if next_raw is None:
+                continue
+            if not next_raw:
+                return stabilizer.last, True
+            raw_messages = next_raw
+
+    async def _wait_for_modem_idle(self) -> None:
+        """Pause collection while another operation owns the modem."""
+        if self.call_in_progress or self.send_in_progress:
+            _LOGGER.debug("Collect: pausing for call/send operation")
+        while self.call_in_progress or self.send_in_progress:
+            await asyncio.sleep(1)
+
+    async def _save_logical_sms(self, message: LogicalSms) -> None:
+        """Persist one already-linked gateway message without heuristically appending."""
+        number = message.number
+        text = message.text
+        if _looks_like_wap_push(text):
+            text = "📎 Входящий MMS (не поддерживается)"
+        date = message.date
         msg_id = await self.hass.async_add_executor_job(
             self.store.add, number, text, date
         )
-        if msg_id:
-            self.push_event("new_message", {
-                "id": msg_id, "number": number,
-                "text": text, "date": date, "is_read": 0
-            })
-            self.hass.bus.async_fire(EVENT_SMS_RECEIVED, {
-                "number": number, "text": text, "date": date,
-            })
+        if not msg_id:
+            _LOGGER.debug("Ignoring already stored SMS from %s at %s", number, date)
+            return
+        self.push_event("new_message", {
+            "id": msg_id, "number": number,
+            "text": text, "date": date, "is_read": 0
+        })
+        self.hass.bus.async_fire(EVENT_SMS_RECEIVED, {
+            "number": number, "text": text, "date": date,
+        })
         await self._notify(number, text)
-
-
-    def _add_to_buffers(self, buffers: dict[str, NumberBuffer], messages: list[dict]) -> bool:
-        got_new = False
-        for msg in messages:
-            number = msg.get("Number", "Unknown")
-            text   = msg.get("Text", "")
-            date   = msg.get("Date", "")
-            if not text:
-                continue
-            # Группируем только по номеру — части одного SMS могут иметь разные даты
-            if number not in buffers:
-                buffers[number] = NumberBuffer(number)
-            if buffers[number].add(text, date):
-                got_new = True
-        return got_new
 
     async def _safe_get_all(self) -> list[dict] | None:
         import time
@@ -931,12 +866,6 @@ class SmsCoordinator:
                 except Exception as re:
                     _LOGGER.error("Modem reset failed: %s", re)
             return None
-
-    async def _safe_delete_all(self) -> None:
-        try:
-            await self.client.delete_all_sms()
-        except Exception as e:
-            _LOGGER.warning("delete_all_sms failed: %s", e)
 
     async def _notify(self, number: str, text: str) -> None:
         targets = self._notify_targets

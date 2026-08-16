@@ -228,9 +228,9 @@ Sender's phone
 USB GSM modem
        ↓
 sms-gammu-gateway (REST API :5000)
-       ↓ GET /sms  (every N sec, or every 3 sec in collect mode)
+       ↓ GET /sms (observe) + GET /sms/getsms (atomic consume)
 SMS Gammu Viewer (custom component)
-       ↓ DELETE /sms/deleteall
+       ↓ one already-linked logical SMS at a time
 SQLite database (/config/sms_gammu_viewer.db)
        ↓
 SMS panel in sidebar  +  Push notification  +  sensor.sms_unread_count
@@ -238,18 +238,18 @@ SMS panel in sidebar  +  Push notification  +  sensor.sms_unread_count
 
 ### Long SMS Assembly
 
-Messages over 160 Latin / 70 Cyrillic characters are split by the carrier into multiple parts. How Gammu's gateway actually exposes this matters: rather than returning each part as a separate record to concatenate, it returns the **same SMS record growing over time** — each poll of `/sms` gives a progressively longer snapshot of the same message as more radio parts arrive.
+Messages over 160 Latin / 70 Cyrillic characters are split by the carrier into transport parts. The gateway reads the physical records with `GetNextSMS` and calls `gammu.LinkSMS`, so each `/sms` array item is already one **logical SMS**. The integration must never concatenate separate array items merely because they have the same sender.
 
 The integration handles this by:
 
-1. Detecting the first snapshot → entering active collection mode
-2. Polling the modem every **N seconds** (configurable, default 2s), deleting each snapshot from the SIM immediately after reading
-3. Tracking the **longest text seen** for each sender — a new poll either confirms the same length (ignored) or replaces the stored text with a longer, more complete version
-4. After **M empty polls in a row** (configurable, default 5) — considers the message complete and saves the longest version seen
-5. If parts arrive in separate waves more than the empty-poll window apart but within 2 minutes — automatically merges them as a fallback safety net
-6. Sends the notification with the full assembled text
+1. Keeping every gateway array item separate and in gateway order
+2. Waiting for `Complete=true` when the gateway exposes multipart metadata
+3. Falling back to **M identical snapshots** (configurable, default 5) for older gateway responses
+4. Confirming the snapshot once more before consuming it
+5. Retrieving and deleting one logical message atomically through `/sms/getsms`; never using a list index followed by `deleteall`
+6. Saving and notifying only after the atomic consume succeeds
 
-Both the polling delay and the empty-poll threshold are configurable in **Settings → SMS Gammu Viewer → Configure** — tune them to find the right balance of speed vs. reliability for your carrier and signal conditions.
+Both the stability-check delay and identical-snapshot threshold are configurable in **Settings → SMS Gammu Viewer → Configure**. See [the experimental AT pipeline notes](docs/EXPERIMENTAL_AT_PIPELINE.md) for limitations and testing guidance.
 
 ### Multi-language UI
 
