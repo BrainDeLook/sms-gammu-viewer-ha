@@ -755,6 +755,8 @@ class SmsCoordinator:
                 continue
             if not acknowledged:
                 _LOGGER.warning("Lean SMS queue ACK was rejected: id=%s", item.id)
+            else:
+                _LOGGER.info("Lean SMS queue ACK completed: id=%s", item.id[:12])
 
     async def _collect_raw(self, payload: list[dict]) -> None:
         """Persist proven raw-part assemblies, then ACK exact modem records."""

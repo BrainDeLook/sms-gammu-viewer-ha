@@ -96,6 +96,8 @@ class GatewayClient:
                 _LOGGER.info("Gateway has no durable v1 message API")
                 return None
             raise
+        if self._lean_api_supported is not True:
+            _LOGGER.info("Detected lean durable gateway API")
         self._lean_api_supported = True
         return data if isinstance(data, list) else []
 
