@@ -70,7 +70,10 @@ class GatewayClient:
         if self._raw_sms_api_supported is False:
             return None
         try:
-            data = await self._request("GET", "/sms/raw", timeout=30)
+            # Gateway serial operations allow up to 60 seconds. The HTTP
+            # client must outlive that window or it disconnects while Gammu is
+            # still reading the modem.
+            data = await self._request("GET", "/sms/raw", timeout=75)
         except aiohttp.ClientResponseError as e:
             if e.status == 404:
                 self._raw_sms_api_supported = False
@@ -91,7 +94,7 @@ class GatewayClient:
             for location, fingerprint in zip(locations, fingerprints)
         ]
         data = await self._request(
-            "POST", "/sms/raw/ack", timeout=30, json={"Parts": items}
+            "POST", "/sms/raw/ack", timeout=75, json={"Parts": items}
         )
         deleted = data.get("Deleted", []) if isinstance(data, dict) else []
         mismatched = data.get("Mismatched", []) if isinstance(data, dict) else []

@@ -754,9 +754,17 @@ class SmsCoordinator:
                     assembled.locations,
                 )
                 continue
-            acknowledged = await self.client.acknowledge_raw_sms(
-                assembled.locations, assembled.fingerprints
-            )
+            try:
+                acknowledged = await self.client.acknowledge_raw_sms(
+                    assembled.locations, assembled.fingerprints
+                )
+            except Exception as error:
+                await self._record_modem_failure("acknowledge_raw_sms", error)
+                _LOGGER.exception(
+                    "Raw SMS persisted but modem ACK request failed; locations=%s",
+                    assembled.locations,
+                )
+                continue
             if not acknowledged:
                 _LOGGER.warning(
                     "Raw SMS persisted but modem ACK was incomplete; the next "
