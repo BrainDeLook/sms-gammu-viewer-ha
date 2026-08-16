@@ -15,6 +15,10 @@ the `url#branch` syntax. Install **SMS Gammu Gateway (Raw UDH Experiment)**,
 stop the stable gateway before starting it, and never let both installations
 open the same modem.
 
+The integration is published as the `v3.15.0b1` GitHub prerelease. In HACS,
+open SMS Gammu Viewer, enable beta/prerelease versions in the repository menu,
+select `v3.15.0b1`, download it and restart Home Assistant.
+
 ## Read physical parts
 
 `GET /sms/raw` returns modem records before `gammu.LinkSMS`:
