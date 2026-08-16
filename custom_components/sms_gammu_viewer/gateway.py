@@ -36,12 +36,27 @@ class GatewayClient:
         self._operation_lock = asyncio.Lock()
         self._raw_sms_api_supported: bool | None = None
 
-    async def _request(self, method: str, path: str, timeout: int = 10, **kwargs) -> Any:
+    async def _request(
+        self,
+        method: str,
+        path: str,
+        timeout: int = 10,
+        *,
+        fresh_connection: bool = False,
+        **kwargs,
+    ) -> Any:
         t = aiohttp.ClientTimeout(total=timeout)
+        headers = dict(self._headers)
+        if fresh_connection:
+            # The add-on currently uses Flask's development HTTP server. It
+            # closes some otherwise reusable connections after a response;
+            # explicitly opting out of pooling avoids making the following
+            # ACK request on a stale socket.
+            headers["Connection"] = "close"
         async with self._operation_lock:
             async with self._session.request(
                 method, f"{self._base}{path}",
-                headers=self._headers, timeout=t, **kwargs
+                headers=headers, timeout=t, **kwargs
             ) as r:
                 r.raise_for_status()
                 if r.content_length == 0 or r.status == 204:
@@ -73,7 +88,9 @@ class GatewayClient:
             # Gateway serial operations allow up to 60 seconds. The HTTP
             # client must outlive that window or it disconnects while Gammu is
             # still reading the modem.
-            data = await self._request("GET", "/sms/raw", timeout=75)
+            data = await self._request(
+                "GET", "/sms/raw", timeout=75, fresh_connection=True
+            )
         except aiohttp.ClientResponseError as e:
             if e.status == 404:
                 self._raw_sms_api_supported = False
@@ -93,9 +110,19 @@ class GatewayClient:
             {"Location": location, "Fingerprint": fingerprint}
             for location, fingerprint in zip(locations, fingerprints)
         ]
-        data = await self._request(
-            "POST", "/sms/raw/ack", timeout=75, json={"Parts": items}
-        )
+        try:
+            data = await self._request(
+                "POST", "/sms/raw/ack", timeout=75,
+                fresh_connection=True, json={"Parts": items}
+            )
+        except aiohttp.ServerDisconnectedError:
+            # ACK is safe to retry: the gateway compares a fingerprint for
+            # every physical location before deleting it.
+            _LOGGER.info("Raw SMS ACK connection closed; retrying once")
+            data = await self._request(
+                "POST", "/sms/raw/ack", timeout=75,
+                fresh_connection=True, json={"Parts": items}
+            )
         deleted = data.get("Deleted", []) if isinstance(data, dict) else []
         mismatched = data.get("Mismatched", []) if isinstance(data, dict) else []
         if mismatched:
