@@ -79,6 +79,11 @@ def parse_raw_gateway_parts(payload: list[dict] | None) -> tuple[RawSmsPart, ...
             continue
         reference_value = item.get("Reference")
         reference = None if reference_value is None else _integer(reference_value)
+        total = (
+            max(1, _integer(item.get("PartsExpected"), 1))
+            if reference is None
+            else _integer(item.get("PartsExpected"), 0)
+        )
         parts.append(
             RawSmsPart(
                 number=str(item.get("Number") or "Unknown"),
@@ -90,7 +95,7 @@ def parse_raw_gateway_parts(payload: list[dict] | None) -> tuple[RawSmsPart, ...
                     else _integer(item.get("ReferenceBits"))
                 ),
                 sequence=_integer(item.get("PartNumber"), 1),
-                total=max(1, _integer(item.get("PartsExpected"), 1)),
+                total=total,
                 date=str(item.get("Date") or ""),
                 location=location,
                 text=str(item.get("Text") or ""),
@@ -134,7 +139,7 @@ def assemble_raw_parts(
     multipart: dict[tuple, list[RawSmsPart]] = {}
 
     for part in parts:
-        if part.reference is None or part.total <= 1:
+        if part.reference is None:
             complete.append(
                 AssembledSms(
                     number=part.number,

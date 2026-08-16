@@ -97,6 +97,13 @@ class RawAssemblyTests(unittest.TestCase):
         self.assertEqual(result.complete, ())
         self.assertEqual(len(result.ambiguous), 4)
 
+    def test_malformed_concat_sequence_is_quarantined(self) -> None:
+        result = assemble_raw_parts([
+            part(4, "invalid", location=11, total=3)
+        ])
+        self.assertEqual(result.complete, ())
+        self.assertEqual([item.location for item in result.ambiguous], [11])
+
     def test_reused_reference_outside_window_forms_new_message(self) -> None:
         result = assemble_raw_parts([
             part(1, "old-1", location=1, date="2026-08-16T12:00:00"),
