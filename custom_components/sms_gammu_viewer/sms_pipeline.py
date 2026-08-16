@@ -37,6 +37,14 @@ class LogicalSms:
         )
 
 
+@dataclass(frozen=True, slots=True)
+class QueuedLogicalSms:
+    """One durable lean-gateway queue item and its immutable ACK ID."""
+
+    id: str
+    message: LogicalSms
+
+
 def _optional_int(value: Any) -> int | None:
     if value is None:
         return None
@@ -78,6 +86,25 @@ def parse_gateway_messages(payload: list[dict] | None) -> tuple[LogicalSms, ...]
                 complete=_optional_bool(item.get("Complete")),
                 parts_received=_optional_int(item.get("PartsReceived")),
                 parts_expected=_optional_int(item.get("PartsExpected")),
+            )
+        )
+    return tuple(messages)
+
+
+def parse_lean_queue(payload: list[dict] | None) -> tuple[QueuedLogicalSms, ...]:
+    """Strictly normalize the durable v1 queue without inventing identity."""
+    messages: list[QueuedLogicalSms] = []
+    for item in payload or []:
+        message_id = str(item.get("ID") or "")
+        number = str(item.get("Number") or "")
+        date = str(item.get("Date") or "")
+        text = item.get("Text")
+        if not message_id or not number or not date or text is None:
+            continue
+        messages.append(
+            QueuedLogicalSms(
+                id=message_id,
+                message=LogicalSms(number=number, text=str(text), date=date),
             )
         )
     return tuple(messages)

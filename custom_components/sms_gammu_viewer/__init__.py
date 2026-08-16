@@ -54,6 +54,7 @@ from .sms_pipeline import (
     LogicalSms,
     SnapshotStabilizer,
     parse_gateway_messages,
+    parse_lean_queue,
     snapshots_equal,
 )
 from .store import SmsStore
@@ -688,20 +689,27 @@ class SmsCoordinator:
                     _LOGGER.debug("Skipping SMS poll — send in progress")
                     continue
 
-                # Prefer the experimental physical-parts API. A gateway that
-                # returns 404 is remembered by the client and uses the linked
-                # compatibility pipeline below.
-                raw_supported, raw_messages = await self._safe_get_raw()
-                if raw_supported:
-                    if raw_messages:
-                        await self._collect_raw(raw_messages)
+                # The lean gateway owns multipart assembly and exposes a
+                # durable logical queue. Only probe raw/legacy endpoints when
+                # the v1 API explicitly returns 404; never fall back after a
+                # transient v1 error because that could consume the same SMS
+                # through two protocols.
+                lean_supported, queued_messages = await self._safe_get_lean()
+                if lean_supported:
+                    if queued_messages:
+                        await self._collect_lean(queued_messages)
                 else:
-                    messages = await self._safe_get_all()
-                    if messages:
-                        self._error_streak = 0
-                        await self._collect(messages)
-                    elif messages is not None:
-                        self._error_streak = 0
+                    raw_supported, raw_messages = await self._safe_get_raw()
+                    if raw_supported:
+                        if raw_messages:
+                            await self._collect_raw(raw_messages)
+                    else:
+                        messages = await self._safe_get_all()
+                        if messages:
+                            self._error_streak = 0
+                            await self._collect(messages)
+                        elif messages is not None:
+                            self._error_streak = 0
                 # Обновляем кеш статуса в фоне каждый цикл
                 try:
                     _s, _n = await asyncio.gather(
@@ -721,6 +729,32 @@ class SmsCoordinator:
                 raise
             except Exception as e:
                 _LOGGER.error("Poll loop error: %s", e)
+
+    async def _collect_lean(self, payload: list[dict]) -> None:
+        """Persist and acknowledge immutable messages from the durable queue."""
+        queued = parse_lean_queue(payload)
+        if len(queued) != len(payload):
+            _LOGGER.error(
+                "Lean gateway returned %d invalid queue item(s)",
+                len(payload) - len(queued),
+            )
+        for item in queued:
+            stored = await self._save_logical_sms(item.message)
+            if not stored:
+                _LOGGER.error(
+                    "Lean SMS was not confirmed in SQLite; leaving queue id=%s",
+                    item.id,
+                )
+                continue
+            try:
+                acknowledged = await self.client.acknowledge_queued_message(
+                    item.id
+                )
+            except Exception as error:
+                await self._record_modem_failure("acknowledge_queued_message", error)
+                continue
+            if not acknowledged:
+                _LOGGER.warning("Lean SMS queue ACK was rejected: id=%s", item.id)
 
     async def _collect_raw(self, payload: list[dict]) -> None:
         """Persist proven raw-part assemblies, then ACK exact modem records."""
@@ -913,6 +947,18 @@ class SmsCoordinator:
             return True, result
         except Exception as e:
             await self._record_modem_failure("get_raw_sms_parts", e)
+            return True, None
+
+    async def _safe_get_lean(self) -> tuple[bool, list[dict] | None]:
+        """Return (API supported, payload) without unsafe protocol fallback."""
+        try:
+            result = await self.client.get_queued_messages()
+            if result is None:
+                return False, None
+            self._mark_modem_connected()
+            return True, result
+        except Exception as error:
+            await self._record_modem_failure("get_queued_messages", error)
             return True, None
 
     def _mark_modem_connected(self) -> None:

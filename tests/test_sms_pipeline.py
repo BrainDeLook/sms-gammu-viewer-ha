@@ -21,6 +21,7 @@ sys.modules[SPEC.name] = MODULE
 SPEC.loader.exec_module(MODULE)
 SnapshotStabilizer = MODULE.SnapshotStabilizer
 parse_gateway_messages = MODULE.parse_gateway_messages
+parse_lean_queue = MODULE.parse_lean_queue
 
 
 def sms(text: str, *, date: str = "2026-08-16 12:00:00", **extra) -> dict:
@@ -49,6 +50,20 @@ class ParseGatewayMessagesTests(unittest.TestCase):
         self.assertTrue(parsed[0].complete)
         self.assertEqual(parsed[0].parts_received, 2)
         self.assertEqual(parsed[0].parts_expected, 2)
+
+    def test_durable_queue_preserves_ack_id_and_message(self) -> None:
+        parsed = parse_lean_queue([{
+            "ID": "stable-id",
+            "Number": "+70000000000",
+            "Text": "assembled",
+            "Date": "2026-08-16T20:00:00",
+        }])
+        self.assertEqual(parsed[0].id, "stable-id")
+        self.assertEqual(parsed[0].message.text, "assembled")
+
+    def test_durable_queue_rejects_item_without_identity(self) -> None:
+        parsed = parse_lean_queue([sms("unsafe")])
+        self.assertEqual(parsed, ())
 
 
 class SnapshotStabilizerTests(unittest.TestCase):

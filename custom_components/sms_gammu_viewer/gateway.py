@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import logging
+import time
 from typing import Any
 
 import aiohttp
@@ -35,6 +36,10 @@ class GatewayClient:
         # AT-ответы/URC и провоцирует ложные таймауты отправки.
         self._operation_lock = asyncio.Lock()
         self._raw_sms_api_supported: bool | None = None
+        self._lean_api_supported: bool | None = None
+        self._lean_status_cache: dict | None = None
+        self._lean_status_at = 0.0
+        self._lean_status_lock = asyncio.Lock()
 
     async def _request(
         self,
@@ -74,6 +79,45 @@ class GatewayClient:
         if isinstance(data, list):
             return data
         return []
+
+    async def get_queued_messages(self) -> list[dict] | None:
+        """Return durable logical messages from the lean gateway.
+
+        ``None`` means this is an older gateway and the caller may probe the
+        raw/legacy APIs. Other errors must not trigger an unsafe fallback.
+        """
+        if self._lean_api_supported is False:
+            return None
+        try:
+            data = await self._request("GET", "/v1/messages", timeout=15)
+        except aiohttp.ClientResponseError as error:
+            if error.status == 404:
+                self._lean_api_supported = False
+                _LOGGER.info("Gateway has no durable v1 message API")
+                return None
+            raise
+        self._lean_api_supported = True
+        return data if isinstance(data, list) else []
+
+    async def acknowledge_queued_message(self, message_id: str) -> bool:
+        data = await self._request(
+            "POST", f"/v1/messages/{message_id}/ack", timeout=15
+        )
+        return bool(isinstance(data, dict) and data.get("acknowledged"))
+
+    async def _get_lean_status(self) -> dict | None:
+        if self._lean_api_supported is not True:
+            return None
+        async with self._lean_status_lock:
+            now = time.monotonic()
+            if self._lean_status_cache is not None and now - self._lean_status_at < 3:
+                return self._lean_status_cache
+            data = await self._request("GET", "/v1/status", timeout=45)
+            if isinstance(data, dict):
+                self._lean_status_cache = data
+                self._lean_status_at = now
+                return data
+            return None
 
     async def get_raw_sms_parts(self) -> list[dict] | None:
         """Return physical SMS records when the experimental API is present.
@@ -160,35 +204,52 @@ class GatewayClient:
 
     async def get_signal(self) -> dict | None:
         try:
+            lean = await self._get_lean_status()
+            if lean is not None:
+                return lean.get("signal")
             return await self._request("GET", "/status/signal")
         except Exception:
             return None
 
     async def get_network(self) -> dict | None:
         try:
+            lean = await self._get_lean_status()
+            if lean is not None:
+                return lean.get("network")
             return await self._request("GET", "/status/network")
         except Exception:
             return None
 
     async def get_modem(self) -> dict | None:
         try:
+            if self._lean_api_supported is True:
+                data = await self._request("GET", "/v1/modem", timeout=45)
+                return data if isinstance(data, dict) else None
             return await self._request("GET", "/status/modem")
         except Exception:
             return None
 
     async def get_sim(self) -> dict | None:
         try:
+            if self._lean_api_supported is True:
+                modem = await self.get_modem()
+                return {"IMSI": modem.get("imsi")} if modem else None
             return await self._request("GET", "/status/sim")
         except Exception:
             return None
 
     async def get_sms_capacity(self) -> dict | None:
         try:
+            lean = await self._get_lean_status()
+            if lean is not None:
+                return lean.get("capacity")
             return await self._request("GET", "/status/sms_capacity")
         except Exception:
             return None
 
     async def reset_modem(self) -> dict | None:
+        if self._lean_api_supported is True:
+            return None
         return await self._request("GET", "/status/reset", timeout=30)
 
     async def send_sms(self, number: str, text: str) -> bool:
@@ -201,6 +262,8 @@ class GatewayClient:
         принять команду, а HTTP-ответ потерялся. Слепой повтор в таком случае
         создаёт дубликаты, поэтому автоматического retry намеренно нет.
         """
+        if self._lean_api_supported is None:
+            await self.get_queued_messages()
         # Определяем нужен ли Unicode режим (кириллица, emoji, и т.д.)
         needs_unicode = any(ord(c) > 127 for c in text)
         form_data = aiohttp.FormData()
@@ -209,11 +272,21 @@ class GatewayClient:
         if needs_unicode:
             form_data.add_field("unicode", "true")
         try:
-            await self._request(
-                "POST", "/sms",
-                data=form_data,
-                timeout=SEND_TIMEOUT,
-            )
+            if self._lean_api_supported is True:
+                await self._request(
+                    "POST", "/v1/sms", timeout=SEND_TIMEOUT,
+                    json={
+                        "number": number,
+                        "text": text,
+                        "unicode": needs_unicode,
+                    },
+                )
+            else:
+                await self._request(
+                    "POST", "/sms",
+                    data=form_data,
+                    timeout=SEND_TIMEOUT,
+                )
             return True
         except aiohttp.ClientResponseError as e:
             _LOGGER.error(
@@ -234,6 +307,9 @@ class GatewayClient:
 
     async def test_connection(self) -> str | None:
         try:
+            lean = await self.get_queued_messages()
+            if lean is not None:
+                return None
             await self._request("GET", "/status/signal", timeout=10)
             return None
         except aiohttp.ClientResponseError as e:
