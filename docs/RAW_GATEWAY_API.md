@@ -4,6 +4,17 @@ The `experiment/raw-udh-assembler` integration branch probes this API once.
 On a `404` it permanently falls back to the linked compatibility pipeline for
 the lifetime of the Home Assistant config entry.
 
+The matching add-on implementation is isolated at:
+
+```text
+https://github.com/BrainDeLook/home-assistant-addons-ru#experiment/raw-udh-api
+```
+
+Home Assistant Supervisor supports pinning an add-on repository branch with
+the `url#branch` syntax. Install **SMS Gammu Gateway (Raw UDH Experiment)**,
+stop the stable gateway before starting it, and never let both installations
+open the same modem.
+
 ## Read physical parts
 
 `GET /sms/raw` returns modem records before `gammu.LinkSMS`:
