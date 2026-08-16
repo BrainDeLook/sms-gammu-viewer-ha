@@ -73,9 +73,10 @@ References:
 The repository also contains a conservative raw-part assembler prototype in
 `raw_sms_pipeline.py`. It orders by UDH sequence, requires every part from
 `1..N`, separates reference reuse outside a time window, and quarantines a
-cluster with duplicate sequence numbers instead of guessing a pairing. It is
-not connected to the current gateway API yet because that API exposes only the
-result after `gammu.LinkSMS`.
+cluster with duplicate sequence numbers instead of guessing a pairing. The
+`experiment/raw-udh-assembler` branch connects it to the optional API described
+in [RAW_GATEWAY_API.md](RAW_GATEWAY_API.md). Existing gateways return `404` and
+continue through the linked compatibility pipeline.
 
 ## Known gateway limitation
 

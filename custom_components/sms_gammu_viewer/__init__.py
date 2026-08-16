@@ -49,6 +49,7 @@ from .const import (
     PANEL_URL,
 )
 from .gateway import GatewayClient
+from .raw_sms_pipeline import assemble_raw_parts, parse_raw_gateway_parts
 from .sms_pipeline import (
     LogicalSms,
     SnapshotStabilizer,
@@ -686,12 +687,20 @@ class SmsCoordinator:
                 if self.send_in_progress:
                     _LOGGER.debug("Skipping SMS poll — send in progress")
                     continue
-                messages = await self._safe_get_all()
-                if messages:
-                    self._error_streak = 0
-                    await self._collect(messages)
+
+                # Prefer the experimental physical-parts API. A gateway that
+                # returns 404 is remembered by the client and uses the linked
+                # compatibility pipeline below.
+                raw_supported, raw_messages = await self._safe_get_raw()
+                if raw_supported:
+                    if raw_messages:
+                        await self._collect_raw(raw_messages)
                 else:
-                    if messages is not None:
+                    messages = await self._safe_get_all()
+                    if messages:
+                        self._error_streak = 0
+                        await self._collect(messages)
+                    elif messages is not None:
                         self._error_streak = 0
                 # Обновляем кеш статуса в фоне каждый цикл
                 try:
@@ -712,6 +721,47 @@ class SmsCoordinator:
                 raise
             except Exception as e:
                 _LOGGER.error("Poll loop error: %s", e)
+
+    async def _collect_raw(self, payload: list[dict]) -> None:
+        """Persist proven raw-part assemblies, then ACK exact modem records."""
+        parts = parse_raw_gateway_parts(payload)
+        result = assemble_raw_parts(parts)
+
+        if result.pending:
+            _LOGGER.info(
+                "Raw SMS: waiting for %d incomplete physical part(s)",
+                len(result.pending),
+            )
+        if result.ambiguous:
+            _LOGGER.error(
+                "Raw SMS: quarantined %d ambiguous physical part(s); "
+                "nothing will be joined or deleted",
+                len(result.ambiguous),
+            )
+
+        for assembled in result.complete:
+            stored = await self._save_logical_sms(
+                LogicalSms(
+                    number=assembled.number,
+                    text=assembled.text,
+                    date=assembled.date,
+                )
+            )
+            if not stored:
+                _LOGGER.error(
+                    "Raw SMS was not confirmed in SQLite; leaving modem "
+                    "locations untouched: %s",
+                    assembled.locations,
+                )
+                continue
+            acknowledged = await self.client.acknowledge_raw_sms(
+                assembled.locations, assembled.fingerprints
+            )
+            if not acknowledged:
+                _LOGGER.warning(
+                    "Raw SMS persisted but modem ACK was incomplete; the next "
+                    "poll will safely deduplicate it"
+                )
 
     async def _collect(self, first_batch: list[dict]) -> None:
         """Consume logical messages without re-linking Gammu's output.
@@ -809,7 +859,7 @@ class SmsCoordinator:
         while self.call_in_progress or self.send_in_progress:
             await asyncio.sleep(1)
 
-    async def _save_logical_sms(self, message: LogicalSms) -> None:
+    async def _save_logical_sms(self, message: LogicalSms) -> bool:
         """Persist one already-linked gateway message without heuristically appending."""
         number = message.number
         text = message.text
@@ -820,8 +870,12 @@ class SmsCoordinator:
             self.store.add, number, text, date
         )
         if not msg_id:
-            _LOGGER.debug("Ignoring already stored SMS from %s at %s", number, date)
-            return
+            stored = await self.hass.async_add_executor_job(
+                self.store.contains, number, text, date
+            )
+            if stored:
+                _LOGGER.debug("Ignoring already stored SMS from %s at %s", number, date)
+            return stored
         self.push_event("new_message", {
             "id": msg_id, "number": number,
             "text": text, "date": date, "is_read": 0
@@ -830,42 +884,63 @@ class SmsCoordinator:
             "number": number, "text": text, "date": date,
         })
         await self._notify(number, text)
+        return True
 
     async def _safe_get_all(self) -> list[dict] | None:
-        import time
         try:
             result = await self.client.get_all_sms()
-            if not self._modem_ok:
-                self._modem_ok = True
-                self.push_event("modem_status", {"ok": True})
-                _LOGGER.info("Modem connection restored")
-            self._error_streak = 0
+            self._mark_modem_connected()
             return result
         except Exception as e:
-            self._error_streak += 1
-            self._modem_ok = False
-            _LOGGER.warning("get_all_sms failed (%d/%d): %s",
-                            self._error_streak, MODEM_ERROR_RESET_THRESHOLD, e)
-            self.push_event("modem_status", {
-                "ok": False,
-                "error": str(e),
-                "streak": self._error_streak,
-            })
-
-            now = time.monotonic()
-            if (self._error_streak >= MODEM_ERROR_RESET_THRESHOLD
-                    and now - self._last_reset_at > MODEM_RESET_COOLDOWN):
-                _LOGGER.warning("Too many errors — resetting modem")
-                self._last_reset_at = now
-                try:
-                    await self.client.reset_modem()
-                    self._error_streak = 0
-                    _LOGGER.info("Modem reset command sent")
-                    # Пауза чтобы модем успел перезагрузиться
-                    await asyncio.sleep(15)
-                except Exception as re:
-                    _LOGGER.error("Modem reset failed: %s", re)
+            await self._record_modem_failure("get_all_sms", e)
             return None
+
+    async def _safe_get_raw(self) -> tuple[bool, list[dict] | None]:
+        """Return (API supported, payload); never fall back after raw API errors."""
+        try:
+            result = await self.client.get_raw_sms_parts()
+            if result is None:
+                return False, None
+            self._mark_modem_connected()
+            return True, result
+        except Exception as e:
+            await self._record_modem_failure("get_raw_sms_parts", e)
+            return True, None
+
+    def _mark_modem_connected(self) -> None:
+        if not self._modem_ok:
+            self._modem_ok = True
+            self.push_event("modem_status", {"ok": True})
+            _LOGGER.info("Modem connection restored")
+        self._error_streak = 0
+
+    async def _record_modem_failure(self, operation: str, error: Exception) -> None:
+        import time
+
+        self._error_streak += 1
+        self._modem_ok = False
+        _LOGGER.warning(
+            "%s failed (%d/%d): %s",
+            operation, self._error_streak, MODEM_ERROR_RESET_THRESHOLD, error,
+        )
+        self.push_event("modem_status", {
+            "ok": False,
+            "error": str(error),
+            "streak": self._error_streak,
+        })
+
+        now = time.monotonic()
+        if (self._error_streak >= MODEM_ERROR_RESET_THRESHOLD
+                and now - self._last_reset_at > MODEM_RESET_COOLDOWN):
+            _LOGGER.warning("Too many errors — resetting modem")
+            self._last_reset_at = now
+            try:
+                await self.client.reset_modem()
+                self._error_streak = 0
+                _LOGGER.info("Modem reset command sent")
+                await asyncio.sleep(15)
+            except Exception as reset_error:
+                _LOGGER.error("Modem reset failed: %s", reset_error)
 
     async def _notify(self, number: str, text: str) -> None:
         targets = self._notify_targets

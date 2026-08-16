@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Iterable
+from typing import Any, Iterable
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,6 +21,7 @@ class RawSmsPart:
     date: str
     location: int
     text: str
+    fingerprint: str
 
     @property
     def concat_key(self) -> tuple[str, str, int | None, int | None, int]:
@@ -39,6 +40,7 @@ class AssembledSms:
     text: str
     date: str
     locations: tuple[int, ...]
+    fingerprints: tuple[str, ...]
     parts: int
 
 
@@ -58,6 +60,44 @@ def _timestamp(value: str) -> float:
 
 def _part_order(part: RawSmsPart) -> tuple[float, int]:
     return (_timestamp(part.date), part.location)
+
+
+def _integer(value: Any, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def parse_raw_gateway_parts(payload: list[dict] | None) -> tuple[RawSmsPart, ...]:
+    """Normalize the proposed `/sms/raw` response."""
+    parts: list[RawSmsPart] = []
+    for item in payload or []:
+        location = _integer(item.get("Location"), -1)
+        fingerprint = str(item.get("Fingerprint") or "")
+        if location < 0 or not fingerprint:
+            continue
+        reference_value = item.get("Reference")
+        reference = None if reference_value is None else _integer(reference_value)
+        parts.append(
+            RawSmsPart(
+                number=str(item.get("Number") or "Unknown"),
+                smsc=str(item.get("SMSC") or ""),
+                reference=reference,
+                reference_bits=(
+                    None
+                    if item.get("ReferenceBits") is None
+                    else _integer(item.get("ReferenceBits"))
+                ),
+                sequence=_integer(item.get("PartNumber"), 1),
+                total=max(1, _integer(item.get("PartsExpected"), 1)),
+                date=str(item.get("Date") or ""),
+                location=location,
+                text=str(item.get("Text") or ""),
+                fingerprint=fingerprint,
+            )
+        )
+    return tuple(parts)
 
 
 def _clusters(
@@ -101,6 +141,7 @@ def assemble_raw_parts(
                     text=part.text,
                     date=part.date,
                     locations=(part.location,),
+                    fingerprints=(part.fingerprint,),
                     parts=1,
                 )
             )
@@ -132,6 +173,7 @@ def assemble_raw_parts(
                     text="".join(part.text for part in ordered),
                     date=min(ordered, key=_part_order).date,
                     locations=tuple(part.location for part in ordered),
+                    fingerprints=tuple(part.fingerprint for part in ordered),
                     parts=len(ordered),
                 )
             )

@@ -173,6 +173,21 @@ class SmsStore:
             _LOGGER.error("SmsStore.add error: %s", e)
             return None
 
+    def contains(self, number: str, text: str, date: str) -> bool:
+        """Check that an incoming message is durably present before modem ACK."""
+        number = self._sanitize_number(number)
+        try:
+            with self._conn() as conn:
+                row = conn.execute(
+                    "SELECT 1 FROM messages WHERE number=? AND text=? AND date=? "
+                    "AND direction='in' LIMIT 1",
+                    (number, text, date),
+                ).fetchone()
+            return row is not None
+        except Exception as e:
+            _LOGGER.error("SmsStore.contains error: %s", e)
+            return False
+
     def add_outgoing(self, number: str, text: str) -> int | None:
         """Сохраняет исходящее SMS в историю чата."""
         number = self._sanitize_number(number)

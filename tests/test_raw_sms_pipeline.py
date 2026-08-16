@@ -19,6 +19,7 @@ sys.modules[SPEC.name] = MODULE
 SPEC.loader.exec_module(MODULE)
 RawSmsPart = MODULE.RawSmsPart
 assemble_raw_parts = MODULE.assemble_raw_parts
+parse_raw_gateway_parts = MODULE.parse_raw_gateway_parts
 
 
 def part(
@@ -40,10 +41,31 @@ def part(
         date=date,
         location=location,
         text=text,
+        fingerprint=f"fingerprint-{location}",
     )
 
 
 class RawAssemblyTests(unittest.TestCase):
+    def test_parses_gateway_contract_and_rejects_unacknowledgeable_parts(self) -> None:
+        parsed = parse_raw_gateway_parts([
+            {
+                "Number": "+70000000000",
+                "SMSC": "+79990000000",
+                "Reference": 42,
+                "ReferenceBits": 8,
+                "PartNumber": 2,
+                "PartsExpected": 3,
+                "Date": "2026-08-16T12:00:00",
+                "Location": 9,
+                "Text": "fragment",
+                "Fingerprint": "abc",
+            },
+            {"Location": 10, "Text": "no fingerprint"},
+        ])
+        self.assertEqual(len(parsed), 1)
+        self.assertEqual(parsed[0].sequence, 2)
+        self.assertEqual(parsed[0].fingerprint, "abc")
+
     def test_orders_complete_message_by_udh_sequence_not_storage(self) -> None:
         result = assemble_raw_parts([
             part(2, "world", location=3),
@@ -51,6 +73,10 @@ class RawAssemblyTests(unittest.TestCase):
         ])
         self.assertEqual(result.complete[0].text, "hello world")
         self.assertEqual(result.complete[0].locations, (8, 3))
+        self.assertEqual(
+            result.complete[0].fingerprints,
+            ("fingerprint-8", "fingerprint-3"),
+        )
         self.assertEqual(result.pending, ())
 
     def test_missing_part_remains_pending_and_is_not_deleted(self) -> None:

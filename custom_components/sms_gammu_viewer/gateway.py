@@ -34,6 +34,7 @@ class GatewayClient:
         # Не создаём параллельную очередь HTTP-запросов к нему: это смешивает
         # AT-ответы/URC и провоцирует ложные таймауты отправки.
         self._operation_lock = asyncio.Lock()
+        self._raw_sms_api_supported: bool | None = None
 
     async def _request(self, method: str, path: str, timeout: int = 10, **kwargs) -> Any:
         t = aiohttp.ClientTimeout(total=timeout)
@@ -58,6 +59,45 @@ class GatewayClient:
         if isinstance(data, list):
             return data
         return []
+
+    async def get_raw_sms_parts(self) -> list[dict] | None:
+        """Return physical SMS records when the experimental API is present.
+
+        ``None`` means this gateway does not implement `/sms/raw`; after the
+        first 404 the legacy endpoint is used without probing every cycle.
+        Other failures are raised so normal modem recovery still applies.
+        """
+        if self._raw_sms_api_supported is False:
+            return None
+        try:
+            data = await self._request("GET", "/sms/raw", timeout=30)
+        except aiohttp.ClientResponseError as e:
+            if e.status == 404:
+                self._raw_sms_api_supported = False
+                _LOGGER.info("Gateway has no experimental raw SMS API")
+                return None
+            raise
+        self._raw_sms_api_supported = True
+        return data if isinstance(data, list) else []
+
+    async def acknowledge_raw_sms(
+        self, locations: tuple[int, ...], fingerprints: tuple[str, ...]
+    ) -> bool:
+        """Delete persisted parts only if their location fingerprints match."""
+        if len(locations) != len(fingerprints) or not locations:
+            return False
+        items = [
+            {"Location": location, "Fingerprint": fingerprint}
+            for location, fingerprint in zip(locations, fingerprints)
+        ]
+        data = await self._request(
+            "POST", "/sms/raw/ack", timeout=30, json={"Parts": items}
+        )
+        deleted = data.get("Deleted", []) if isinstance(data, dict) else []
+        mismatched = data.get("Mismatched", []) if isinstance(data, dict) else []
+        if mismatched:
+            _LOGGER.warning("Raw SMS acknowledge mismatch: %s", mismatched)
+        return len(deleted) == len(items) and not mismatched
 
     async def delete_sms(self, sms_id: int) -> bool:
         try:
