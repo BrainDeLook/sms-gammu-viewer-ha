@@ -234,6 +234,11 @@ const CSS = `
     font-size: 12px;
     letter-spacing: -.5px;
   }
+  .avatar img, .pb-avatar img, .chat-profile-avatar img,
+  .profile-avatar img, .profile-avatar-edit img {
+    width: 100%; height: 100%; border-radius: inherit;
+    object-fit: cover; display: block;
+  }
 
   .contact-info { flex: 1; min-width: 0; }
 
@@ -296,6 +301,15 @@ const CSS = `
     background: var(--card);
     border-bottom: 1px solid var(--line);
     min-height: 58px;
+  }
+  .chat-profile-trigger {
+    flex: 1; min-width: 0; cursor: pointer;
+  }
+  .chat-profile-avatar {
+    width: 36px; height: 36px; border-radius: 50%; border: 0;
+    background: rgba(255,255,255,.22); color: #fff;
+    display: none; align-items: center; justify-content: center;
+    font-weight: 700; overflow: hidden; cursor: pointer; flex-shrink: 0;
   }
 
   .chat-title {
@@ -877,6 +891,72 @@ const CSS = `
     border-color: var(--accent);
   }
 
+  /* ─── Contact profile/editor ─── */
+  .contact-modal-overlay {
+    display: none; position: fixed; inset: 0; z-index: 120;
+    background: rgba(0,0,0,.52); align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .contact-modal-overlay.open { display: flex; }
+  .contact-modal {
+    width: min(460px, 100%); max-height: min(760px, calc(100dvh - 40px));
+    overflow: auto; background: var(--card); color: var(--text);
+    border-radius: 18px; box-shadow: 0 18px 55px rgba(0,0,0,.32);
+  }
+  .profile-hero {
+    position: relative; text-align: center; padding: 28px 24px 20px;
+    background: linear-gradient(145deg, color-mix(in srgb, var(--accent) 88%, #fff), var(--accent));
+    color: #fff; border-radius: 18px 18px 0 0;
+  }
+  .profile-close {
+    position: absolute; right: 12px; top: 12px; width: 36px; height: 36px;
+    border: 0; border-radius: 50%; color: #fff; background: rgba(0,0,0,.18);
+    font-size: 24px; line-height: 1; cursor: pointer;
+  }
+  .profile-avatar, .profile-avatar-edit {
+    width: 104px; height: 104px; border-radius: 50%; margin: 0 auto 13px;
+    display: flex; align-items: center; justify-content: center; overflow: hidden;
+    background: rgba(255,255,255,.22); color: #fff; font-size: 34px; font-weight: 700;
+    border: 3px solid rgba(255,255,255,.78);
+  }
+  .profile-name { font-size: 23px; font-weight: 650; overflow-wrap: anywhere; }
+  .profile-label { margin-top: 4px; opacity: .84; font-size: 13px; }
+  .profile-actions { display: flex; justify-content: center; gap: 18px; padding: 16px; border-bottom: 1px solid var(--line); }
+  .profile-action {
+    min-width: 72px; border: 0; background: transparent; color: var(--accent);
+    cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 5px;
+    font-size: 12px;
+  }
+  .profile-action-icon {
+    width: 42px; height: 42px; border-radius: 50%; display: flex;
+    align-items: center; justify-content: center; background: color-mix(in srgb, var(--accent) 13%, transparent);
+    font-size: 20px;
+  }
+  .profile-details { padding: 8px 20px 20px; }
+  .profile-detail { padding: 11px 0; border-bottom: 1px solid var(--line); }
+  .profile-detail:last-child { border-bottom: 0; }
+  .profile-detail-label { color: var(--sub); font-size: 11px; margin-bottom: 3px; }
+  .profile-detail-value { font-size: 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .contact-form { padding: 18px 20px 20px; }
+  .contact-form-title { font-size: 19px; font-weight: 600; margin-bottom: 16px; }
+  .contact-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .contact-field { display: flex; flex-direction: column; gap: 5px; }
+  .contact-field.full { grid-column: 1 / -1; }
+  .contact-field label { color: var(--sub); font-size: 12px; }
+  .contact-field input, .contact-field textarea {
+    width: 100%; padding: 10px 11px; border: 1px solid var(--line);
+    border-radius: 9px; background: var(--bg); color: var(--text); font: inherit;
+  }
+  .contact-field input:focus, .contact-field textarea:focus { outline: none; border-color: var(--accent); }
+  .contact-photo-actions { display: flex; justify-content: center; gap: 8px; margin: -5px 0 17px; }
+  .contact-photo-btn, .contact-form-btn {
+    border: 0; border-radius: 9px; padding: 9px 13px; cursor: pointer;
+    background: color-mix(in srgb, var(--accent) 13%, transparent); color: var(--accent);
+  }
+  .contact-form-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 18px; }
+  .contact-form-btn.primary { background: var(--accent); color: #fff; }
+  .contact-form-btn.secondary { background: transparent; color: var(--sub); }
+
   @media (max-width: 580px) {
     .contacts { width: 100%; border-right: none; }
     .chat { display: none; position: absolute; inset: 0; z-index: 10; background: var(--bg); }
@@ -897,6 +977,15 @@ const CSS = `
     }
     .pb-actions-inline { display: none !important; }
     .pb-more-btn { display: flex !important; }
+    .contact-modal-overlay { padding: 0; align-items: flex-end; }
+    .contact-modal {
+      width: 100%; max-height: calc(100dvh - var(--safe-area-inset-top, 0px));
+      border-radius: 20px 20px 0 0;
+      padding-bottom: var(--safe-area-inset-bottom, 0px);
+    }
+    .profile-hero { border-radius: 20px 20px 0 0; }
+    .contact-form-grid { grid-template-columns: 1fr; }
+    .contact-field.full { grid-column: 1; }
   }
 
   .pb-actions-inline { display: flex; align-items: center; }
@@ -956,6 +1045,9 @@ class SmsGammuPanel extends HTMLElement {
     this._narrow = false;
     this._callHistory = [];
     this._phonebook = [];
+    this._phonebookLoaded = false;
+    this._profileContact = null;
+    this._avatarDraft = undefined;
   }
 
   _t(key, ...args) {
@@ -1123,6 +1215,14 @@ class SmsGammuPanel extends HTMLElement {
     this._updateRefreshBtn();
     try {
       this._contacts = await this._api("contacts");
+      // Фотографии не включаются в часто опрашиваемый список диалогов:
+      // телефонную книгу загружаем один раз и обновляем только при изменениях.
+      if (!this._phonebookLoaded) {
+        try {
+          this._phonebook = await this._api("phonebook");
+          this._phonebookLoaded = true;
+        } catch (_) {}
+      }
       if (this._activeNumber) {
         this._messages = await this._api(
           `messages/${encodeURIComponent(this._activeNumber)}`
@@ -1233,6 +1333,7 @@ class SmsGammuPanel extends HTMLElement {
 
       let needContacts = false;
       let needMessages = false;
+      let needPhonebook = false;
 
       for (const ev of data.events) {
         if (ev.type === "new_message") {
@@ -1243,6 +1344,9 @@ class SmsGammuPanel extends HTMLElement {
         } else if (ev.type === "message_deleted" || ev.type === "contact_deleted") {
           needContacts = true;
           needMessages = true;
+        } else if (ev.type === "contact_saved" || ev.type === "contact_deleted_pb") {
+          needContacts = true;
+          needPhonebook = true;
         } else if (ev.type === "modem_status") {
           if (!ev.data.ok) {
             this._modemError = ev.data;
@@ -1259,6 +1363,13 @@ class SmsGammuPanel extends HTMLElement {
         this._contacts = await this._api("contacts");
         this._renderContacts();
         this._updateBadge();
+      }
+      if (needPhonebook) {
+        this._phonebook = await this._api("phonebook");
+        this._phonebookLoaded = true;
+        this._renderContacts();
+        if (this._activeTab === "phonebook") this._renderPhonebook();
+        if (this._activeNumber && this._activeTab === "chats") this._renderMessages();
       }
       if (needMessages && this._activeNumber && this._activeTab === "chats") {
         this._messages = await this._api(`messages/${encodeURIComponent(this._activeNumber)}`);
@@ -1517,6 +1628,7 @@ class SmsGammuPanel extends HTMLElement {
     return this._contacts.filter(
       (c) =>
         c.number.toLowerCase().includes(q) ||
+        (c.contact_name || "").toLowerCase().includes(q) ||
         (c.last_text || "").toLowerCase().includes(q)
     );
   }
@@ -1961,6 +2073,7 @@ class SmsGammuPanel extends HTMLElement {
     page.innerHTML = `<div class="status-loading">${this._t("loading_phonebook")}</div>`;
     try {
       this._phonebook = await this._api("phonebook");
+      this._phonebookLoaded = true;
     } catch (e) {
       this._phonebook = [];
       this._phonebookError = e.message;
@@ -1978,18 +2091,20 @@ class SmsGammuPanel extends HTMLElement {
       ? all.filter((c) =>
           (c.name || "").toLowerCase().includes(q) ||
           (c.number || "").toLowerCase().includes(q) ||
-          (c.label || "").toLowerCase().includes(q)
+          (c.label || "").toLowerCase().includes(q) ||
+          (c.email || "").toLowerCase().includes(q) ||
+          (c.company || "").toLowerCase().includes(q)
         )
       : all;
 
     const rows = items.length
       ? items.map((c) => `
           <div class="pb-item" data-number="${this._esc(c.number)}">
-            <div class="pb-avatar">${this._esc((c.name || "?").slice(0, 1).toUpperCase())}</div>
+            ${this._contactAvatar(c, "pb-avatar")}
             <div class="pb-info">
               <div class="pb-name">${this._esc(c.name)}</div>
               <div class="pb-meta">
-                ${this._esc(c.number)}${c.label ? " · " + this._esc(c.label) : ""}
+                ${this._esc(c.number)}${c.label ? " · " + this._esc(c.label) : ""}${c.company ? " · " + this._esc(c.company) : ""}
               </div>
             </div>
             <div class="pb-actions-inline">
@@ -2068,15 +2183,11 @@ class SmsGammuPanel extends HTMLElement {
       });
     });
 
-    // На мобиле клик по строке контакта (не по кнопке) → сразу открываем pb-sheet
-    // Двойное нажатие на мобиле не нужно — сразу sheet с кнопками
+    // Как в мессенджерах: нажатие по контакту открывает полноценный профиль.
     page.querySelectorAll(".pb-item").forEach((item) => {
       item.addEventListener("click", (e) => {
         if (e.target.closest(".pb-action-btn") || e.target.closest(".pb-more-btn")) return;
-        const btn = item.querySelector(".pb-more-btn");
-        if (btn && getComputedStyle(btn).display !== "none") {
-          this._openPbSheet(btn.dataset.number, btn.dataset.name, btn.dataset.muted === "1");
-        }
+        this._openContactProfile(item.dataset.number);
       });
     });
 
@@ -2107,35 +2218,219 @@ class SmsGammuPanel extends HTMLElement {
     });
   }
 
-  _openContactEditor(contact) {
-    const isEdit = !!contact;
-    const name = prompt(this._t("contact_name_prompt"), contact?.name || "");
-    if (name === null) return;
-    if (!name.trim()) {
-      this._showToast(this._t("name_required"));
-      return;
-    }
-    let number = contact?.number;
-    if (!isEdit) {
-      number = prompt(this._t("contact_number_prompt"), "");
-      if (number === null) return;
-      if (!number.trim()) {
-        this._showToast(this._t("number_required"));
-        return;
-      }
-    }
-    const label = prompt(this._t("contact_label_prompt"), contact?.label || "");
-    this._saveContact(number.trim(), name.trim(), (label || "").trim());
+  _avatarFor(contact) {
+    if (!contact) return "";
+    if (contact.avatar) return contact.avatar;
+    return this._phonebook.find((c) => c.number === contact.number)?.avatar || "";
   }
 
-  async _saveContact(number, name, label) {
+  _contactAvatar(contact, className = "profile-avatar") {
+    const avatar = this._avatarFor(contact);
+    const name = contact?.name || contact?.contact_name || contact?.number || "?";
+    const fallback = this._esc(name.slice(0, 1).toUpperCase() || "?");
+    return `<div class="${className}">${avatar
+      ? `<img src="${this._esc(avatar)}" alt="" />`
+      : fallback}</div>`;
+  }
+
+  async _contactForNumber(number) {
+    const cached = this._phonebook.find((c) => c.number === number);
+    if (cached) return { ...cached, _saved: true };
     try {
-      await this._api("add_contact", "POST", { number, name, label });
-      await this._loadPhonebook();
-      this._refreshContacts();
+      const contact = await this._api(`phonebook/${encodeURIComponent(number)}`);
+      return { ...contact, _saved: true };
+    } catch (_) {
+      const chat = this._contacts.find((c) => c.number === number);
+      return {
+        number,
+        name: chat?.contact_name || number,
+        label: chat?.contact_label || "",
+        avatar: this._avatarFor(chat),
+        email: "", company: "", birthday: "", notes: "",
+        _saved: false,
+      };
+    }
+  }
+
+  async _openContactProfile(number) {
+    if (!number) return;
+    this._profileContact = await this._contactForNumber(number);
+    this._renderContactProfile();
+    this.shadowRoot.getElementById("contact-modal-overlay")?.classList.add("open");
+  }
+
+  _closeContactModal() {
+    this.shadowRoot.getElementById("contact-modal-overlay")?.classList.remove("open");
+    this._avatarDraft = undefined;
+  }
+
+  _renderContactProfile() {
+    const modal = this.shadowRoot.getElementById("contact-modal");
+    const c = this._profileContact;
+    if (!modal || !c) return;
+    const details = [
+      [this._t("contact_number"), c.number],
+      [this._t("contact_email"), c.email],
+      [this._t("contact_company"), c.company],
+      [this._t("contact_birthday"), c.birthday],
+      [this._t("contact_notes"), c.notes],
+    ].filter(([, value]) => value);
+    modal.innerHTML = `
+      <div class="profile-hero">
+        <button class="profile-close" id="profile-close" title="${this._t("close")}">×</button>
+        ${this._contactAvatar(c)}
+        <div class="profile-name">${this._esc(c.name || c.number)}</div>
+        <div class="profile-label">${this._esc(c.label || c.number)}</div>
+      </div>
+      <div class="profile-actions">
+        <button class="profile-action" id="profile-message">
+          <span class="profile-action-icon">✉</span><span>${this._t("open_chat")}</span>
+        </button>
+        ${this._status?.call_enabled ? `<button class="profile-action" id="profile-call">
+          <span class="profile-action-icon">☎</span><span>${this._t("call_number")}</span>
+        </button>` : ""}
+        <button class="profile-action" id="profile-edit">
+          <span class="profile-action-icon">✎</span><span>${c._saved ? this._t("edit") : this._t("add_to_contacts")}</span>
+        </button>
+      </div>
+      <div class="profile-details">
+        ${details.length ? details.map(([label, value]) => `
+          <div class="profile-detail">
+            <div class="profile-detail-label">${this._esc(label)}</div>
+            <div class="profile-detail-value">${this._esc(value)}</div>
+          </div>`).join("") : `<div class="pb-empty">${this._t("contact_details")}</div>`}
+      </div>`;
+    modal.querySelector("#profile-close")?.addEventListener("click", () => this._closeContactModal());
+    modal.querySelector("#profile-message")?.addEventListener("click", async () => {
+      this._closeContactModal();
+      this._activeTab = "chats";
+      this.shadowRoot.getElementById("phonebook-btn").style.color = "";
+      this._switchTab();
+      await this._selectContact(c.number);
+    });
+    modal.querySelector("#profile-call")?.addEventListener("click", () => {
+      this._closeContactModal();
+      this._callNumber(c.number);
+    });
+    modal.querySelector("#profile-edit")?.addEventListener("click", () => this._openContactEditor(c));
+  }
+
+  _openContactEditor(contact = null) {
+    const modal = this.shadowRoot.getElementById("contact-modal");
+    const overlay = this.shadowRoot.getElementById("contact-modal-overlay");
+    if (!modal || !overlay) return;
+    const c = contact || {
+      number: "", name: "", label: "", email: "", company: "",
+      birthday: "", notes: "", avatar: "", _saved: false,
+    };
+    this._profileContact = c;
+    this._avatarDraft = undefined;
+    const readonly = c._saved ? "readonly" : "";
+    modal.innerHTML = `
+      <div class="contact-form">
+        <div class="contact-form-title">${c._saved ? this._t("edit_contact") : this._t("add_contact")}</div>
+        <div id="contact-avatar-preview">${this._contactAvatar(c, "profile-avatar-edit")}</div>
+        <div class="contact-photo-actions">
+          <button class="contact-photo-btn" id="contact-photo-choose">${this._t("choose_photo")}</button>
+          <button class="contact-photo-btn" id="contact-photo-remove" ${c.avatar ? "" : "style=\"display:none\""}>${this._t("remove_photo")}</button>
+          <input id="contact-photo-input" type="file" accept="image/jpeg,image/png,image/webp" hidden />
+        </div>
+        <div class="contact-form-grid">
+          <div class="contact-field full"><label>${this._t("contact_name")} *</label><input id="contact-name" maxlength="120" value="${this._esc(c.name || "")}" /></div>
+          <div class="contact-field full"><label>${this._t("contact_number")} *</label><input id="contact-number" maxlength="64" value="${this._esc(c.number || "")}" ${readonly} /></div>
+          <div class="contact-field"><label>${this._t("contact_label")}</label><input id="contact-label" maxlength="80" value="${this._esc(c.label || "")}" /></div>
+          <div class="contact-field"><label>${this._t("contact_company")}</label><input id="contact-company" maxlength="120" value="${this._esc(c.company || "")}" /></div>
+          <div class="contact-field"><label>${this._t("contact_email")}</label><input id="contact-email" type="email" maxlength="254" value="${this._esc(c.email || "")}" /></div>
+          <div class="contact-field"><label>${this._t("contact_birthday")}</label><input id="contact-birthday" type="date" value="${this._esc(c.birthday || "")}" /></div>
+          <div class="contact-field full"><label>${this._t("contact_notes")}</label><textarea id="contact-notes" rows="4" maxlength="4000">${this._esc(c.notes || "")}</textarea></div>
+        </div>
+        <div class="contact-form-actions">
+          <button class="contact-form-btn secondary" id="contact-cancel">${this._t("cancel")}</button>
+          <button class="contact-form-btn primary" id="contact-save">${this._t("save")}</button>
+        </div>
+      </div>`;
+    overlay.classList.add("open");
+    modal.querySelector("#contact-cancel")?.addEventListener("click", () => this._closeContactModal());
+    const fileInput = modal.querySelector("#contact-photo-input");
+    modal.querySelector("#contact-photo-choose")?.addEventListener("click", () => fileInput?.click());
+    fileInput?.addEventListener("change", async () => {
+      const file = fileInput.files?.[0];
+      if (!file) return;
+      try {
+        this._avatarDraft = await this._prepareAvatar(file);
+        const preview = modal.querySelector("#contact-avatar-preview");
+        if (preview) preview.innerHTML = this._contactAvatar({ ...c, avatar: this._avatarDraft }, "profile-avatar-edit");
+        const remove = modal.querySelector("#contact-photo-remove");
+        if (remove) remove.style.display = "";
+      } catch (_) {
+        this._showToast(this._t("photo_too_large"));
+      }
+    });
+    modal.querySelector("#contact-photo-remove")?.addEventListener("click", () => {
+      this._avatarDraft = "";
+      const preview = modal.querySelector("#contact-avatar-preview");
+      if (preview) preview.innerHTML = this._contactAvatar({ ...c, avatar: "" }, "profile-avatar-edit");
+      modal.querySelector("#contact-photo-remove").style.display = "none";
+    });
+    modal.querySelector("#contact-save")?.addEventListener("click", () => this._saveContactForm(modal));
+    setTimeout(() => modal.querySelector("#contact-name")?.focus(), 30);
+  }
+
+  _prepareAvatar(file) {
+    return new Promise((resolve, reject) => {
+      if (!file.type.startsWith("image/") || file.size > 12 * 1024 * 1024) return reject(new Error("invalid image"));
+      const reader = new FileReader();
+      reader.onerror = reject;
+      reader.onload = () => {
+        const image = new Image();
+        image.onerror = reject;
+        image.onload = () => {
+          const side = Math.min(image.naturalWidth, image.naturalHeight);
+          const size = Math.min(512, side);
+          const canvas = document.createElement("canvas");
+          canvas.width = size; canvas.height = size;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(
+            image,
+            (image.naturalWidth - side) / 2,
+            (image.naturalHeight - side) / 2,
+            side, side, 0, 0, size, size,
+          );
+          const data = canvas.toDataURL("image/jpeg", .84);
+          data.length <= 700000 ? resolve(data) : reject(new Error("image too large"));
+        };
+        image.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async _saveContactForm(modal) {
+    const value = (id) => modal.querySelector(`#${id}`)?.value.trim() || "";
+    const payload = {
+      number: value("contact-number"), name: value("contact-name"),
+      label: value("contact-label"), email: value("contact-email"),
+      company: value("contact-company"), birthday: value("contact-birthday"),
+      notes: value("contact-notes"),
+    };
+    if (!payload.name) return this._showToast(this._t("name_required"));
+    if (!payload.number) return this._showToast(this._t("number_required"));
+    if (payload.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) {
+      return this._showToast(this._t("invalid_email"));
+    }
+    if (this._avatarDraft !== undefined) payload.avatar = this._avatarDraft;
+    const save = modal.querySelector("#contact-save");
+    if (save) save.disabled = true;
+    try {
+      const result = await this._api("add_contact", "POST", payload);
+      this._profileContact = { ...(result.contact || payload), _saved: true };
+      this._phonebook = await this._api("phonebook");
+      await this._refreshContacts();
       this._showToast(this._t("saved"));
+      this._renderContactProfile();
     } catch (e) {
       this._showToast(this._t("send_error") + ": " + e.message);
+      if (save) save.disabled = false;
     }
   }
 
@@ -2377,6 +2672,10 @@ class SmsGammuPanel extends HTMLElement {
       <style>${CSS}</style>
       <div class="root" id="root">
 
+        <div class="contact-modal-overlay" id="contact-modal-overlay">
+          <div class="contact-modal" id="contact-modal"></div>
+        </div>
+
         <div class="contacts">
           <div class="contacts-header">
             <div class="contacts-header-row">
@@ -2461,6 +2760,7 @@ class SmsGammuPanel extends HTMLElement {
               </div>
             </div>
           </div>
+
         </div>
 
         <div class="chat" id="chat">
@@ -2470,7 +2770,8 @@ class SmsGammuPanel extends HTMLElement {
                 <polyline points="15 18 9 12 15 6"/>
               </svg>
             </button>
-            <div style="flex:1">
+            <button class="chat-profile-avatar" id="chat-profile-avatar" title="${this._t('contact_profile')}">?</button>
+            <div class="chat-profile-trigger" id="chat-profile-trigger" title="${this._t('contact_profile')}">
               <div class="chat-title" id="chat-title">Выберите диалог</div>
               <div class="chat-subtitle" id="chat-subtitle"></div>
             </div>
@@ -2566,6 +2867,17 @@ class SmsGammuPanel extends HTMLElement {
     });
     this.shadowRoot.getElementById("new-chat-cancel").addEventListener("click", () => {
       this._closeNewChat();
+    });
+    this.shadowRoot.getElementById("contact-modal-overlay").addEventListener("click", (e) => {
+      if (e.target === this.shadowRoot.getElementById("contact-modal-overlay")) {
+        this._closeContactModal();
+      }
+    });
+    this.shadowRoot.getElementById("chat-profile-trigger").addEventListener("click", () => {
+      if (this._activeNumber) this._openContactProfile(this._activeNumber);
+    });
+    this.shadowRoot.getElementById("chat-profile-avatar").addEventListener("click", () => {
+      if (this._activeNumber) this._openContactProfile(this._activeNumber);
     });
 
     const numInput  = this.shadowRoot.getElementById("new-chat-number");
@@ -2822,7 +3134,9 @@ class SmsGammuPanel extends HTMLElement {
         <div class="swipe-inner contact-item ${c.unread > 0 ? "has-unread has-unread-wrap" : ""} ${
           c.number === this._activeNumber ? "active" : ""
         } ${c.is_pinned ? "pinned-active" : ""}">
-          <div class="avatar ${this._isAlphaTag(c.number) ? 'alpha' : ''}">${this._esc(c.contact_name ? c.contact_name.slice(0,1).toUpperCase() : this._avatar(c.number))}</div>
+          ${this._avatarFor(c)
+            ? this._contactAvatar(c, "avatar")
+            : `<div class="avatar ${this._isAlphaTag(c.number) ? 'alpha' : ''}">${this._esc(c.contact_name ? c.contact_name.slice(0,1).toUpperCase() : this._avatar(c.number))}</div>`}
           <div class="contact-info">
             <div class="contact-row1">
               <span class="contact-number">${c.is_muted ? "🔇 " : ""}${this._esc(c.contact_name || c.number)}</span>
@@ -3140,6 +3454,7 @@ class SmsGammuPanel extends HTMLElement {
     const delBtn = this.shadowRoot.getElementById("delete-contact-btn");
     const muteBtn = this.shadowRoot.getElementById("mute-contact-btn");
     const callBtn = this.shadowRoot.getElementById("call-contact-btn");
+    const profileAvatar = this.shadowRoot.getElementById("chat-profile-avatar");
     if (!area) return;
 
     const sendBar = this.shadowRoot.getElementById("send-bar");
@@ -3150,6 +3465,7 @@ class SmsGammuPanel extends HTMLElement {
       delBtn && (delBtn.style.display = "none");
       muteBtn && (muteBtn.style.display = "none");
       callBtn && (callBtn.style.display = "none");
+      profileAvatar && (profileAvatar.style.display = "none");
       sendBar && (sendBar.style.display = "none");
       area.innerHTML = `
         <div class="empty">
@@ -3167,6 +3483,13 @@ class SmsGammuPanel extends HTMLElement {
     const count = contact?.total ?? this._messages.length;
     titleEl && (titleEl.textContent = contact?.contact_name || this._activeNumber);
     subEl && (subEl.textContent = this._t("messages_count", count));
+    if (profileAvatar) {
+      const avatar = this._avatarFor(contact);
+      profileAvatar.style.display = "flex";
+      profileAvatar.innerHTML = avatar
+        ? `<img src="${this._esc(avatar)}" alt="" />`
+        : this._esc((contact?.contact_name || this._activeNumber).slice(0, 1).toUpperCase());
+    }
     delBtn && (delBtn.style.display = "");
     muteBtn && (muteBtn.style.display = "");
     this._updateMuteBtn(contact?.is_muted || false);

@@ -1178,7 +1178,8 @@ class SmsApiView(HomeAssistantView):
             return self._json(data)
 
         if action.startswith("phonebook/"):
-            number = action[len("phonebook/"):]
+            from urllib.parse import unquote as _uq
+            number = _uq(action[len("phonebook/"):])
             data = await self.hass.async_add_executor_job(store.get_contact, number)
             if data is None:
                 return self._error("Contact not found", 404)
@@ -1359,16 +1360,42 @@ class SmsApiView(HomeAssistantView):
             number = (body.get("number") or "").strip()
             name = (body.get("name") or "").strip()
             label = (body.get("label") or "").strip()
+            email = (body.get("email") or "").strip()
+            company = (body.get("company") or "").strip()
+            birthday = (body.get("birthday") or "").strip()
+            notes = (body.get("notes") or "").strip()
+            # ``None`` означает «оставить существующее фото», пустая строка —
+            # удалить его. Фронтенд заранее уменьшает фото до 512 px.
+            avatar = body.get("avatar") if "avatar" in body else None
             if not number:
                 return self._error("number required", 400)
             if not name:
                 return self._error("name required", 400)
-            await self.hass.async_add_executor_job(store.add_contact, number, name, label)
-            coord.push_event("contact_saved", {"number": number, "name": name, "label": label})
-            return self._json({"ok": True})
+            if len(number) > 64 or len(name) > 120:
+                return self._error("contact field too long", 400)
+            if any(len(value) > limit for value, limit in (
+                (label, 80), (email, 254), (company, 120),
+                (birthday, 10), (notes, 4000),
+            )):
+                return self._error("contact field too long", 400)
+            if avatar is not None:
+                if not isinstance(avatar, str):
+                    return self._error("invalid avatar", 400)
+                if avatar and not avatar.startswith(("data:image/jpeg;base64,", "data:image/png;base64,", "data:image/webp;base64,")):
+                    return self._error("invalid avatar format", 400)
+                if len(avatar) > 700_000:
+                    return self._error("avatar too large", 413)
+            await self.hass.async_add_executor_job(
+                store.add_contact, number, name, label, email, company,
+                birthday, notes, avatar,
+            )
+            contact = await self.hass.async_add_executor_job(store.get_contact, number)
+            coord.push_event("contact_saved", {"number": number, "name": name})
+            return self._json({"ok": True, "contact": contact})
 
         if action.startswith("delete_phonebook_contact/"):
-            number = action[len("delete_phonebook_contact/"):]
+            from urllib.parse import unquote as _uq
+            number = _uq(action[len("delete_phonebook_contact/"):])
             await self.hass.async_add_executor_job(store.delete_contact, number)
             coord.push_event("contact_deleted_pb", {"number": number})
             return self._json({"ok": True})

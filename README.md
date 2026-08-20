@@ -32,7 +32,7 @@ After installation, an **SMS** tab appears in the sidebar. Messages are stored i
 - 👆 **Long press** (mobile) / **right click** (desktop) — copy, star, delete message
 - 👈 **Swipe actions** (mobile) — swipe left: mute/delete, swipe right: mark read/pin
 - 📞 **Outgoing voice calls** via AT interface
-- 📖 **Phonebook** — contact names shown in chat list and headers
+- 📖 **Contact profiles** — name, photo, label, email, company, birthday and notes, available from the conversation list and chat header
 - 📡 **Modem status page** — signal, network, SIM, memory, firmware, IMEI
 - 💾 **Storage stats** — DB size and message count, with clear-all button
 - 🏠 **HA sensors** — unread count, last SMS, signal quality %, network operator

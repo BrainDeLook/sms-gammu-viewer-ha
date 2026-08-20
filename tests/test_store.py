@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
+import sqlite3
 import sys
 import tempfile
 import unittest
@@ -45,6 +46,50 @@ class StoreContainsTests(unittest.TestCase):
             self.assertIsNotNone(store.add(*args))
             self.assertIsNone(store.add(*args))
             self.assertTrue(store.contains(*args))
+
+
+class ContactProfileTests(unittest.TestCase):
+    def test_migrates_existing_phonebook_and_preserves_contacts(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            db_path = Path(directory) / "sms.db"
+            conn = sqlite3.connect(db_path)
+            try:
+                with conn:
+                    conn.execute(
+                        "CREATE TABLE phonebook (number TEXT PRIMARY KEY, "
+                        "name TEXT NOT NULL, label TEXT, created_at TEXT NOT NULL)"
+                    )
+                    conn.execute(
+                        "INSERT INTO phonebook VALUES (?, ?, ?, ?)",
+                        ("+7000", "Old contact", "mobile", "2026-01-01"),
+                    )
+            finally:
+                conn.close()
+            store = SmsStore(db_path)
+            store.init()
+            contact = store.get_contact("+7000")
+            self.assertEqual("Old contact", contact["name"])
+            self.assertEqual("", contact["email"])
+            self.assertEqual("", contact["avatar"])
+
+    def test_saves_full_profile_and_can_remove_avatar(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = SmsStore(Path(directory) / "sms.db")
+            store.init()
+            avatar = "data:image/jpeg;base64,abc"
+            store.add_contact(
+                "+7000", "Daniil", "main", "d@example.com",
+                "Home", "2000-01-02", "Notes", avatar,
+            )
+            contact = store.get_contact("+7000")
+            self.assertEqual("d@example.com", contact["email"])
+            self.assertEqual("Home", contact["company"])
+            self.assertEqual(avatar, contact["avatar"])
+
+            store.add_contact("+7000", "New name", avatar=None)
+            self.assertEqual(avatar, store.get_contact("+7000")["avatar"])
+            store.add_contact("+7000", "New name", avatar="")
+            self.assertEqual("", store.get_contact("+7000")["avatar"])
 
 
 if __name__ == "__main__":

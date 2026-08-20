@@ -80,6 +80,23 @@ class SmsStore:
                 )
             """)
             conn.execute("CREATE INDEX IF NOT EXISTS idx_phonebook_name ON phonebook(name)")
+            # Расширенный профиль контакта. ALTER оставляет старую телефонную
+            # книгу полностью совместимой и не требует отдельной миграции БД.
+            for column, declaration in (
+                ("email", "TEXT NOT NULL DEFAULT ''"),
+                ("company", "TEXT NOT NULL DEFAULT ''"),
+                ("birthday", "TEXT NOT NULL DEFAULT ''"),
+                ("notes", "TEXT NOT NULL DEFAULT ''"),
+                ("avatar", "TEXT NOT NULL DEFAULT ''"),
+                ("updated_at", "TEXT NOT NULL DEFAULT ''"),
+            ):
+                try:
+                    conn.execute(
+                        f"ALTER TABLE phonebook ADD COLUMN {column} {declaration}"
+                    )
+                    _LOGGER.info("Migrated phonebook table: added %s", column)
+                except sqlite3.OperationalError:
+                    pass
             # Эти таблицы раньше создавались лениво в get_contacts /
             # get_messages_with_starred — из-за этого pin_number/star_message
             # падали с "no such table", если вызывались раньше первого чтения
@@ -412,13 +429,43 @@ class SmsStore:
 
     # ─── Телефонная книга ───────────────────────────────────────────
 
-    def add_contact(self, number: str, name: str, label: str = "") -> None:
+    def add_contact(
+        self,
+        number: str,
+        name: str,
+        label: str = "",
+        email: str = "",
+        company: str = "",
+        birthday: str = "",
+        notes: str = "",
+        avatar: str | None = None,
+    ) -> None:
         number = self._sanitize_number(number)
+        now = datetime.now().isoformat(timespec="seconds")
         with self._conn() as conn:
             conn.execute(
-                "INSERT OR REPLACE INTO phonebook (number, name, label, created_at) "
-                "VALUES (?, ?, ?, COALESCE((SELECT created_at FROM phonebook WHERE number=?), ?))",
-                (number, name, label, number, datetime.now().isoformat(timespec="seconds")),
+                """
+                INSERT INTO phonebook (
+                    number, name, label, email, company, birthday, notes,
+                    avatar, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(number) DO UPDATE SET
+                    name=excluded.name,
+                    label=excluded.label,
+                    email=excluded.email,
+                    company=excluded.company,
+                    birthday=excluded.birthday,
+                    notes=excluded.notes,
+                    avatar=CASE
+                        WHEN ? IS NULL THEN phonebook.avatar
+                        ELSE excluded.avatar
+                    END,
+                    updated_at=excluded.updated_at
+                """,
+                (
+                    number, name, label, email, company, birthday, notes,
+                    avatar or "", now, now, avatar,
+                ),
             )
 
     def delete_contact(self, number: str) -> None:
