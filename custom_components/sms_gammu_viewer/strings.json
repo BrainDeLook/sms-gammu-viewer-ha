@@ -24,24 +24,56 @@
     "step": {
       "init": {
         "menu_options": {
-          "settings": "General settings",
-          "call_entities": "Call entities (cover/button per phone number)"
+          "connection": "SMS gateway connection",
+          "sms": "SMS and notifications",
+          "interface": "Interface",
+          "calls": "Voice port and call settings",
+          "call_entities": "Call buttons and covers",
+          "advanced": "Legacy gateway compatibility"
         }
       },
-      "settings": {
-        "title": "SMS Gammu Viewer Settings",
-        "description": "Configure polling interval and notification targets.",
+      "connection": {
+        "title": "SMS gateway connection",
+        "description": "Change the REST API address or credentials. The connection is tested before saving.",
+        "data": {
+          "host": "Host or IP address",
+          "port": "REST API port",
+          "username": "Username",
+          "password": "Password"
+        }
+      },
+      "sms": {
+        "title": "SMS and notifications",
+        "description": "Configure how often the durable queue is checked and where new-message notifications are sent.",
         "data": {
           "poll_interval": "Polling interval (seconds, min 5)",
-          "notify_targets": "Devices to notify on new SMS",
-          "call_device": "Voice call serial port (optional, e.g. /dev/serial/by-id/...-if02-port0)",
-          "call_dial_timeout": "Dial timeout (seconds)",
-          "call_duration": "Max call duration after answer (seconds)",
-          "collect_interval": "Delay between SMS stability checks (seconds)",
-          "collect_empty_max": "Identical snapshots required when the gateway does not report completeness",
+          "notify_targets": "Devices to notify on new SMS"
+        }
+      },
+      "interface": {
+        "title": "Interface",
+        "description": "Configure the SMS panel and its sidebar indicator.",
+        "data": {
           "language": "Panel interface language",
           "show_panel": "Show SMS panel in sidebar",
           "show_sidebar_badge": "Show unread SMS count in sidebar"
+        }
+      },
+      "calls": {
+        "title": "Voice port and call settings",
+        "description": "Calls use a separate modem serial port directly from the integration; they do not use the SMS gateway REST API.",
+        "data": {
+          "call_device": "Voice call serial port (optional, e.g. /dev/serial/by-id/...-if02-port0)",
+          "call_dial_timeout": "Dial timeout (seconds)",
+          "call_duration": "Max call duration after answer (seconds)"
+        }
+      },
+      "advanced": {
+        "title": "Legacy gateway compatibility",
+        "description": "Only used with old Gammu Gateway versions. The lean gateway assembles multipart SMS itself, so normally these values should not be changed.",
+        "data": {
+          "collect_interval": "Delay between SMS stability checks (seconds)",
+          "collect_empty_max": "Identical snapshots required when the gateway does not report completeness"
         }
       },
       "call_entities": {

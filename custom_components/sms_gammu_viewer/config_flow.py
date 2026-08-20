@@ -108,54 +108,94 @@ class SmsGammuOptionsFlow(OptionsFlow):
     async def async_step_init(
         self, user_input: dict | None = None
     ) -> ConfigFlowResult:
-        """Главное меню Options flow: общие настройки или управление сущностями звонков.
+        """Показывает понятное тематическое меню настроек.
 
-        Текст всегда на английском, захардкожен напрямую. У HA frontend есть
-        известный баг с переводом menu_options через strings.json именно для
-        Options Flow (issue home-assistant/frontend#21887/#21889) — подписи
-        пунктов остаются пустыми. Раз меню всего из двух статичных пунктов,
-        проще оставить фиксированный английский текст, чем гоняться за
-        нестабильным поведением системы переводов.
+        Подписи передаются напрямую: некоторые версии HA frontend не
+        подставляют ``menu_options`` из переводов для Options Flow.
         """
+        language = self._entry.data.get(
+            CONF_LANGUAGE, getattr(self.hass.config, "language", DEFAULT_LANGUAGE)
+        )
+        if language == "ru":
+            labels = {
+                "connection": "Подключение к SMS-шлюзу",
+                "sms": "SMS и уведомления",
+                "interface": "Интерфейс",
+                "calls": "Голосовой порт и параметры звонков",
+                "call_entities": "Кнопки и ворота для звонков",
+                "advanced": "Совместимость со старым шлюзом",
+            }
+        else:
+            labels = {
+                "connection": "SMS gateway connection",
+                "sms": "SMS and notifications",
+                "interface": "Interface",
+                "calls": "Voice port and call settings",
+                "call_entities": "Call buttons and covers",
+                "advanced": "Legacy gateway compatibility",
+            }
         return self.async_show_menu(
             step_id="init",
-            menu_options={
-                "settings": "General settings",
-                "call_entities": "Call entities (cover/button per phone number)",
+            menu_options=labels,
+        )
+
+    def _save_data(self, updates: dict) -> ConfigFlowResult:
+        self.hass.config_entries.async_update_entry(
+            self._entry, data={**self._entry.data, **updates}
+        )
+        return self.async_create_entry(
+            title="",
+            data={
+                CONF_CALL_ENTITIES: self._entry.options.get(
+                    CONF_CALL_ENTITIES, []
+                )
             },
         )
 
-    async def async_step_settings(
+    async def async_step_connection(
+        self, user_input: dict | None = None
+    ) -> ConfigFlowResult:
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            candidate = {**self._entry.data, **user_input}
+            error = await GatewayClient(self.hass, candidate).test_connection()
+            if error:
+                errors["base"] = error
+            else:
+                return self._save_data(user_input)
+
+        return self.async_show_form(
+            step_id="connection",
+            data_schema=vol.Schema({
+                vol.Required(
+                    CONF_HOST, default=self._entry.data.get(CONF_HOST, "localhost")
+                ): str,
+                vol.Required(
+                    CONF_PORT, default=self._entry.data.get(CONF_PORT, DEFAULT_PORT)
+                ): int,
+                vol.Required(
+                    CONF_USERNAME,
+                    default=self._entry.data.get(CONF_USERNAME, DEFAULT_USERNAME),
+                ): str,
+                vol.Required(
+                    CONF_PASSWORD,
+                    default=self._entry.data.get(CONF_PASSWORD, DEFAULT_PASSWORD),
+                ): TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD)),
+            }),
+            errors=errors,
+        )
+
+    async def async_step_sms(
         self, user_input: dict | None = None
     ) -> ConfigFlowResult:
         if user_input is not None:
             targets = user_input.get(CONF_NOTIFY_TARGETS, [])
-            call_device = user_input.get(CONF_CALL_DEVICE, "").strip()
-            self.hass.config_entries.async_update_entry(
-                self._entry,
-                data={
-                    **self._entry.data,
-                    CONF_POLL_INTERVAL: int(user_input[CONF_POLL_INTERVAL]),
-                    CONF_NOTIFY_TARGETS: targets,
-                    CONF_CALL_DEVICE: call_device,
-                    CONF_CALL_DIAL_TIMEOUT: int(user_input.get(CONF_CALL_DIAL_TIMEOUT, DEFAULT_CALL_DIAL_TIMEOUT)),
-                    CONF_CALL_DURATION: int(user_input.get(CONF_CALL_DURATION, DEFAULT_CALL_DURATION)),
-                    CONF_COLLECT_INTERVAL: int(user_input.get(CONF_COLLECT_INTERVAL, DEFAULT_COLLECT_INTERVAL)),
-                    CONF_COLLECT_EMPTY_MAX: int(user_input.get(CONF_COLLECT_EMPTY_MAX, DEFAULT_COLLECT_EMPTY_MAX)),
-                    CONF_LANGUAGE: user_input.get(CONF_LANGUAGE, DEFAULT_LANGUAGE),
-                    CONF_SHOW_PANEL: bool(user_input.get(CONF_SHOW_PANEL, DEFAULT_SHOW_PANEL)),
-                    CONF_SHOW_SIDEBAR_BADGE: bool(
-                        user_input.get(CONF_SHOW_SIDEBAR_BADGE, DEFAULT_SHOW_SIDEBAR_BADGE)
-                    ),
-                },
-            )
-            # ВАЖНО: async_create_entry(data=...) для OptionsFlow ПОЛНОСТЬЮ
-            # заменяет entry.options, а не дополняет. Нужно явно сохранить
-            # уже существующие call_entities, иначе они стираются.
-            return self.async_create_entry(
-                title="",
-                data={CONF_CALL_ENTITIES: self._entry.options.get(CONF_CALL_ENTITIES, [])},
-            )
+            if isinstance(targets, str):
+                targets = [item.strip() for item in targets.split(",") if item.strip()]
+            return self._save_data({
+                CONF_POLL_INTERVAL: int(user_input[CONF_POLL_INTERVAL]),
+                CONF_NOTIFY_TARGETS: targets,
+            })
 
         notify_options = self._get_notify_options()
         current_targets = self._entry.data.get(CONF_NOTIFY_TARGETS, [])
@@ -197,43 +237,28 @@ class SmsGammuOptionsFlow(OptionsFlow):
                 default=", ".join(current_targets),
             )] = str
 
-        schema_fields[vol.Optional(
-            CONF_CALL_DEVICE,
-            default=self._entry.data.get(CONF_CALL_DEVICE, ""),
-        )] = str
-
-        schema_fields[vol.Optional(
-            CONF_CALL_DIAL_TIMEOUT,
-            default=self._entry.data.get(CONF_CALL_DIAL_TIMEOUT, DEFAULT_CALL_DIAL_TIMEOUT),
-        )] = NumberSelector(
-            NumberSelectorConfig(min=5, max=120, step=1, mode=NumberSelectorMode.BOX, unit_of_measurement="сек")
+        return self.async_show_form(
+            step_id="sms", data_schema=vol.Schema(schema_fields)
         )
 
-        schema_fields[vol.Optional(
-            CONF_CALL_DURATION,
-            default=self._entry.data.get(CONF_CALL_DURATION, DEFAULT_CALL_DURATION),
-        )] = NumberSelector(
-            NumberSelectorConfig(min=5, max=300, step=1, mode=NumberSelectorMode.BOX, unit_of_measurement="сек")
-        )
-
-        schema_fields[vol.Optional(
-            CONF_COLLECT_INTERVAL,
-            default=self._entry.data.get(CONF_COLLECT_INTERVAL, DEFAULT_COLLECT_INTERVAL),
-        )] = NumberSelector(
-            NumberSelectorConfig(min=1, max=15, step=1, mode=NumberSelectorMode.BOX, unit_of_measurement="сек")
-        )
-
-        schema_fields[vol.Optional(
-            CONF_COLLECT_EMPTY_MAX,
-            default=self._entry.data.get(CONF_COLLECT_EMPTY_MAX, DEFAULT_COLLECT_EMPTY_MAX),
-        )] = NumberSelector(
-            NumberSelectorConfig(min=1, max=20, step=1, mode=NumberSelectorMode.BOX, unit_of_measurement="опросов")
-        )
-
-        schema_fields[vol.Optional(
-            CONF_LANGUAGE,
-            default=self._entry.data.get(CONF_LANGUAGE, DEFAULT_LANGUAGE),
-        )] = SelectSelector(
+    async def async_step_interface(
+        self, user_input: dict | None = None
+    ) -> ConfigFlowResult:
+        if user_input is not None:
+            return self._save_data({
+                CONF_LANGUAGE: user_input.get(CONF_LANGUAGE, DEFAULT_LANGUAGE),
+                CONF_SHOW_PANEL: bool(user_input.get(CONF_SHOW_PANEL, True)),
+                CONF_SHOW_SIDEBAR_BADGE: bool(
+                    user_input.get(CONF_SHOW_SIDEBAR_BADGE, True)
+                ),
+            })
+        return self.async_show_form(
+            step_id="interface",
+            data_schema=vol.Schema({
+                vol.Optional(
+                    CONF_LANGUAGE,
+                    default=self._entry.data.get(CONF_LANGUAGE, DEFAULT_LANGUAGE),
+                ): SelectSelector(
             SelectSelectorConfig(
                 options=[
                     {"value": "ru", "label": "Русский"},
@@ -241,24 +266,102 @@ class SmsGammuOptionsFlow(OptionsFlow):
                 ],
                 mode=SelectSelectorMode.DROPDOWN,
             )
+                ),
+                vol.Optional(
+                    CONF_SHOW_PANEL,
+                    default=self._entry.data.get(CONF_SHOW_PANEL, DEFAULT_SHOW_PANEL),
+                ): BooleanSelector(),
+                vol.Optional(
+                    CONF_SHOW_SIDEBAR_BADGE,
+                    default=self._entry.data.get(
+                        CONF_SHOW_SIDEBAR_BADGE, DEFAULT_SHOW_SIDEBAR_BADGE
+                    ),
+                ): BooleanSelector(),
+            }),
         )
 
-        schema_fields[vol.Optional(
-            CONF_SHOW_PANEL,
-            default=self._entry.data.get(CONF_SHOW_PANEL, DEFAULT_SHOW_PANEL),
-        )] = BooleanSelector()
-
-        schema_fields[vol.Optional(
-            CONF_SHOW_SIDEBAR_BADGE,
-            default=self._entry.data.get(
-                CONF_SHOW_SIDEBAR_BADGE, DEFAULT_SHOW_SIDEBAR_BADGE
-            ),
-        )] = BooleanSelector()
-
+    async def async_step_calls(
+        self, user_input: dict | None = None
+    ) -> ConfigFlowResult:
+        if user_input is not None:
+            return self._save_data({
+                CONF_CALL_DEVICE: user_input.get(CONF_CALL_DEVICE, "").strip(),
+                CONF_CALL_DIAL_TIMEOUT: int(
+                    user_input.get(CONF_CALL_DIAL_TIMEOUT, DEFAULT_CALL_DIAL_TIMEOUT)
+                ),
+                CONF_CALL_DURATION: int(
+                    user_input.get(CONF_CALL_DURATION, DEFAULT_CALL_DURATION)
+                ),
+            })
         return self.async_show_form(
-            step_id="settings",
-            data_schema=vol.Schema(schema_fields),
+            step_id="calls",
+            data_schema=vol.Schema({
+                vol.Optional(
+                    CONF_CALL_DEVICE,
+                    default=self._entry.data.get(CONF_CALL_DEVICE, ""),
+                ): str,
+                vol.Optional(
+                    CONF_CALL_DIAL_TIMEOUT,
+                    default=self._entry.data.get(
+                        CONF_CALL_DIAL_TIMEOUT, DEFAULT_CALL_DIAL_TIMEOUT
+                    ),
+                ): NumberSelector(NumberSelectorConfig(
+                    min=5, max=120, step=1, mode=NumberSelectorMode.BOX,
+                    unit_of_measurement="сек",
+                )),
+                vol.Optional(
+                    CONF_CALL_DURATION,
+                    default=self._entry.data.get(
+                        CONF_CALL_DURATION, DEFAULT_CALL_DURATION
+                    ),
+                ): NumberSelector(NumberSelectorConfig(
+                    min=5, max=300, step=1, mode=NumberSelectorMode.BOX,
+                    unit_of_measurement="сек",
+                )),
+            }),
         )
+
+    async def async_step_advanced(
+        self, user_input: dict | None = None
+    ) -> ConfigFlowResult:
+        if user_input is not None:
+            return self._save_data({
+                CONF_COLLECT_INTERVAL: int(
+                    user_input.get(CONF_COLLECT_INTERVAL, DEFAULT_COLLECT_INTERVAL)
+                ),
+                CONF_COLLECT_EMPTY_MAX: int(
+                    user_input.get(CONF_COLLECT_EMPTY_MAX, DEFAULT_COLLECT_EMPTY_MAX)
+                ),
+            })
+        return self.async_show_form(
+            step_id="advanced",
+            data_schema=vol.Schema({
+                vol.Optional(
+                    CONF_COLLECT_INTERVAL,
+                    default=self._entry.data.get(
+                        CONF_COLLECT_INTERVAL, DEFAULT_COLLECT_INTERVAL
+                    ),
+                ): NumberSelector(NumberSelectorConfig(
+                    min=1, max=15, step=1, mode=NumberSelectorMode.BOX,
+                    unit_of_measurement="сек",
+                )),
+                vol.Optional(
+                    CONF_COLLECT_EMPTY_MAX,
+                    default=self._entry.data.get(
+                        CONF_COLLECT_EMPTY_MAX, DEFAULT_COLLECT_EMPTY_MAX
+                    ),
+                ): NumberSelector(NumberSelectorConfig(
+                    min=1, max=20, step=1, mode=NumberSelectorMode.BOX,
+                    unit_of_measurement="опросов",
+                )),
+            }),
+        )
+
+    async def async_step_settings(
+        self, user_input: dict | None = None
+    ) -> ConfigFlowResult:
+        """Совместимость с уже открытым старым Options Flow."""
+        return await self.async_step_sms(user_input)
 
     # ─── Управление call-сущностями (cover/button для звонков) ────────
 
