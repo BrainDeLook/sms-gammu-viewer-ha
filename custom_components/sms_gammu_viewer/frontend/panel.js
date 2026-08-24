@@ -3757,9 +3757,13 @@ class SmsGammuPanel extends HTMLElement {
     }
     if (window.matchMedia?.("(max-width: 580px)").matches) {
       const status = this.shadowRoot.getElementById("status-bar");
+      const contactList = this.shadowRoot.getElementById("contact-list");
+      const shell = host.querySelector(".folder-tab-shell");
       host.style.top = `${(status?.offsetTop || 0) + (status?.offsetHeight || 0) + 4}px`;
+      if (contactList && shell) contactList.style.paddingTop = `${shell.offsetHeight + 16}px`;
     } else {
       host.style.removeProperty("top");
+      this.shadowRoot.getElementById("contact-list")?.style.removeProperty("padding-top");
     }
     host.querySelectorAll("[data-folder-id]").forEach((button) => button.addEventListener("click", () => {
       this._activeFolderId = button.dataset.folderId;
