@@ -3799,7 +3799,7 @@ class SmsGammuPanel extends HTMLElement {
     const modal = this.shadowRoot.getElementById("contact-modal");
     if (!overlay || !modal) return;
     modal.innerHTML = `<div class="contact-form" style="padding:20px">
-      <div class="contact-form-header"><h2>${this._esc(this._t("folder_settings"))}</h2><button class="icon-btn" id="folder-settings-close">×</button></div>
+      <div class="contact-form-header"><h2>${this._esc(this._t("folder_settings"))}</h2></div>
       <label class="folder-editor-chat"><input type="checkbox" id="folder-show-all" ${this._folderOptions.show_all !== false ? "checked" : ""}/> ${this._esc(this._t("show_all_chats"))}</label>
       <label class="folder-editor-chat"><input type="checkbox" id="folder-brands-enabled" ${this._folderOptions.brands_enabled ? "checked" : ""}/> ${this._esc(this._t("enable_brands_folder"))}</label>
       <button id="folder-manage-brands" ${this._folderOptions.brands_enabled ? "" : "disabled"}>${this._esc(this._t("manage_brands_folder"))}</button>
@@ -3879,7 +3879,7 @@ class SmsGammuPanel extends HTMLElement {
     const manual = new Set(this._folderOptions.brands_manual || []);
     const excluded = new Set(this._folderOptions.brands_excluded || []);
     modal.innerHTML = `<div class="contact-form" style="padding:20px">
-      <div class="contact-form-header"><h2>🏷️ ${this._esc(this._t("brands_folder"))}</h2><button class="icon-btn" id="brands-close">×</button></div>
+      <div class="contact-form-header"><h2>🏷️ ${this._esc(this._t("brands_folder"))}</h2></div>
       <p class="form-help">${this._esc(this._t("brands_folder_help"))}</p>
       <div class="folder-editor-list">${this._contacts.map((chat) => { const checked = !excluded.has(chat.number) && (manual.has(chat.number) || this._isBrandChat(chat)); return `<label class="folder-editor-chat"><input type="checkbox" data-brand-number="${this._esc(chat.number)}" ${checked ? "checked" : ""}/><span>${this._esc(chat.contact_name || chat.number)}</span></label>`; }).join("")}</div>
       <div class="contact-form-actions"><button id="brands-cancel">${this._esc(this._t("cancel"))}</button><button class="primary" id="brands-save">${this._esc(this._t("save"))}</button></div>
@@ -3907,7 +3907,7 @@ class SmsGammuPanel extends HTMLElement {
     const current = folder || { id: `folder-${Date.now()}`, name: "", icon: "", numbers: [] };
     const selected = new Set(current.numbers || []);
     modal.innerHTML = `<div class="contact-form" style="padding:20px">
-      <div class="contact-form-header"><h2>${this._esc(folder ? this._t("edit_folder") : this._t("new_folder"))}</h2><button class="icon-btn" id="folder-close">×</button></div>
+      <div class="contact-form-header"><h2>${this._esc(folder ? this._t("edit_folder") : this._t("new_folder"))}</h2></div>
       <label class="folder-edit-field">${this._esc(this._t("folder_name"))}<input id="folder-name" maxlength="80" value="${this._esc(current.name)}" /></label>
       <label class="folder-edit-field">${this._esc(this._t("folder_icon"))}<input id="folder-icon" maxlength="8" placeholder="📁" value="${this._esc(current.icon || "")}" /></label>
       <div class="folder-editor-list">${this._contacts.map((chat) => `<label class="folder-editor-chat"><input type="checkbox" data-folder-number="${this._esc(chat.number)}" ${selected.has(chat.number) ? "checked" : ""}/><span>${this._esc(chat.contact_name || chat.number)}</span></label>`).join("")}</div>
