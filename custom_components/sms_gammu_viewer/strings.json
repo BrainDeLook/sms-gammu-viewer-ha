@@ -47,7 +47,8 @@
         "description": "Configure how often the durable queue is checked and where new-message notifications are sent.",
         "data": {
           "poll_interval": "Polling interval (seconds, min 5)",
-          "notify_targets": "Devices to notify on new SMS"
+          "notify_targets": "Devices to notify on new SMS",
+          "notify_images": "Show sender logos as notification images"
         }
       },
       "interface": {
