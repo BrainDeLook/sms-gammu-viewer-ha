@@ -235,7 +235,9 @@ const CSS = `
     letter-spacing: -.5px;
   }
   .contact-list.brand-loading { visibility: hidden; }
-  .avatar.brand-avatar { background: #fff; padding: 5px; }
+  /* Brand marks in the chat list use the same full circular treatment as the
+     chat header; don't add the old white inset ring around the logo. */
+  .avatar.brand-avatar { background: transparent; padding: 0; }
   .avatar img, .pb-avatar img, .chat-profile-avatar img,
   .profile-avatar img, .profile-avatar-edit img {
     width: 100%; height: 100%; border-radius: inherit;
@@ -2761,7 +2763,9 @@ class SmsGammuPanel extends HTMLElement {
         image.onerror = reject;
         image.onload = () => {
           const side = Math.min(image.naturalWidth, image.naturalHeight);
-          const size = Math.min(512, side);
+          // Keep contact photos lightweight: avatars are rendered at 42–64px
+          // in the UI and do not need the original camera resolution.
+          const size = Math.min(384, side);
           const canvas = document.createElement("canvas");
           canvas.width = size; canvas.height = size;
           const ctx = canvas.getContext("2d");
@@ -2771,8 +2775,8 @@ class SmsGammuPanel extends HTMLElement {
             (image.naturalHeight - side) / 2,
             side, side, 0, 0, size, size,
           );
-          const data = canvas.toDataURL("image/jpeg", .84);
-          data.length <= 700000 ? resolve(data) : reject(new Error("image too large"));
+          const data = canvas.toDataURL("image/jpeg", .78);
+          data.length <= 350000 ? resolve(data) : reject(new Error("image too large"));
         };
         image.src = reader.result;
       };
