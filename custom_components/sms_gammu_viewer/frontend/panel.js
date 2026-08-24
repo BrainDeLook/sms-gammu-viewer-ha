@@ -122,6 +122,9 @@ const CSS = `
     align-items: center;
     gap: 6px;
   }
+  @media (max-width: 580px) {
+    .status-bar { position: relative; z-index: 9; transition: transform .18s ease, opacity .18s ease; }
+  }
 
   .signal-dot {
     width: 7px; height: 7px;
@@ -3759,11 +3762,19 @@ class SmsGammuPanel extends HTMLElement {
       const status = this.shadowRoot.getElementById("status-bar");
       const contactList = this.shadowRoot.getElementById("contact-list");
       const shell = host.querySelector(".folder-tab-shell");
-      host.style.top = `${Math.max(0, (status?.offsetTop || 0) + (status?.offsetHeight || 0) - 8)}px`;
+      this._folderBaseTop = Math.max(0, (status?.offsetTop || 0) + (status?.offsetHeight || 0) - 8);
+      host.style.top = `${this._folderBaseTop}px`;
       if (contactList && shell) contactList.style.paddingTop = `${shell.offsetHeight + 2}px`;
+      if (contactList && !this._mobileChromeScrollBound) {
+        this._mobileChromeScrollBound = true;
+        contactList.addEventListener("scroll", () => this._syncMobileChrome(), { passive: true });
+      }
+      this._syncMobileChrome();
     } else {
       host.style.removeProperty("top");
       this.shadowRoot.getElementById("contact-list")?.style.removeProperty("padding-top");
+      this.shadowRoot.getElementById("status-bar")?.style.removeProperty("transform");
+      this.shadowRoot.getElementById("status-bar")?.style.removeProperty("opacity");
     }
     host.querySelectorAll("[data-folder-id]").forEach((button) => button.addEventListener("click", () => {
       this._activeFolderId = button.dataset.folderId;
@@ -3790,6 +3801,17 @@ class SmsGammuPanel extends HTMLElement {
         else if (button.dataset.folderId === "brands") this._openBrandsEditor();
       });
     });
+  }
+
+  _syncMobileChrome() {
+    const list = this.shadowRoot.getElementById("contact-list");
+    const status = this.shadowRoot.getElementById("status-bar");
+    const host = this.shadowRoot.getElementById("folder-tabs");
+    if (!list || !status || !host || !window.matchMedia?.("(max-width: 580px)").matches) return;
+    const collapse = Math.min(list.scrollTop, status.offsetHeight + 8);
+    status.style.transform = `translateY(-${collapse}px)`;
+    status.style.opacity = collapse >= status.offsetHeight ? "0" : "1";
+    host.style.top = `${Math.max(0, (this._folderBaseTop || 0) - collapse)}px`;
   }
 
   _folderTabDefinitions() {
