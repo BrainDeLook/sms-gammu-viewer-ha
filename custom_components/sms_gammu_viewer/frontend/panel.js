@@ -948,7 +948,22 @@ const CSS = `
     border-radius: 9px; background: var(--bg); color: var(--text); font: inherit; box-sizing: border-box; min-width: 0;
   }
   .contact-field input:focus, .contact-field textarea:focus { outline: none; border-color: var(--accent); }
-  .contact-field input[type="date"] { display: block; max-width: 100%; }
+  .contact-date-wrap {
+    position: relative; width: 100%; max-width: 100%; min-width: 0;
+    overflow: hidden; box-sizing: border-box; border: 1px solid var(--line);
+    border-radius: 9px; background: var(--bg);
+  }
+  .contact-date-wrap:focus-within { border-color: var(--accent); }
+  .contact-date-wrap input[type="date"] {
+    display: block; width: 100% !important; max-width: 100% !important;
+    min-width: 0 !important; margin: 0; padding: 10px 11px;
+    box-sizing: border-box !important; border: 0 !important;
+    border-radius: 0; background: transparent; color: var(--text);
+    font: inherit; -webkit-appearance: none; appearance: none;
+  }
+  .contact-date-wrap input[type="date"]::-webkit-date-and-time-value {
+    min-width: 0; margin: 0; text-align: left;
+  }
   .contact-photo-actions { display: flex; justify-content: center; gap: 8px; margin: -5px 0 17px; }
   .contact-photo-btn, .contact-form-btn {
     border: 0; border-radius: 9px; padding: 9px 13px; cursor: pointer;
@@ -2364,7 +2379,7 @@ class SmsGammuPanel extends HTMLElement {
           <div class="contact-field"><label>${this._t("contact_label")}</label><input id="contact-label" maxlength="80" value="${this._esc(c.label || "")}" /></div>
           <div class="contact-field"><label>${this._t("contact_company")}</label><input id="contact-company" maxlength="120" value="${this._esc(c.company || "")}" /></div>
           <div class="contact-field"><label>${this._t("contact_email")}</label><input id="contact-email" type="email" maxlength="254" value="${this._esc(c.email || "")}" /></div>
-          <div class="contact-field"><label>${this._t("contact_birthday")}</label><input id="contact-birthday" type="date" value="${this._esc(c.birthday || "")}" /></div>
+          <div class="contact-field"><label>${this._t("contact_birthday")}</label><div class="contact-date-wrap"><input id="contact-birthday" type="date" value="${this._esc(c.birthday || "")}" /></div></div>
           <div class="custom-methods"><div class="custom-methods-title">${this._t("contact_custom_methods")}</div><div id="custom-method-list"></div><button type="button" class="contact-photo-btn custom-method-add" id="custom-method-add">＋ ${this._t("add_custom_method")}</button></div>
           <div class="contact-field full"><label>${this._t("contact_notes")}</label><textarea id="contact-notes" rows="4" maxlength="4000">${this._esc(c.notes || "")}</textarea></div>
         </div>
