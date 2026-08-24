@@ -2276,6 +2276,12 @@ class SmsGammuPanel extends HTMLElement {
       if (callBtn) callBtn.style.display = "none";
       const muteBtn = this.shadowRoot.getElementById("mute-contact-btn");
       if (muteBtn) muteBtn.style.display = "none";
+      const profileAvatar = this.shadowRoot.getElementById("chat-profile-avatar");
+      if (profileAvatar) profileAvatar.style.display = "none";
+      const profileTrigger = this.shadowRoot.getElementById("chat-profile-trigger");
+      if (profileTrigger) profileTrigger.style.pointerEvents = "none";
+      const starBtn = this.shadowRoot.getElementById("star-filter-btn");
+      if (starBtn) starBtn.style.display = "none";
       // На мобилке показываем правую область
       root?.classList.add("chat-open");
       if (isStatus) {
@@ -2289,6 +2295,8 @@ class SmsGammuPanel extends HTMLElement {
       if (messagesArea) messagesArea.style.display = "";
       if (statusMain)   statusMain.style.display = "none";
       if (chatHeader)   chatHeader.style.display = "";
+      const profileTrigger = this.shadowRoot.getElementById("chat-profile-trigger");
+      if (profileTrigger) profileTrigger.style.pointerEvents = "";
       // Восстанавливаем заголовок чата
       this._renderMessages();
       if (!this._activeNumber) {
@@ -2860,11 +2868,13 @@ class SmsGammuPanel extends HTMLElement {
       ${row("LAC", s.network?.LAC)}
     `);
 
+    const modem = s.modem || {};
+    const modemValue = (upper, ...lower) => modem[upper] ?? lower.map((key) => modem[key]).find((value) => value != null);
     const modemCard = card(this._t("modem_card"), `
-      ${row(this._t("manufacturer"), s.modem?.Manufacturer)}
-      ${row(this._t("model"), s.modem?.Model)}
-      ${row(this._t("firmware"), s.modem?.Firmware)}
-      ${row("IMEI", s.modem?.IMEI)}
+      ${row(this._t("manufacturer"), modemValue("Manufacturer", "manufacturer", "vendor"))}
+      ${row(this._t("model"), modemValue("Model", "model", "device"))}
+      ${row(this._t("firmware"), modemValue("Firmware", "firmware", "firmware_version", "revision"))}
+      ${row("IMEI", modemValue("IMEI", "imei"))}
     `);
 
     const fmt = (b) => b < 1024*1024 ? (b/1024).toFixed(1)+" KB" : (b/1024/1024).toFixed(2)+" MB";
