@@ -123,7 +123,7 @@ const CSS = `
     gap: 6px;
   }
   @media (max-width: 580px) {
-    .status-bar { position: relative; z-index: 9; transition: max-height .12s linear, padding .12s linear, opacity .12s linear; overflow: hidden; }
+    .status-bar { position: relative; z-index: 9; transition: max-height .22s ease-out, padding .22s ease-out, opacity .22s ease-out; overflow: hidden; }
   }
 
   .signal-dot {
@@ -1059,7 +1059,7 @@ const CSS = `
 
   @media (max-width: 580px) {
     .folder-tabs {
-      position: absolute; left: 0; right: 0; z-index: 8; display: block; transition: top .12s linear;
+      position: absolute; left: 0; right: 0; z-index: 8; display: block; transition: top .22s ease-out;
     }
     .folder-tab-shell {
       width: auto; margin: 0 12px 7px; padding: 3px; gap: 3px; border: 1px solid var(--line);
@@ -3818,18 +3818,14 @@ class SmsGammuPanel extends HTMLElement {
     const expanded = this._statusExpandedHeight || status.offsetHeight || 1;
     const collapse = Math.min(Math.max(0, list.scrollTop), expanded);
     const remaining = expanded - collapse;
-    if (collapse <= 0) {
-      status.style.removeProperty("max-height");
-      status.style.removeProperty("padding-top");
-      status.style.removeProperty("padding-bottom");
-      status.style.removeProperty("opacity");
-    } else {
-      const ratio = remaining / expanded;
-      status.style.maxHeight = `${remaining}px`;
-      status.style.paddingTop = `${4 * ratio}px`;
-      status.style.paddingBottom = `${8 * ratio}px`;
-      status.style.opacity = String(Math.max(0, ratio));
-    }
+    // Keep explicit dimensions at both ends of the scroll range. Removing
+    // max-height at scrollTop=0 switches back to intrinsic layout and causes
+    // a visible jump when the status row returns.
+    const ratio = remaining / expanded;
+    status.style.maxHeight = `${remaining}px`;
+    status.style.paddingTop = `${4 * ratio}px`;
+    status.style.paddingBottom = `${8 * ratio}px`;
+    status.style.opacity = String(Math.max(0, ratio));
     const minTop = this._folderMinTop || 0;
     host.style.top = `${Math.max(minTop, (this._folderBaseTop || 0) - collapse)}px`;
   }
