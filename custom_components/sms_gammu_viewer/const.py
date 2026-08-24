@@ -13,11 +13,13 @@ CONF_USERNAME = "username"
 CONF_PASSWORD = "password"
 CONF_POLL_INTERVAL = "poll_interval"
 CONF_NOTIFY_TARGETS = "notify_targets"
+CONF_NOTIFY_IMAGES = "notify_images"
 
 DEFAULT_PORT = 5000
 DEFAULT_USERNAME = "admin"
 DEFAULT_PASSWORD = "password"
 DEFAULT_POLL_INTERVAL = 30
+DEFAULT_NOTIFY_IMAGES = False
 
 DB_FILENAME = "sms_gammu_viewer.db"
 
