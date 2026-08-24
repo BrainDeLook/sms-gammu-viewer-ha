@@ -251,6 +251,9 @@ const CSS = `
   .folder-editor-list { max-height: 260px; overflow: auto; margin-top: 12px; border-top: 1px solid var(--border); }
   .folder-editor-chat { display: flex; align-items: center; gap: 8px; padding: 8px 2px; border-bottom: 1px solid var(--border); }
   .folder-editor-chat input { width: 18px; height: 18px; }
+  .folder-edit-field { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; color: var(--sub); font-size: 12px; }
+  .folder-edit-field input { width: 100%; box-sizing: border-box; border: 1px solid var(--line); border-radius: 12px; padding: 11px 12px; background: var(--bg); color: var(--text); font: inherit; }
+  .folder-edit-field input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 15%, transparent); }
   .folder-settings-list { max-height: 220px; overflow: auto; margin: 8px 0 10px; border-top: 1px solid var(--border); }
   .folder-settings-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--border); }
   .folder-settings-row > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -3901,8 +3904,8 @@ class SmsGammuPanel extends HTMLElement {
     const selected = new Set(current.numbers || []);
     modal.innerHTML = `<div class="contact-form" style="padding:20px">
       <div class="contact-form-header"><h2>${this._esc(folder ? this._t("edit_folder") : this._t("new_folder"))}</h2><button class="icon-btn" id="folder-close">×</button></div>
-      <label>${this._esc(this._t("folder_name"))}<input id="folder-name" maxlength="80" value="${this._esc(current.name)}" /></label>
-      <label>${this._esc(this._t("folder_icon"))}<input id="folder-icon" maxlength="8" placeholder="📁" value="${this._esc(current.icon || "")}" /></label>
+      <label class="folder-edit-field">${this._esc(this._t("folder_name"))}<input id="folder-name" maxlength="80" value="${this._esc(current.name)}" /></label>
+      <label class="folder-edit-field">${this._esc(this._t("folder_icon"))}<input id="folder-icon" maxlength="8" placeholder="📁" value="${this._esc(current.icon || "")}" /></label>
       <div class="folder-editor-list">${this._contacts.map((chat) => `<label class="folder-editor-chat"><input type="checkbox" data-folder-number="${this._esc(chat.number)}" ${selected.has(chat.number) ? "checked" : ""}/><span>${this._esc(chat.contact_name || chat.number)}</span></label>`).join("")}</div>
       <div class="contact-form-actions"><button id="folder-cancel">${this._esc(this._t("cancel"))}</button><button class="primary" id="folder-save">${this._esc(this._t("save"))}</button></div>
     </div>`;
