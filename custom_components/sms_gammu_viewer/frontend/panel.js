@@ -234,6 +234,7 @@ const CSS = `
     font-size: 12px;
     letter-spacing: -.5px;
   }
+  .contact-list.brand-loading { visibility: hidden; }
   .avatar.brand-avatar { background: #fff; padding: 5px; }
   .avatar img, .pb-avatar img, .chat-profile-avatar img,
   .profile-avatar img, .profile-avatar-edit img {
@@ -1075,6 +1076,8 @@ class SmsGammuPanel extends HTMLElement {
     this._brandCatalogPromise = null;
     this._brandAssetPromises = new Map();
     this._brandAssets = {};
+    this._contactsLoaded = false;
+    this._brandReady = false;
   }
 
   _t(key, ...args) {
@@ -1250,6 +1253,7 @@ class SmsGammuPanel extends HTMLElement {
       contactsChanged = signature !== this._contactsSignature;
       this._contactsSignature = signature;
       this._contacts = contacts;
+      this._contactsLoaded = true;
       // Фотографии не включаются в часто опрашиваемый список диалогов:
       // телефонную книгу загружаем один раз и обновляем только при изменениях.
       if (!this._phonebookLoaded) {
@@ -1268,6 +1272,8 @@ class SmsGammuPanel extends HTMLElement {
     } finally {
       this._refreshing = false;
       this._updateRefreshBtn();
+      if (this._status?.use_brand_logos) await this._prepareBrandDisplay();
+      else if (this._status) this._brandReady = true;
       if (contactsChanged) this._renderContacts();
       this._renderMessages();
       this._updateBadge();
@@ -1292,7 +1298,12 @@ class SmsGammuPanel extends HTMLElement {
         } catch (_) {}
       }
     } catch (_) {}
-    if (this._status?.use_brand_logos) this._ensureBrandCatalog();
+    if (this._status?.use_brand_logos) {
+      this._brandReady = false;
+      await this._prepareBrandDisplay();
+    } else {
+      this._brandReady = true;
+    }
     this._statusLoading = false;
 
     // Первая загрузка статуса — только теперь известна настройка языка
@@ -1650,27 +1661,12 @@ class SmsGammuPanel extends HTMLElement {
   async _ensureBrandCatalog() {
     if (this._brandCatalog || this._brandCatalogPromise) return this._brandCatalog;
     this._brandCatalogPromise = (async () => {
-      const cacheKey = "sms_gammu_trace_logo_catalog_v1";
-      try {
-        const cached = JSON.parse(localStorage.getItem(cacheKey) || "null");
-        if (cached?.updated && Array.isArray(cached.logos) &&
-            Date.now() - cached.cachedAt < 7 * 86400000) {
-          this._brandCatalog = cached.logos;
-          this._renderContacts();
-          this._brandCatalogPromise = null;
-          return this._brandCatalog;
-        }
-      } catch (_) {}
       try {
         const data = await this._api("brand_catalog");
         if (!Array.isArray(data.logos)) throw new Error("Invalid Trace Logo's catalog");
         this._brandCatalog = data.logos.filter((logo) =>
           logo && !logo.comingSoon && (logo.svgUrl || logo.pngUrl)
         );
-        try { localStorage.setItem(cacheKey, JSON.stringify({
-          updated: data.updated || "", cachedAt: Date.now(), logos: this._brandCatalog,
-        })); } catch (_) {}
-        this._renderContacts();
       } catch (_) {
         this._brandCatalog = [];
       } finally {
@@ -1679,6 +1675,21 @@ class SmsGammuPanel extends HTMLElement {
       return this._brandCatalog;
     })();
     return this._brandCatalogPromise;
+  }
+
+  async _prepareBrandDisplay() {
+    if (!this._status) return;
+    if (!this._status.use_brand_logos) {
+      this._brandReady = true;
+      return;
+    }
+    if (!this._contactsLoaded) return;
+    await this._ensureBrandCatalog();
+    const logos = [...new Set(this._contacts
+      .map((contact) => this._brandLogoFor(contact))
+      .filter((logo) => logo && !logo.startsWith("/")))];
+    await Promise.all(logos.map((logo) => this._ensureBrandAsset(logo)));
+    this._brandReady = true;
   }
 
   _brandLogoFor(contact) {
@@ -3292,6 +3303,9 @@ class SmsGammuPanel extends HTMLElement {
   _renderContacts() {
     const list = this.shadowRoot.getElementById("contact-list");
     if (!list) return;
+    const brandLoading = !this._status || (this._status.use_brand_logos && !this._brandReady);
+    list.classList.toggle("brand-loading", brandLoading);
+    if (brandLoading) return;
 
     // Локальная сортировка: закреплённые вверху
     this._contacts.sort((a, b) => (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0) || new Date(b.last_activity) - new Date(a.last_activity));
