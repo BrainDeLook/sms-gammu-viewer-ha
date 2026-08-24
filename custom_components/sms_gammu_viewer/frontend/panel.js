@@ -1712,7 +1712,8 @@ class SmsGammuPanel extends HTMLElement {
 
   _brandAvatarFor(contact, className = "avatar") {
     const logo = this._brandLogoFor(contact);
-    return logo ? `<div class="${className} brand-avatar"><img src="${this._esc(logo)}" alt="" loading="lazy" referrerpolicy="no-referrer" /></div>` : "";
+    const src = logo ? `/api/sms_gammu_viewer/brand_asset?url=${encodeURIComponent(logo)}` : "";
+    return src ? `<div class="${className} brand-avatar"><img src="${this._esc(src)}" alt="" loading="eager" /></div>` : "";
   }
 
   _chatAvatarMarkup(contact) {
@@ -2357,7 +2358,7 @@ class SmsGammuPanel extends HTMLElement {
     return `<div class="${className}">${avatar
       ? `<img src="${this._esc(avatar)}" alt="" />`
       : brand
-        ? `<img src="${this._esc(brand)}" alt="" loading="eager" referrerpolicy="no-referrer" />`
+        ? `<img src="${this._esc(`/api/sms_gammu_viewer/brand_asset?url=${encodeURIComponent(brand)}`)}" alt="" loading="eager" />`
       : fallback}</div>`;
   }
 
@@ -3647,7 +3648,7 @@ class SmsGammuPanel extends HTMLElement {
       profileAvatar.innerHTML = avatar
         ? `<img src="${this._esc(avatar)}" alt="" />`
         : brand
-          ? `<img src="${this._esc(brand)}" alt="" loading="eager" referrerpolicy="no-referrer" />`
+          ? `<img src="${this._esc(`/api/sms_gammu_viewer/brand_asset?url=${encodeURIComponent(brand)}`)}" alt="" loading="eager" />`
         : this._esc((contact?.contact_name || this._activeNumber).slice(0, 1).toUpperCase());
     }
     delBtn && (delBtn.style.display = "");
