@@ -147,7 +147,7 @@ const CSS = `
     .swipe-wrap { border-bottom: none; margin-bottom: 6px; }
     .swipe-wrap:last-child { margin-bottom: 0; }
     .swipe-inner { border: 1px solid var(--line); border-radius: 22px; }
-    .contact-list { padding-bottom: calc(90px + var(--safe-area-inset-bottom, 0px)); }
+    .contact-list { padding-top: 48px; padding-bottom: calc(90px + var(--safe-area-inset-bottom, 0px)); }
   }
   @media (min-width: 581px) {
     .swipe-actions-left, .swipe-actions-right { display: none !important; }
@@ -1056,7 +1056,7 @@ const CSS = `
 
   @media (max-width: 580px) {
     .folder-tabs {
-      display: contents;
+      position: absolute; left: 0; right: 0; z-index: 8; display: block;
     }
     .folder-tab-shell {
       width: auto; margin: 6px 12px 7px; padding: 3px; gap: 3px; border: 1px solid var(--line);
@@ -3754,6 +3754,12 @@ class SmsGammuPanel extends HTMLElement {
     if (newScroller) {
       newScroller.scrollLeft = scrollLeft;
       this._folderScrollLeft = scrollLeft;
+    }
+    if (window.matchMedia?.("(max-width: 580px)").matches) {
+      const status = this.shadowRoot.getElementById("status-bar");
+      host.style.top = `${(status?.offsetTop || 0) + (status?.offsetHeight || 0) + 4}px`;
+    } else {
+      host.style.removeProperty("top");
     }
     host.querySelectorAll("[data-folder-id]").forEach((button) => button.addEventListener("click", () => {
       this._activeFolderId = button.dataset.folderId;
