@@ -49,6 +49,18 @@ class StoreContainsTests(unittest.TestCase):
 
 
 class ContactProfileTests(unittest.TestCase):
+    def test_brand_logo_override_is_persistent_and_clearable(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = SmsStore(Path(directory) / "sms.db")
+            store.init()
+            store.set_brand_logo_override("VK.RU", "https://trace-logos.ru/assets/logos/vk.svg")
+            self.assertEqual(
+                "https://trace-logos.ru/assets/logos/vk.svg",
+                store.get_brand_logo_override("VK.RU"),
+            )
+            store.set_brand_logo_override("VK.RU", "")
+            self.assertEqual("", store.get_brand_logo_override("VK.RU"))
+
     def test_migrates_existing_phonebook_and_preserves_contacts(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             db_path = Path(directory) / "sms.db"
