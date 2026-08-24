@@ -237,7 +237,7 @@ const CSS = `
   .contact-list.brand-loading { visibility: hidden; }
   .folder-tabs {
     display: flex; gap: 6px; padding: 7px 12px 5px; overflow-x: auto;
-    scrollbar-width: none; border-top: 1px solid var(--border);
+    scrollbar-width: none; border-top: 1px solid var(--border); touch-action: pan-x;
   }
   .folder-tabs::-webkit-scrollbar { display: none; }
   .folder-tab {
@@ -247,6 +247,7 @@ const CSS = `
   }
   .folder-tab.active { color: var(--accent); border-color: var(--accent); background: rgba(3,169,244,.1); }
   .folder-tab.add { font-size: 17px; line-height: 15px; padding: 4px 9px; }
+  .folder-tab.settings { position: sticky; right: 0; z-index: 2; background: var(--panel); box-shadow: -8px 0 8px var(--panel); }
   .folder-editor-list { max-height: 260px; overflow: auto; margin-top: 12px; border-top: 1px solid var(--border); }
   .folder-editor-chat { display: flex; align-items: center; gap: 8px; padding: 8px 2px; border-bottom: 1px solid var(--border); }
   .folder-editor-chat input { width: 18px; height: 18px; }
@@ -3723,7 +3724,8 @@ class SmsGammuPanel extends HTMLElement {
     }));
     host.querySelector("#folder-add")?.addEventListener("click", () => this._openFolderEditor());
     const settings = document.createElement("button");
-    settings.className = "folder-tab add"; settings.title = this._t("folder_settings"); settings.textContent = "⚙";
+    settings.id = "folder-settings";
+    settings.className = "folder-tab add settings"; settings.title = this._t("folder_settings"); settings.textContent = "⚙";
     settings.addEventListener("click", () => this._openFolderSettings()); host.appendChild(settings);
     host.querySelectorAll("[data-folder-id]:not([data-folder-id=all])").forEach((button) => {
       button.addEventListener("dblclick", () => {
