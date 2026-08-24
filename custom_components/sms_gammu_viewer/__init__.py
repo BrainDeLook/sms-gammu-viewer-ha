@@ -738,7 +738,21 @@ class SmsCoordinator:
                         png_id = _brand_asset_id(asset_url + "|notification-png")
                         png_path = _brand_asset_dir(self.hass) / png_id
                         if not png_path.is_file():
-                            png_body = await self.hass.async_add_executor_job(_svg_to_png, header)
+                            try:
+                                png_body = await self.hass.async_add_executor_job(_svg_to_png, header)
+                            except Exception as raster_error:
+                                # HA OS may not ship libcairo. Use the public
+                                # image proxy as a fallback for these public
+                                # catalog assets, then keep the PNG locally.
+                                _LOGGER.debug("Local SVG rasterizer unavailable: %s", raster_error)
+                                proxy_url = "https://images.weserv.nl/?url=" + asset_url.removeprefix("https://") + "&output=png"
+                                timeout = aiohttp.ClientTimeout(total=20)
+                                async with aiohttp.ClientSession(timeout=timeout) as session:
+                                    async with session.get(proxy_url) as response:
+                                        response.raise_for_status()
+                                        png_body = await response.read()
+                                if not png_body.startswith(b"\x89PNG"):
+                                    raise ValueError("image proxy did not return PNG")
                             await self.hass.async_add_executor_job(png_path.write_bytes, png_body)
                         return {"url": f"/api/sms_gammu_viewer_brand/{png_id}.png", "content_type": "png"}
                     except Exception as error:
