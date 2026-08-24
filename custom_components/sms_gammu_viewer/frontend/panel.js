@@ -1059,7 +1059,7 @@ const CSS = `
       position: absolute; left: 0; right: 0; z-index: 8; display: block;
     }
     .folder-tab-shell {
-      width: auto; margin: 6px 12px 7px; padding: 3px; gap: 3px; border: 1px solid var(--line);
+      width: auto; margin: 0 12px 7px; padding: 3px; gap: 3px; border: 1px solid var(--line);
       border-radius: 999px; overflow: hidden; background: color-mix(in srgb, var(--card) 86%, var(--text) 14%);
     }
     .folder-tab-scroll { gap: 3px; padding: 0 1px; }
@@ -3759,7 +3759,7 @@ class SmsGammuPanel extends HTMLElement {
       const status = this.shadowRoot.getElementById("status-bar");
       const contactList = this.shadowRoot.getElementById("contact-list");
       const shell = host.querySelector(".folder-tab-shell");
-      host.style.top = `${(status?.offsetTop || 0) + (status?.offsetHeight || 0) + 4}px`;
+      host.style.top = `${Math.max(0, (status?.offsetTop || 0) + (status?.offsetHeight || 0) - 8)}px`;
       if (contactList && shell) contactList.style.paddingTop = `${shell.offsetHeight + 16}px`;
     } else {
       host.style.removeProperty("top");
