@@ -34,6 +34,8 @@ from .const import (
     CONF_NOTIFY_TARGETS,
     CONF_SHOW_PANEL,
     CONF_SHOW_SIDEBAR_BADGE,
+    CONF_USE_BRAND_LOGOS,
+    DEFAULT_USE_BRAND_LOGOS,
     CONF_PASSWORD,
     CONF_POLL_INTERVAL,
     CONF_PORT,
@@ -251,6 +253,9 @@ class SmsGammuOptionsFlow(OptionsFlow):
                 CONF_SHOW_SIDEBAR_BADGE: bool(
                     user_input.get(CONF_SHOW_SIDEBAR_BADGE, True)
                 ),
+                CONF_USE_BRAND_LOGOS: bool(
+                    user_input.get(CONF_USE_BRAND_LOGOS, DEFAULT_USE_BRAND_LOGOS)
+                ),
             })
         return self.async_show_form(
             step_id="interface",
@@ -275,6 +280,12 @@ class SmsGammuOptionsFlow(OptionsFlow):
                     CONF_SHOW_SIDEBAR_BADGE,
                     default=self._entry.data.get(
                         CONF_SHOW_SIDEBAR_BADGE, DEFAULT_SHOW_SIDEBAR_BADGE
+                    ),
+                ): BooleanSelector(),
+                vol.Optional(
+                    CONF_USE_BRAND_LOGOS,
+                    default=self._entry.data.get(
+                        CONF_USE_BRAND_LOGOS, DEFAULT_USE_BRAND_LOGOS
                     ),
                 ): BooleanSelector(),
             }),

@@ -234,6 +234,7 @@ const CSS = `
     font-size: 12px;
     letter-spacing: -.5px;
   }
+  .avatar.brand-avatar { background: #fff; padding: 5px; }
   .avatar img, .pb-avatar img, .chat-profile-avatar img,
   .profile-avatar img, .profile-avatar-edit img {
     width: 100%; height: 100%; border-radius: inherit;
@@ -1070,6 +1071,8 @@ class SmsGammuPanel extends HTMLElement {
     this._phonebookLoaded = false;
     this._profileContact = null;
     this._avatarDraft = undefined;
+    this._brandCatalog = null;
+    this._brandCatalogPromise = null;
   }
 
   _t(key, ...args) {
@@ -1279,6 +1282,7 @@ class SmsGammuPanel extends HTMLElement {
         } catch (_) {}
       }
     } catch (_) {}
+    if (this._status?.use_brand_logos) this._ensureBrandCatalog();
     this._statusLoading = false;
 
     // Первая загрузка статуса — только теперь известна настройка языка
@@ -1631,6 +1635,71 @@ class SmsGammuPanel extends HTMLElement {
     // Текстовое имя — первые 2 буквы в верхнем регистре
     const letters = s.replace(/[^a-zA-Zа-яёА-ЯЁ]/g, "");
     return letters.slice(0, 2).toUpperCase() || s.slice(0, 2).toUpperCase() || "?";
+  }
+
+  async _ensureBrandCatalog() {
+    if (this._brandCatalog || this._brandCatalogPromise) return this._brandCatalog;
+    this._brandCatalogPromise = (async () => {
+      const cacheKey = "sms_gammu_trace_logo_catalog_v1";
+      try {
+        const cached = JSON.parse(localStorage.getItem(cacheKey) || "null");
+        if (cached?.updated && Array.isArray(cached.logos) &&
+            Date.now() - cached.cachedAt < 7 * 86400000) {
+          this._brandCatalog = cached.logos;
+          this._renderContacts();
+          this._brandCatalogPromise = null;
+          return this._brandCatalog;
+        }
+      } catch (_) {}
+      try {
+        const response = await fetch("https://trace-logos.ru/logos.json", {
+          headers: { "Accept": "application/json" },
+          credentials: "omit",
+        });
+        if (!response.ok) throw new Error(`Trace Logo's HTTP ${response.status}`);
+        const data = await response.json();
+        if (!Array.isArray(data.logos)) throw new Error("Invalid Trace Logo's catalog");
+        this._brandCatalog = data.logos.filter((logo) =>
+          logo && !logo.comingSoon && (logo.svgUrl || logo.pngUrl)
+        );
+        try { localStorage.setItem(cacheKey, JSON.stringify({
+          updated: data.updated || "", cachedAt: Date.now(), logos: this._brandCatalog,
+        })); } catch (_) {}
+        this._renderContacts();
+      } catch (_) {
+        this._brandCatalog = [];
+      } finally {
+        this._brandCatalogPromise = null;
+      }
+      return this._brandCatalog;
+    })();
+    return this._brandCatalogPromise;
+  }
+
+  _brandLogoFor(contact) {
+    if (!this._status?.use_brand_logos || !this._brandCatalog?.length || !contact) return "";
+    const value = String(contact.contact_name || contact.number || "").trim().toLowerCase();
+    if (!value || !this._isAlphaTag(contact.number)) return "";
+    const normalized = value.replace(/[«»"'’.,()\[\]{}]/g, " ").replace(/\s+/g, " ").trim();
+    const found = this._brandCatalog.find((logo) => {
+      const haystack = `${logo.name || ""} ${logo.name_en || ""} ${logo.tags || ""}`
+        .toLowerCase().replace(/\s+/g, " ");
+      return haystack.split(/\s+/).some((token) => token.length >= 3 && normalized.includes(token))
+        || haystack.includes(normalized);
+    });
+    return found?.svgUrl || found?.pngUrl || "";
+  }
+
+  _brandAvatarFor(contact, className = "avatar") {
+    const logo = this._brandLogoFor(contact);
+    return logo ? `<div class="${className} brand-avatar"><img src="${this._esc(logo)}" alt="" loading="lazy" referrerpolicy="no-referrer" /></div>` : "";
+  }
+
+  _chatAvatarMarkup(contact) {
+    if (this._avatarFor(contact)) return this._contactAvatar(contact, "avatar");
+    const brand = this._brandAvatarFor(contact);
+    if (brand) return brand;
+    return `<div class="avatar ${this._isAlphaTag(contact.number) ? 'alpha' : ''}">${this._esc(contact.contact_name ? contact.contact_name.slice(0,1).toUpperCase() : this._avatar(contact.number))}</div>`;
   }
 
   _isAlphaTag(number) {
@@ -3201,9 +3270,7 @@ class SmsGammuPanel extends HTMLElement {
         <div class="swipe-inner contact-item ${c.unread > 0 ? "has-unread has-unread-wrap" : ""} ${
           c.number === this._activeNumber ? "active" : ""
         } ${c.is_pinned ? "pinned-active" : ""}">
-          ${this._avatarFor(c)
-            ? this._contactAvatar(c, "avatar")
-            : `<div class="avatar ${this._isAlphaTag(c.number) ? 'alpha' : ''}">${this._esc(c.contact_name ? c.contact_name.slice(0,1).toUpperCase() : this._avatar(c.number))}</div>`}
+          ${this._chatAvatarMarkup(c)}
           <div class="contact-info">
             <div class="contact-row1">
               <span class="contact-number">${c.is_muted ? "🔇 " : ""}${this._esc(c.contact_name || c.number)}</span>

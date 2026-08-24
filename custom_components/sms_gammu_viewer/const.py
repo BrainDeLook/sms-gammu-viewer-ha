@@ -66,6 +66,10 @@ DEFAULT_SHOW_PANEL = True
 CONF_SHOW_SIDEBAR_BADGE = "show_sidebar_badge"
 DEFAULT_SHOW_SIDEBAR_BADGE = True
 
+# Автоматические логотипы организаций для буквенных отправителей.
+CONF_USE_BRAND_LOGOS = "use_brand_logos"
+DEFAULT_USE_BRAND_LOGOS = False
+
 # Префикс action в мобильном уведомлении для ответа на SMS:
 # полное имя action = префикс + номер отправителя
 NOTIFY_ACTION_REPLY_PREFIX = "SMS_GAMMU_REPLY_"

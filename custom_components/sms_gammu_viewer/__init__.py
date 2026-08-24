@@ -29,6 +29,8 @@ from .const import (
     CONF_LANGUAGE,
     CONF_SHOW_PANEL,
     CONF_SHOW_SIDEBAR_BADGE,
+    CONF_USE_BRAND_LOGOS,
+    DEFAULT_USE_BRAND_LOGOS,
     DEFAULT_LANGUAGE,
     DEFAULT_SHOW_PANEL,
     DEFAULT_SHOW_SIDEBAR_BADGE,
@@ -611,6 +613,9 @@ class SmsCoordinator:
                 "call_enabled": bool(self.entry.data.get(CONF_CALL_DEVICE, "").strip()),
                 "language":   self.entry.data.get(CONF_LANGUAGE, DEFAULT_LANGUAGE),
                 "show_panel": self.entry.data.get(CONF_SHOW_PANEL, DEFAULT_SHOW_PANEL),
+                "use_brand_logos": self.entry.data.get(
+                    CONF_USE_BRAND_LOGOS, DEFAULT_USE_BRAND_LOGOS
+                ),
             }
             _LOGGER.debug("Status cache refreshed")
         except Exception as e:
@@ -1139,6 +1144,7 @@ class SmsApiView(HomeAssistantView):
                     "call_enabled":  cache.get("call_enabled"),
                     "language":      cache.get("language"),
                     "show_panel":    cache.get("show_panel"),
+                    "use_brand_logos": cache.get("use_brand_logos", False),
                     "poll_interval_hint": coord._interval,
                     "cached": True,
                 })
@@ -1164,6 +1170,7 @@ class SmsApiView(HomeAssistantView):
                 "call_enabled": bool(coord.entry.data.get("call_device", "").strip()),
                 "sim_phone_number": sim_phone_number,
                 "language": coord.entry.data.get("language", "ru"),
+                "use_brand_logos": bool(coord.entry.data.get(CONF_USE_BRAND_LOGOS, DEFAULT_USE_BRAND_LOGOS)),
             })
 
         if action == "poll_interval":

@@ -57,6 +57,7 @@
           "language": "Panel interface language",
           "show_panel": "Show SMS panel in sidebar",
           "show_sidebar_badge": "Show unread SMS count in sidebar"
+          ,"use_brand_logos": "Use organization logos for sender avatars"
         }
       },
       "calls": {
