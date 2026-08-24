@@ -673,6 +673,16 @@ class SmsCoordinator:
             except Exception as error:
                 _LOGGER.debug("Contact avatar unavailable for notification: %s", error)
         source = str((contact or {}).get("brand_logo_url") or "").strip()
+        if not source:
+            try:
+                source = str(
+                    await self.hass.async_add_executor_job(
+                        self.store.get_brand_logo_override, number
+                    )
+                    or ""
+                ).strip()
+            except Exception as error:
+                _LOGGER.debug("Could not load manual brand logo override: %s", error)
         catalog_path = Path(self.hass.config.config_dir) / ".storage" / "sms_gammu_viewer_brand_catalog.json"
         try:
             payload = json.loads(await self.hass.async_add_executor_job(catalog_path.read_text, "utf-8"))
