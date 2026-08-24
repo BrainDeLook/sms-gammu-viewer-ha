@@ -1016,6 +1016,8 @@ const CSS = `
   .brand-picker-empty { padding: 24px 8px; color: var(--sub); text-align: center; }
 
   @media (max-width: 580px) {
+    .profile-actions { gap: 6px; padding: 13px 8px; flex-wrap: wrap; }
+    .profile-action { min-width: 62px; flex: 1 1 62px; }
     .contacts { width: 100%; border-right: none; }
     .chat { display: none; position: absolute; inset: 0; z-index: 10; background: var(--bg); }
     .root.chat-open .contacts { display: none; }
