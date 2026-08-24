@@ -398,6 +398,10 @@ class BrandAssetView(HomeAssistantView):
         body = await self.hass.async_add_executor_job(path.read_bytes)
         if body.startswith(b"\x89PNG"):
             content_type = "image/png"
+        elif body.startswith(b"\xff\xd8"):
+            content_type = "image/jpeg"
+        elif body.startswith(b"GIF8"):
+            content_type = "image/gif"
         elif body.startswith(b"RIFF") and body[8:12] == b"WEBP":
             content_type = "image/webp"
         else:
