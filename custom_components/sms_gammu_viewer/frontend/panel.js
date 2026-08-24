@@ -939,7 +939,7 @@ const CSS = `
   .profile-detail-value { font-size: 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
   .contact-form { padding: 18px 20px 20px; }
   .contact-form-title { font-size: 19px; font-weight: 600; margin-bottom: 16px; }
-  .contact-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; min-width: 0; }
+  .contact-form-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; min-width: 0; }
   .contact-field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
   .contact-field.full { grid-column: 1 / -1; }
   .contact-field label { color: var(--sub); font-size: 12px; }
@@ -1007,7 +1007,7 @@ const CSS = `
       overflow-x: hidden;
     }
     .profile-hero { border-radius: 20px 20px 0 0; }
-    .contact-form-grid { grid-template-columns: 1fr; }
+    .contact-form-grid { grid-template-columns: minmax(0, 1fr); }
     .contact-field.full { grid-column: 1; }
   }
 
