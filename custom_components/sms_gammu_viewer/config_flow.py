@@ -32,10 +32,12 @@ from .const import (
     CONF_HOST,
     CONF_LANGUAGE,
     CONF_NOTIFY_TARGETS,
+    CONF_NOTIFY_IMAGES,
     CONF_SHOW_PANEL,
     CONF_SHOW_SIDEBAR_BADGE,
     CONF_USE_BRAND_LOGOS,
     DEFAULT_USE_BRAND_LOGOS,
+    DEFAULT_NOTIFY_IMAGES,
     CONF_PASSWORD,
     CONF_POLL_INTERVAL,
     CONF_PORT,
@@ -197,6 +199,7 @@ class SmsGammuOptionsFlow(OptionsFlow):
             return self._save_data({
                 CONF_POLL_INTERVAL: int(user_input[CONF_POLL_INTERVAL]),
                 CONF_NOTIFY_TARGETS: targets,
+                CONF_NOTIFY_IMAGES: bool(user_input.get(CONF_NOTIFY_IMAGES, DEFAULT_NOTIFY_IMAGES)),
             })
 
         notify_options = self._get_notify_options()
@@ -219,6 +222,10 @@ class SmsGammuOptionsFlow(OptionsFlow):
                     unit_of_measurement="сек",
                 )
             ),
+            vol.Optional(
+                CONF_NOTIFY_IMAGES,
+                default=self._entry.data.get(CONF_NOTIFY_IMAGES, DEFAULT_NOTIFY_IMAGES),
+            ): BooleanSelector(),
         }
 
         if notify_options:
