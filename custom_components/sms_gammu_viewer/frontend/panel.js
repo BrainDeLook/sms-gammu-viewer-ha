@@ -1238,8 +1238,16 @@ class SmsGammuPanel extends HTMLElement {
     this._refreshing = true;
     this._error = null;
     this._updateRefreshBtn();
+    let contactsChanged = true;
     try {
-      this._contacts = await this._api("contacts");
+      const contacts = await this._api("contacts");
+      const signature = JSON.stringify((contacts || []).map((c) => [
+        c.number, c.contact_name, c.last_text, c.last_date, c.unread,
+        c.is_muted, c.is_pinned, c.total,
+      ]));
+      contactsChanged = signature !== this._contactsSignature;
+      this._contactsSignature = signature;
+      this._contacts = contacts;
       // Фотографии не включаются в часто опрашиваемый список диалогов:
       // телефонную книгу загружаем один раз и обновляем только при изменениях.
       if (!this._phonebookLoaded) {
@@ -1258,7 +1266,7 @@ class SmsGammuPanel extends HTMLElement {
     } finally {
       this._refreshing = false;
       this._updateRefreshBtn();
-      this._renderContacts();
+      if (contactsChanged) this._renderContacts();
       this._renderMessages();
       this._updateBadge();
     }
@@ -1675,14 +1683,31 @@ class SmsGammuPanel extends HTMLElement {
     if (!this._status?.use_brand_logos || !this._brandCatalog?.length || !contact) return "";
     const value = String(contact.contact_name || contact.number || "").trim().toLowerCase();
     if (!value || !this._isAlphaTag(contact.number)) return "";
-    const normalized = value.replace(/[«»"'’.,()\[\]{}]/g, " ").replace(/\s+/g, " ").trim();
+    const normalized = this._normalizeBrandText(value);
     const found = this._brandCatalog.find((logo) => {
-      const haystack = `${logo.name || ""} ${logo.name_en || ""} ${logo.tags || ""}`
-        .toLowerCase().replace(/\s+/g, " ");
-      return haystack.split(/\s+/).some((token) => token.length >= 3 && normalized.includes(token))
-        || haystack.includes(normalized);
+      const haystack = this._normalizeBrandText(
+        `${logo.name || ""} ${logo.name_en || ""} ${logo.tags || ""}`
+      );
+      const tokens = haystack.split(/\s+/).filter(Boolean);
+      return Boolean(normalized && (
+        haystack === normalized || haystack.includes(normalized) ||
+        normalized.split(/\s+/).some((inputToken) =>
+          inputToken.length >= 2 && tokens.includes(inputToken)
+        )
+      ));
     });
     return found?.svgUrl || found?.pngUrl || "";
+  }
+
+  _normalizeBrandText(value) {
+    return String(value || "")
+      .toLowerCase()
+      // Адресные суффиксы мешают сопоставлению «VK.RU» с «VK».
+      .replace(/\.(?:ru|рф|com|net|org|io|su|me|tv|online)\b/gi, " ")
+      .replace(/\b(?:ru|рф|com|net|org|io|su|me|tv|online)\b/gi, " ")
+      .replace(/[«»"'’.,()\[\]{}_/\\-]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
   }
 
   _brandAvatarFor(contact, className = "avatar") {
@@ -2326,10 +2351,13 @@ class SmsGammuPanel extends HTMLElement {
 
   _contactAvatar(contact, className = "profile-avatar") {
     const avatar = this._avatarFor(contact);
+    const brand = avatar ? "" : this._brandLogoFor(contact);
     const name = contact?.name || contact?.contact_name || contact?.number || "?";
     const fallback = this._esc(name.slice(0, 1).toUpperCase() || "?");
     return `<div class="${className}">${avatar
       ? `<img src="${this._esc(avatar)}" alt="" />`
+      : brand
+        ? `<img src="${this._esc(brand)}" alt="" loading="eager" referrerpolicy="no-referrer" />`
       : fallback}</div>`;
   }
 
@@ -3614,9 +3642,12 @@ class SmsGammuPanel extends HTMLElement {
     subEl && (subEl.textContent = this._t("messages_count", count));
     if (profileAvatar) {
       const avatar = this._avatarFor(contact);
+      const brand = avatar ? "" : this._brandLogoFor(contact);
       profileAvatar.style.display = "flex";
       profileAvatar.innerHTML = avatar
         ? `<img src="${this._esc(avatar)}" alt="" />`
+        : brand
+          ? `<img src="${this._esc(brand)}" alt="" loading="eager" referrerpolicy="no-referrer" />`
         : this._esc((contact?.contact_name || this._activeNumber).slice(0, 1).toUpperCase());
     }
     delBtn && (delBtn.style.display = "");
