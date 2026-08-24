@@ -951,18 +951,18 @@ const CSS = `
   .contact-date-wrap {
     position: relative; width: 100%; max-width: 100%; min-width: 0;
     overflow: hidden; box-sizing: border-box; border: 1px solid var(--line);
-    border-radius: 9px; background: var(--bg);
+    border-radius: 9px; background: var(--bg); min-height: 43px;
+    display: flex; align-items: center;
   }
   .contact-date-wrap:focus-within { border-color: var(--accent); }
+  .contact-date-display { padding: 10px 11px; color: var(--text); font: inherit; pointer-events: none; }
+  .contact-date-display.empty { color: var(--sub); }
   .contact-date-wrap input[type="date"] {
-    display: block; width: 100% !important; max-width: 100% !important;
-    min-width: 0 !important; margin: 0; padding: 10px 11px;
+    position: absolute; inset: 0; z-index: 1; display: block;
+    width: 100% !important; height: 100% !important; opacity: 0;
+    cursor: pointer; min-width: 0 !important; margin: 0; padding: 0;
     box-sizing: border-box !important; border: 0 !important;
-    border-radius: 0; background: transparent; color: var(--text);
-    font: inherit; -webkit-appearance: none; appearance: none;
-  }
-  .contact-date-wrap input[type="date"]::-webkit-date-and-time-value {
-    min-width: 0; margin: 0; text-align: left;
+    -webkit-appearance: none; appearance: none;
   }
   .contact-photo-actions { display: flex; justify-content: center; gap: 8px; margin: -5px 0 17px; }
   .contact-photo-btn, .contact-form-btn {
@@ -2256,6 +2256,11 @@ class SmsGammuPanel extends HTMLElement {
     return escaped;
   }
 
+  _formatDateInput(value) {
+    const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return match ? `${match[3]}.${match[2]}.${match[1]}` : String(value || "");
+  }
+
   _contactAvatar(contact, className = "profile-avatar") {
     const avatar = this._avatarFor(contact);
     const name = contact?.name || contact?.contact_name || contact?.number || "?";
@@ -2379,7 +2384,7 @@ class SmsGammuPanel extends HTMLElement {
           <div class="contact-field"><label>${this._t("contact_label")}</label><input id="contact-label" maxlength="80" value="${this._esc(c.label || "")}" /></div>
           <div class="contact-field"><label>${this._t("contact_company")}</label><input id="contact-company" maxlength="120" value="${this._esc(c.company || "")}" /></div>
           <div class="contact-field"><label>${this._t("contact_email")}</label><input id="contact-email" type="email" maxlength="254" value="${this._esc(c.email || "")}" /></div>
-          <div class="contact-field"><label>${this._t("contact_birthday")}</label><div class="contact-date-wrap"><input id="contact-birthday" type="date" value="${this._esc(c.birthday || "")}" /></div></div>
+          <div class="contact-field"><label>${this._t("contact_birthday")}</label><div class="contact-date-wrap"><span id="contact-birthday-display" class="contact-date-display ${c.birthday ? "" : "empty"}">${this._esc(c.birthday ? this._formatDateInput(c.birthday) : this._t("choose_birthday"))}</span><input id="contact-birthday" type="date" value="${this._esc(c.birthday || "")}" aria-label="${this._esc(this._t("contact_birthday"))}" /></div></div>
           <div class="custom-methods"><div class="custom-methods-title">${this._t("contact_custom_methods")}</div><div id="custom-method-list"></div><button type="button" class="contact-photo-btn custom-method-add" id="custom-method-add">＋ ${this._t("add_custom_method")}</button></div>
           <div class="contact-field full"><label>${this._t("contact_notes")}</label><textarea id="contact-notes" rows="4" maxlength="4000">${this._esc(c.notes || "")}</textarea></div>
         </div>
@@ -2398,6 +2403,13 @@ class SmsGammuPanel extends HTMLElement {
     };
     (Array.isArray(c.custom_methods) ? c.custom_methods : []).forEach(addMethodRow);
     modal.querySelector("#custom-method-add")?.addEventListener("click", () => addMethodRow());
+    modal.querySelector("#contact-birthday")?.addEventListener("change", (event) => {
+      const input = event.currentTarget;
+      const display = modal.querySelector("#contact-birthday-display");
+      if (!display) return;
+      display.textContent = input.value ? this._formatDateInput(input.value) : this._t("choose_birthday");
+      display.classList.toggle("empty", !input.value);
+    });
     modal.querySelector("#contact-cancel")?.addEventListener("click", () => this._closeContactModal());
     const fileInput = modal.querySelector("#contact-photo-input");
     modal.querySelector("#contact-photo-choose")?.addEventListener("click", () => fileInput?.click());

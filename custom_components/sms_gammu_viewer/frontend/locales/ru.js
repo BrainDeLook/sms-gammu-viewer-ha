@@ -123,6 +123,7 @@ export default {
   contact_email: "Электронная почта",
   contact_company: "Организация",
   contact_birthday: "День рождения",
+  choose_birthday: "Выберите дату",
   contact_notes: "Заметки",
   contact_custom_methods: "Социальные сети и другие контакты",
   add_custom_method: "Добавить соцсеть или способ связи",

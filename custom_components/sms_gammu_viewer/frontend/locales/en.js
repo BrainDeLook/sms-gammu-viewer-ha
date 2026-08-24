@@ -123,6 +123,7 @@ export default {
   contact_email: "Email",
   contact_company: "Company",
   contact_birthday: "Birthday",
+  choose_birthday: "Choose a date",
   contact_notes: "Notes",
   contact_custom_methods: "Social networks and other contacts",
   add_custom_method: "Add social network or contact method",
