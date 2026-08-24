@@ -1491,6 +1491,32 @@ class SmsApiView(HomeAssistantView):
             )
             return self._json({"ok": True, "number": number})
 
+        if action == "brand_logo_override":
+            try:
+                body = await request.json()
+            except Exception:
+                return self._error("Invalid JSON", 400)
+            number = str(body.get("number") or "").strip()
+            source_url = str(body.get("url") or "").strip()
+            if not number or len(number) > 64:
+                return self._error("invalid sender", 400)
+            if source_url:
+                parsed = urlparse(source_url)
+                if (
+                    parsed.scheme != "https"
+                    or parsed.netloc != "trace-logos.ru"
+                    or not parsed.path.startswith("/assets/logos/")
+                    or len(source_url) > 1000
+                ):
+                    return self._error("Invalid brand asset URL", 400)
+            await self.hass.async_add_executor_job(
+                store.set_brand_logo_override, number, source_url
+            )
+            coord.push_event(
+                "brand_logo_changed", {"number": number, "custom": bool(source_url)}
+            )
+            return self._json({"ok": True, "number": number, "url": source_url})
+
         if action == "add_contact":
             try:
                 body = await request.json()

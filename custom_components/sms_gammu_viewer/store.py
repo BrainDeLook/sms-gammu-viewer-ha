@@ -104,6 +104,13 @@ class SmsStore:
             # падали с "no such table", если вызывались раньше первого чтения
             conn.execute("CREATE TABLE IF NOT EXISTS pinned_numbers (number TEXT PRIMARY KEY)")
             conn.execute("CREATE TABLE IF NOT EXISTS starred_messages (msg_id INTEGER PRIMARY KEY)")
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS brand_logo_overrides (
+                    number     TEXT PRIMARY KEY,
+                    source_url TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+            """)
 
             # Миграция: чистим номера с переводами строк/лишними пробелами
             try:
@@ -307,6 +314,8 @@ class SmsStore:
                     (SELECT 1 FROM muted_numbers mn WHERE mn.number = m.number) as is_muted,
                     pb.name as contact_name,
                     pb.label as contact_label,
+                    (SELECT source_url FROM brand_logo_overrides blo
+                     WHERE blo.number = m.number) as brand_logo_url,
                     (SELECT 1 FROM pinned_numbers pn WHERE pn.number = m.number) as is_pinned
                 FROM messages m
                 LEFT JOIN phonebook pb ON pb.number = m.number
@@ -429,6 +438,29 @@ class SmsStore:
                 (key, value),
             )
 
+    def set_brand_logo_override(self, number: str, source_url: str) -> None:
+        """Persist or clear the manually selected logo for an SMS sender."""
+        number = self._sanitize_number(number)
+        with self._conn() as conn:
+            if source_url:
+                conn.execute(
+                    "INSERT OR REPLACE INTO brand_logo_overrides "
+                    "(number, source_url, updated_at) VALUES (?, ?, ?)",
+                    (number, source_url, datetime.now().isoformat(timespec="seconds")),
+                )
+            else:
+                conn.execute(
+                    "DELETE FROM brand_logo_overrides WHERE number=?", (number,)
+                )
+
+    def get_brand_logo_override(self, number: str) -> str:
+        number = self._sanitize_number(number)
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT source_url FROM brand_logo_overrides WHERE number=?", (number,)
+            ).fetchone()
+        return row[0] if row else ""
+
     # ─── Телефонная книга ───────────────────────────────────────────
 
     def add_contact(
@@ -495,6 +527,7 @@ class SmsStore:
             result["custom_methods"] = json.loads(result.get("custom_methods") or "[]")
         except (TypeError, ValueError):
             result["custom_methods"] = []
+        result["brand_logo_url"] = self.get_brand_logo_override(number)
         return result
 
     def get_all_contacts(self) -> list[dict[str, Any]]:
@@ -502,7 +535,9 @@ class SmsStore:
             rows = conn.execute("""
                 SELECT pb.*,
                     (SELECT 1 FROM muted_numbers mn WHERE mn.number = pb.number) as is_muted,
-                    (SELECT 1 FROM pinned_numbers pn WHERE pn.number = pb.number) as is_pinned
+                    (SELECT 1 FROM pinned_numbers pn WHERE pn.number = pb.number) as is_pinned,
+                    (SELECT source_url FROM brand_logo_overrides blo
+                     WHERE blo.number = pb.number) as brand_logo_url
                 FROM phonebook pb
                 ORDER BY pb.name COLLATE NOCASE
             """).fetchall()
