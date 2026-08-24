@@ -1060,7 +1060,7 @@ const CSS = `
     }
     .folder-tab-shell {
       width: auto; margin: 0 12px 7px; padding: 3px; gap: 3px; border: 1px solid var(--line);
-      border-radius: 999px; overflow: hidden; background: color-mix(in srgb, var(--card) 86%, var(--text) 14%);
+      border-radius: 999px; overflow: hidden; background: var(--card);
     }
     .folder-tab-scroll { gap: 3px; padding: 0 1px; }
     .folder-tab { border-color: transparent; border-radius: 999px; padding: 7px 12px; }
@@ -3760,7 +3760,7 @@ class SmsGammuPanel extends HTMLElement {
       const contactList = this.shadowRoot.getElementById("contact-list");
       const shell = host.querySelector(".folder-tab-shell");
       host.style.top = `${Math.max(0, (status?.offsetTop || 0) + (status?.offsetHeight || 0) - 8)}px`;
-      if (contactList && shell) contactList.style.paddingTop = `${shell.offsetHeight + 16}px`;
+      if (contactList && shell) contactList.style.paddingTop = `${shell.offsetHeight + 2}px`;
     } else {
       host.style.removeProperty("top");
       this.shadowRoot.getElementById("contact-list")?.style.removeProperty("padding-top");
