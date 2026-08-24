@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import sqlite3
 import logging
+import json
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -88,6 +89,7 @@ class SmsStore:
                 ("birthday", "TEXT NOT NULL DEFAULT ''"),
                 ("notes", "TEXT NOT NULL DEFAULT ''"),
                 ("avatar", "TEXT NOT NULL DEFAULT ''"),
+                ("custom_methods", "TEXT NOT NULL DEFAULT '[]'"),
                 ("updated_at", "TEXT NOT NULL DEFAULT ''"),
             ):
                 try:
@@ -439,16 +441,18 @@ class SmsStore:
         birthday: str = "",
         notes: str = "",
         avatar: str | None = None,
+        custom_methods: list[dict[str, str]] | None = None,
     ) -> None:
         number = self._sanitize_number(number)
         now = datetime.now().isoformat(timespec="seconds")
+        custom_methods_json = json.dumps(custom_methods, ensure_ascii=False) if custom_methods is not None else None
         with self._conn() as conn:
             conn.execute(
                 """
                 INSERT INTO phonebook (
                     number, name, label, email, company, birthday, notes,
-                    avatar, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    avatar, custom_methods, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, '[]'), ?, ?)
                 ON CONFLICT(number) DO UPDATE SET
                     name=excluded.name,
                     label=excluded.label,
@@ -456,6 +460,10 @@ class SmsStore:
                     company=excluded.company,
                     birthday=excluded.birthday,
                     notes=excluded.notes,
+                    custom_methods=CASE
+                        WHEN ? IS NULL THEN phonebook.custom_methods
+                        ELSE excluded.custom_methods
+                    END,
                     avatar=CASE
                         WHEN ? IS NULL THEN phonebook.avatar
                         ELSE excluded.avatar
@@ -464,7 +472,8 @@ class SmsStore:
                 """,
                 (
                     number, name, label, email, company, birthday, notes,
-                    avatar or "", now, now, avatar,
+                    avatar or "", custom_methods_json,
+                    now, now, custom_methods_json, avatar,
                 ),
             )
 
@@ -479,7 +488,14 @@ class SmsStore:
             row = conn.execute(
                 "SELECT * FROM phonebook WHERE number=?", (number,)
             ).fetchone()
-        return dict(row) if row else None
+        if not row:
+            return None
+        result = dict(row)
+        try:
+            result["custom_methods"] = json.loads(result.get("custom_methods") or "[]")
+        except (TypeError, ValueError):
+            result["custom_methods"] = []
+        return result
 
     def get_all_contacts(self) -> list[dict[str, Any]]:
         with self._conn() as conn:
@@ -490,7 +506,14 @@ class SmsStore:
                 FROM phonebook pb
                 ORDER BY pb.name COLLATE NOCASE
             """).fetchall()
-        result = [dict(r) for r in rows]
+        result = []
+        for row in rows:
+            item = dict(row)
+            try:
+                item["custom_methods"] = json.loads(item.get("custom_methods") or "[]")
+            except (TypeError, ValueError):
+                item["custom_methods"] = []
+            result.append(item)
         for r in result:
             r["is_muted"] = bool(r["is_muted"])
             r["is_pinned"] = bool(r["is_pinned"])

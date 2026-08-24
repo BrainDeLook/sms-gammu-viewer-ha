@@ -80,11 +80,16 @@ class ContactProfileTests(unittest.TestCase):
             store.add_contact(
                 "+7000", "Daniil", "main", "d@example.com",
                 "Home", "2000-01-02", "Notes", avatar,
+                [{"method": "Telegram", "value": "@daniil"}, {"method": "Web", "value": "https://example.com"}],
             )
             contact = store.get_contact("+7000")
             self.assertEqual("d@example.com", contact["email"])
             self.assertEqual("Home", contact["company"])
             self.assertEqual(avatar, contact["avatar"])
+            self.assertEqual(
+                [{"method": "Telegram", "value": "@daniil"}, {"method": "Web", "value": "https://example.com"}],
+                contact["custom_methods"],
+            )
 
             store.add_contact("+7000", "New name", avatar=None)
             self.assertEqual(avatar, store.get_contact("+7000")["avatar"])

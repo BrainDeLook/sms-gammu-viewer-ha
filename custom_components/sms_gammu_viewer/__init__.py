@@ -1364,6 +1364,20 @@ class SmsApiView(HomeAssistantView):
             company = (body.get("company") or "").strip()
             birthday = (body.get("birthday") or "").strip()
             notes = (body.get("notes") or "").strip()
+            custom_methods = body.get("custom_methods") or []
+            if not isinstance(custom_methods, list) or len(custom_methods) > 20:
+                return self._error("invalid custom methods", 400)
+            normalized_methods = []
+            for method in custom_methods:
+                if not isinstance(method, dict):
+                    return self._error("invalid custom method", 400)
+                method_name = str(method.get("method") or "").strip()
+                method_value = str(method.get("value") or "").strip()
+                if not method_name and not method_value:
+                    continue
+                if not method_name or not method_value or len(method_name) > 80 or len(method_value) > 500:
+                    return self._error("invalid custom method", 400)
+                normalized_methods.append({"method": method_name, "value": method_value})
             # ``None`` означает «оставить существующее фото», пустая строка —
             # удалить его. Фронтенд заранее уменьшает фото до 512 px.
             avatar = body.get("avatar") if "avatar" in body else None
@@ -1388,6 +1402,7 @@ class SmsApiView(HomeAssistantView):
             await self.hass.async_add_executor_job(
                 store.add_contact, number, name, label, email, company,
                 birthday, notes, avatar,
+                normalized_methods,
             )
             contact = await self.hass.async_add_executor_job(store.get_contact, number)
             coord.push_event("contact_saved", {"number": number, "name": name})

@@ -895,11 +895,11 @@ const CSS = `
   .contact-modal-overlay {
     display: none; position: fixed; inset: 0; z-index: 120;
     background: rgba(0,0,0,.52); align-items: center; justify-content: center;
-    padding: 20px;
+    padding: 20px; overflow-x: hidden;
   }
   .contact-modal-overlay.open { display: flex; }
   .contact-modal {
-    width: min(460px, 100%); max-height: min(760px, calc(100dvh - 40px));
+    width: min(460px, 100%); max-width: 100%; min-width: 0; max-height: min(760px, calc(100dvh - 40px));
     overflow: auto; background: var(--card); color: var(--text);
     border-radius: 18px; box-shadow: 0 18px 55px rgba(0,0,0,.32);
   }
@@ -945,7 +945,7 @@ const CSS = `
   .contact-field label { color: var(--sub); font-size: 12px; }
   .contact-field input, .contact-field textarea {
     width: 100%; padding: 10px 11px; border: 1px solid var(--line);
-    border-radius: 9px; background: var(--bg); color: var(--text); font: inherit;
+    border-radius: 9px; background: var(--bg); color: var(--text); font: inherit; box-sizing: border-box; min-width: 0;
   }
   .contact-field input:focus, .contact-field textarea:focus { outline: none; border-color: var(--accent); }
   .contact-photo-actions { display: flex; justify-content: center; gap: 8px; margin: -5px 0 17px; }
@@ -954,6 +954,12 @@ const CSS = `
     background: color-mix(in srgb, var(--accent) 13%, transparent); color: var(--accent);
   }
   .contact-form-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 18px; }
+  .custom-methods { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 8px; }
+  .custom-methods-title { color: var(--sub); font-size: 12px; }
+  .custom-method-row { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.4fr) auto; gap: 7px; align-items: center; }
+  .custom-method-row input { min-width: 0; }
+  .custom-method-remove { border: 0; background: transparent; color: var(--sub); cursor: pointer; font-size: 18px; padding: 5px; }
+  .custom-method-add { align-self: flex-start; }
   .contact-form-btn.primary { background: var(--accent); color: #fff; }
   .contact-form-btn.secondary { background: transparent; color: var(--sub); }
 
@@ -982,6 +988,7 @@ const CSS = `
       width: 100%; max-height: calc(100dvh - var(--safe-area-inset-top, 0px));
       border-radius: 20px 20px 0 0;
       padding-bottom: var(--safe-area-inset-bottom, 0px);
+      overflow-x: hidden;
     }
     .profile-hero { border-radius: 20px 20px 0 0; }
     .contact-form-grid { grid-template-columns: 1fr; }
@@ -2224,6 +2231,15 @@ class SmsGammuPanel extends HTMLElement {
     return this._phonebook.find((c) => c.number === contact.number)?.avatar || "";
   }
 
+  _contactMethodValue(value) {
+    const text = String(value || "");
+    const escaped = this._esc(text);
+    if (/^(https?:\/\/|mailto:|tel:)/i.test(text)) {
+      return `<a href="${escaped}" target="_blank" rel="noopener noreferrer">${escaped}</a>`;
+    }
+    return escaped;
+  }
+
   _contactAvatar(contact, className = "profile-avatar") {
     const avatar = this._avatarFor(contact);
     const name = contact?.name || contact?.contact_name || contact?.number || "?";
@@ -2275,6 +2291,7 @@ class SmsGammuPanel extends HTMLElement {
       [this._t("contact_birthday"), c.birthday],
       [this._t("contact_notes"), c.notes],
     ].filter(([, value]) => value);
+    const customMethods = Array.isArray(c.custom_methods) ? c.custom_methods.filter((item) => item?.method && item?.value) : [];
     modal.innerHTML = `
       <div class="profile-hero">
         <button class="profile-close" id="profile-close" title="${this._t("close")}">×</button>
@@ -2294,11 +2311,15 @@ class SmsGammuPanel extends HTMLElement {
         </button>
       </div>
       <div class="profile-details">
-        ${details.length ? details.map(([label, value]) => `
+        ${details.length || customMethods.length ? `${details.map(([label, value]) => `
           <div class="profile-detail">
             <div class="profile-detail-label">${this._esc(label)}</div>
             <div class="profile-detail-value">${this._esc(value)}</div>
-          </div>`).join("") : `<div class="pb-empty">${this._t("contact_details")}</div>`}
+          </div>`).join("")}${customMethods.map((item) => `
+          <div class="profile-detail">
+            <div class="profile-detail-label">${this._esc(item.method)}</div>
+            <div class="profile-detail-value">${this._contactMethodValue(item.value)}</div>
+          </div>`).join("")}` : `<div class="pb-empty">${this._t("contact_details")}</div>`}
       </div>`;
     modal.querySelector("#profile-close")?.addEventListener("click", () => this._closeContactModal());
     modal.querySelector("#profile-message")?.addEventListener("click", async () => {
@@ -2322,6 +2343,7 @@ class SmsGammuPanel extends HTMLElement {
     const c = contact || {
       number: "", name: "", label: "", email: "", company: "",
       birthday: "", notes: "", avatar: "", _saved: false,
+      custom_methods: [],
     };
     this._profileContact = c;
     this._avatarDraft = undefined;
@@ -2342,6 +2364,7 @@ class SmsGammuPanel extends HTMLElement {
           <div class="contact-field"><label>${this._t("contact_company")}</label><input id="contact-company" maxlength="120" value="${this._esc(c.company || "")}" /></div>
           <div class="contact-field"><label>${this._t("contact_email")}</label><input id="contact-email" type="email" maxlength="254" value="${this._esc(c.email || "")}" /></div>
           <div class="contact-field"><label>${this._t("contact_birthday")}</label><input id="contact-birthday" type="date" value="${this._esc(c.birthday || "")}" /></div>
+          <div class="custom-methods"><div class="custom-methods-title">${this._t("contact_custom_methods")}</div><div id="custom-method-list"></div><button type="button" class="contact-photo-btn custom-method-add" id="custom-method-add">＋ ${this._t("add_custom_method")}</button></div>
           <div class="contact-field full"><label>${this._t("contact_notes")}</label><textarea id="contact-notes" rows="4" maxlength="4000">${this._esc(c.notes || "")}</textarea></div>
         </div>
         <div class="contact-form-actions">
@@ -2350,6 +2373,15 @@ class SmsGammuPanel extends HTMLElement {
         </div>
       </div>`;
     overlay.classList.add("open");
+    const methodList = modal.querySelector("#custom-method-list");
+    const addMethodRow = (item = {}) => {
+      const row = document.createElement("div"); row.className = "custom-method-row";
+      row.innerHTML = `<input class="custom-method-name" maxlength="80" placeholder="${this._esc(this._t("custom_method_placeholder"))}" value="${this._esc(item.method || "")}"><input class="custom-method-value" maxlength="500" placeholder="${this._esc(this._t("custom_value_placeholder"))}" value="${this._esc(item.value || "")}"><button type="button" class="custom-method-remove" title="${this._t("remove_custom_method")}">×</button>`;
+      row.querySelector(".custom-method-remove")?.addEventListener("click", () => row.remove());
+      methodList?.appendChild(row);
+    };
+    (Array.isArray(c.custom_methods) ? c.custom_methods : []).forEach(addMethodRow);
+    modal.querySelector("#custom-method-add")?.addEventListener("click", () => addMethodRow());
     modal.querySelector("#contact-cancel")?.addEventListener("click", () => this._closeContactModal());
     const fileInput = modal.querySelector("#contact-photo-input");
     modal.querySelector("#contact-photo-choose")?.addEventListener("click", () => fileInput?.click());
@@ -2412,6 +2444,10 @@ class SmsGammuPanel extends HTMLElement {
       label: value("contact-label"), email: value("contact-email"),
       company: value("contact-company"), birthday: value("contact-birthday"),
       notes: value("contact-notes"),
+      custom_methods: [...modal.querySelectorAll(".custom-method-row")].map((row) => ({
+        method: row.querySelector(".custom-method-name")?.value.trim() || "",
+        value: row.querySelector(".custom-method-value")?.value.trim() || "",
+      })).filter((item) => item.method || item.value),
     };
     if (!payload.name) return this._showToast(this._t("name_required"));
     if (!payload.number) return this._showToast(this._t("number_required"));
