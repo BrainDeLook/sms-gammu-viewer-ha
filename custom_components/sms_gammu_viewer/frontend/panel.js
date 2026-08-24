@@ -1142,6 +1142,7 @@ class SmsGammuPanel extends HTMLElement {
     this._chatFolders = [];
     this._activeFolderId = "all";
     this._folderOptions = { show_all: true, brands_enabled: false, brands_manual: [], brands_excluded: [], folder_order: [] };
+    this._folderScrollLeft = 0;
   }
 
   _t(key, ...args) {
@@ -3712,12 +3713,19 @@ class SmsGammuPanel extends HTMLElement {
   _renderFolders() {
     const host = this.shadowRoot.getElementById("folder-tabs");
     if (!host) return;
+    const previousScroller = host.querySelector(".folder-tab-scroll");
+    const scrollLeft = previousScroller ? previousScroller.scrollLeft : this._folderScrollLeft;
     const tabs = this._folderTabDefinitions();
     if (!tabs.some((item) => item.id === this._activeFolderId)) this._activeFolderId = tabs[0]?.id || "all";
     host.innerHTML = `<div class="folder-tab-scroll">${tabs.map((folder) => `
       <button class="folder-tab ${this._activeFolderId === folder.id ? "active" : ""}" data-folder-id="${this._esc(folder.id)}">
         ${folder.icon ? this._esc(folder.icon) + " " : ""}${this._esc(folder.name)}
       </button>`).join("")}<button class="folder-tab add" id="folder-add" title="${this._esc(this._t("new_folder"))}">＋</button></div><div class="folder-tab-actions"><button class="folder-tab add" id="folder-settings" title="${this._esc(this._t("folder_settings"))}">⚙</button></div>`;
+    const newScroller = host.querySelector(".folder-tab-scroll");
+    if (newScroller) {
+      newScroller.scrollLeft = scrollLeft;
+      this._folderScrollLeft = scrollLeft;
+    }
     host.querySelectorAll("[data-folder-id]").forEach((button) => button.addEventListener("click", () => {
       this._activeFolderId = button.dataset.folderId;
       this._renderContacts();
@@ -3729,7 +3737,11 @@ class SmsGammuPanel extends HTMLElement {
       if (!delta) return;
       event.preventDefault();
       folderScroller.scrollLeft += delta;
+      this._folderScrollLeft = folderScroller.scrollLeft;
     }, { passive: false });
+    folderScroller?.addEventListener("scroll", () => {
+      this._folderScrollLeft = folderScroller.scrollLeft;
+    }, { passive: true });
     host.querySelector("#folder-add")?.addEventListener("click", () => this._openFolderEditor());
     host.querySelector("#folder-settings")?.addEventListener("click", () => this._openFolderSettings());
     host.querySelectorAll("[data-folder-id]:not([data-folder-id=all])").forEach((button) => {
