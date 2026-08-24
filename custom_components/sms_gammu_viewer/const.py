@@ -69,6 +69,7 @@ DEFAULT_SHOW_SIDEBAR_BADGE = True
 # Автоматические логотипы организаций для буквенных отправителей.
 CONF_USE_BRAND_LOGOS = "use_brand_logos"
 DEFAULT_USE_BRAND_LOGOS = False
+BRAND_CATALOG_URL = "https://trace-logos.ru/logos.json"
 
 # Префикс action в мобильном уведомлении для ответа на SMS:
 # полное имя action = префикс + номер отправителя
