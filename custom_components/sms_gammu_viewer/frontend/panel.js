@@ -123,7 +123,7 @@ const CSS = `
     gap: 6px;
   }
   @media (max-width: 580px) {
-    .status-bar { position: relative; z-index: 9; transition: max-height .22s ease-out, padding .22s ease-out, opacity .22s ease-out; overflow: hidden; }
+    .status-bar { position: relative; z-index: 9; transition: none; overflow: hidden; }
   }
 
   .signal-dot {
@@ -1059,7 +1059,7 @@ const CSS = `
 
   @media (max-width: 580px) {
     .folder-tabs {
-      position: absolute; left: 0; right: 0; z-index: 8; display: block; transition: top .22s ease-out;
+      position: absolute; left: 0; right: 0; z-index: 8; display: block; transition: none;
     }
     .folder-tab-shell {
       width: auto; margin: 0 12px 7px; padding: 3px; gap: 3px; border: 1px solid var(--line);
@@ -3770,7 +3770,7 @@ class SmsGammuPanel extends HTMLElement {
       if (contactList && shell) contactList.style.paddingTop = `${shell.offsetHeight + 2}px`;
       if (contactList && !this._mobileChromeScrollBound) {
         this._mobileChromeScrollBound = true;
-        contactList.addEventListener("scroll", () => this._syncMobileChrome(), { passive: true });
+        contactList.addEventListener("scroll", () => this._queueMobileChromeSync(), { passive: true });
       }
       this._syncMobileChrome();
     } else {
@@ -3806,6 +3806,15 @@ class SmsGammuPanel extends HTMLElement {
         if (folder) this._openFolderEditor(folder);
         else if (button.dataset.folderId === "brands") this._openBrandsEditor();
       });
+    });
+  }
+
+  _queueMobileChromeSync() {
+    if (this._mobileChromeRaf) return;
+    const schedule = window.requestAnimationFrame || ((callback) => window.setTimeout(callback, 16));
+    this._mobileChromeRaf = schedule(() => {
+      this._mobileChromeRaf = 0;
+      this._syncMobileChrome();
     });
   }
 
