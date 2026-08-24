@@ -5,6 +5,7 @@ import asyncio
 import json
 import logging
 import re
+from urllib.parse import urlparse
 from datetime import datetime
 from pathlib import Path
 
@@ -1211,6 +1212,33 @@ class SmsApiView(HomeAssistantView):
             except Exception as err:
                 _LOGGER.warning("Trace Logo catalog unavailable: %s", err)
                 return self._json({"updated": "", "logos": []})
+
+        if action == "brand_asset":
+            asset_url = request.rel_url.query.get("url", "")
+            parsed = urlparse(asset_url)
+            if (
+                parsed.scheme != "https"
+                or parsed.netloc != "trace-logos.ru"
+                or not parsed.path.startswith("/assets/logos/")
+            ):
+                return self._error("Invalid brand asset URL", 400)
+            try:
+                timeout = aiohttp.ClientTimeout(total=15)
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    async with session.get(asset_url) as response:
+                        response.raise_for_status()
+                        body = await response.read()
+                        content_type = response.headers.get("Content-Type", "image/svg+xml").split(";", 1)[0]
+                if content_type not in {"image/svg+xml", "image/png", "image/webp"}:
+                    content_type = "image/svg+xml"
+                return web.Response(
+                    body=body,
+                    content_type=content_type,
+                    headers={"Cache-Control": "public, max-age=31536000, immutable"},
+                )
+            except Exception as err:
+                _LOGGER.debug("Trace Logo asset unavailable (%s): %s", asset_url, err)
+                return self._error("Brand asset unavailable", 502)
 
         if action == "poll_interval":
             return self._json({"interval": coord._interval})
