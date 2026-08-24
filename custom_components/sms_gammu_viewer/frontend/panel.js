@@ -236,11 +236,11 @@ const CSS = `
   }
   .contact-list.brand-loading { visibility: hidden; }
   .folder-tabs { display: flex; align-items: center; gap: 6px; padding: 7px 12px 5px; overflow: hidden; border-top: 1px solid var(--border); }
-  .folder-tab-scroll { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1 1 auto; overflow-x: auto; scrollbar-width: none; touch-action: pan-x; }
+  .folder-tab-scroll { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1 1 auto; overflow-x: auto; scrollbar-width: none; touch-action: pan-x; background: transparent; }
   .folder-tab-scroll::-webkit-scrollbar { display: none; }
   .folder-tab-scroll { cursor: grab; }
   .folder-tab-scroll:active { cursor: grabbing; }
-  .folder-tab-actions { display: flex; flex: 0 0 auto; align-items: center; padding-left: 4px; background: var(--panel); }
+  .folder-tab-actions { display: flex; flex: 0 0 auto; align-items: center; padding-left: 4px; background: transparent; }
   .folder-tab {
     flex: 0 0 auto; border: 1px solid var(--border); border-radius: 16px;
     background: transparent; color: var(--sub); padding: 5px 10px;
@@ -1056,7 +1056,7 @@ const CSS = `
   @media (max-width: 580px) {
     .folder-tabs {
       margin: 6px 12px 7px; padding: 3px; gap: 3px; border: 1px solid var(--line);
-      border-radius: 999px; background: color-mix(in srgb, var(--text) 6%, var(--panel));
+      border-radius: 999px; overflow: hidden; background: color-mix(in srgb, var(--text) 6%, var(--panel));
     }
     .folder-tab-scroll { gap: 3px; padding: 0 1px; }
     .folder-tab { border-color: transparent; border-radius: 999px; padding: 7px 12px; }
