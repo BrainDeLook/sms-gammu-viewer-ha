@@ -662,7 +662,7 @@ class SmsCoordinator:
                         await self.hass.async_add_executor_job(asset_path.write_bytes, body)
                     content_type = avatar_match.group(1).lower()
                     suffix = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif"}[content_type]
-                    return {"url": f"/api/sms_gammu_viewer_brand/{asset_id}.{suffix}", "content_type": content_type}
+                    return {"url": f"/api/sms_gammu_viewer_brand/{asset_id}.{suffix}", "content_type": suffix}
             except Exception as error:
                 _LOGGER.debug("Contact avatar unavailable for notification: %s", error)
         source = str((contact or {}).get("brand_logo_url") or "").strip()
@@ -720,7 +720,7 @@ class SmsCoordinator:
                 else:
                     continue
                 suffix = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif"}[content_type]
-                return {"url": f"/api/sms_gammu_viewer_brand/{asset_id}.{suffix}", "content_type": content_type}
+                return {"url": f"/api/sms_gammu_viewer_brand/{asset_id}.{suffix}", "content_type": suffix}
             except Exception as error:
                 _LOGGER.debug("Notification brand asset unavailable (%s): %s", asset_url, error)
         return None
