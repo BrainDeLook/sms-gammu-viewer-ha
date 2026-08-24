@@ -3764,6 +3764,7 @@ class SmsGammuPanel extends HTMLElement {
       const shell = host.querySelector(".folder-tab-shell");
       if (status && !this._statusExpandedHeight && status.offsetHeight) this._statusExpandedHeight = status.offsetHeight;
       this._folderBaseTop = Math.max(0, (status?.offsetTop || 0) + (this._statusExpandedHeight || status?.offsetHeight || 0) - 8);
+      this._folderMinTop = Math.max(0, (status?.offsetTop || 0) + 6);
       host.style.top = `${this._folderBaseTop}px`;
       if (contactList && shell) contactList.style.paddingTop = `${shell.offsetHeight + 2}px`;
       if (contactList && !this._mobileChromeScrollBound) {
@@ -3828,7 +3829,8 @@ class SmsGammuPanel extends HTMLElement {
       status.style.paddingBottom = `${8 * ratio}px`;
       status.style.opacity = String(Math.max(0, ratio));
     }
-    host.style.top = `${Math.max(0, (this._folderBaseTop || 0) - collapse)}px`;
+    const minTop = this._folderMinTop || 0;
+    host.style.top = `${Math.max(minTop, (this._folderBaseTop || 0) - collapse)}px`;
   }
 
   _folderTabDefinitions() {
