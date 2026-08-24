@@ -11,7 +11,7 @@ export default {
   enable_brands_folder: "Enable automatic People and Brands folders",
   manage_brands_folder: "Manage Brands folder",
   brands_folder_help: "Chats with library logos are added automatically. Uncheck a chat to move it to People, or check any chat to add it to Brands manually.",
-  custom_folders: "Custom folders",
+  custom_folders: "Folders and order",
   no_custom_folders: "No custom folders yet",
   delete_folder: "Delete",
   delete_folder_confirm: "Delete this folder? Chats and messages will not be deleted.",

@@ -1140,7 +1140,7 @@ class SmsGammuPanel extends HTMLElement {
     this._brandPickerContact = null;
     this._chatFolders = [];
     this._activeFolderId = "all";
-    this._folderOptions = { show_all: true, brands_enabled: false, brands_manual: [], brands_excluded: [] };
+    this._folderOptions = { show_all: true, brands_enabled: false, brands_manual: [], brands_excluded: [], folder_order: [] };
   }
 
   _t(key, ...args) {
@@ -3711,13 +3711,7 @@ class SmsGammuPanel extends HTMLElement {
   _renderFolders() {
     const host = this.shadowRoot.getElementById("folder-tabs");
     if (!host) return;
-    const tabs = [];
-    if (this._folderOptions.show_all !== false) tabs.push({ id: "all", name: this._t("all_chats"), icon: "" });
-    if (this._folderOptions.brands_enabled) {
-      tabs.push({ id: "people", name: this._t("people_folder"), icon: "👤" });
-      tabs.push({ id: "brands", name: this._t("brands_folder"), icon: "🏷️" });
-    }
-    tabs.push(...this._chatFolders);
+    const tabs = this._folderTabDefinitions();
     if (!tabs.some((item) => item.id === this._activeFolderId)) this._activeFolderId = tabs[0]?.id || "all";
     host.innerHTML = tabs.map((folder) => `
       <button class="folder-tab ${this._activeFolderId === folder.id ? "active" : ""}" data-folder-id="${this._esc(folder.id)}">
@@ -3740,6 +3734,22 @@ class SmsGammuPanel extends HTMLElement {
     });
   }
 
+  _folderTabDefinitions() {
+    const tabs = [];
+    if (this._folderOptions.show_all !== false) tabs.push({ id: "all", name: this._t("all_chats"), icon: "", system: true });
+    if (this._folderOptions.brands_enabled) {
+      tabs.push({ id: "people", name: this._t("people_folder"), icon: "👤", system: true });
+      tabs.push({ id: "brands", name: this._t("brands_folder"), icon: "🏷️", system: true });
+    }
+    tabs.push(...this._chatFolders.map((folder) => ({ ...folder, system: false })));
+    const byId = new Map(tabs.map((folder) => [folder.id, folder]));
+    const ordered = [];
+    for (const id of (Array.isArray(this._folderOptions.folder_order) ? this._folderOptions.folder_order : [])) {
+      if (byId.has(id)) { ordered.push(byId.get(id)); byId.delete(id); }
+    }
+    return [...ordered, ...byId.values()];
+  }
+
   _openFolderSettings() {
     const overlay = this.shadowRoot.getElementById("contact-modal-overlay");
     const modal = this.shadowRoot.getElementById("contact-modal");
@@ -3750,7 +3760,7 @@ class SmsGammuPanel extends HTMLElement {
       <label class="folder-editor-chat"><input type="checkbox" id="folder-brands-enabled" ${this._folderOptions.brands_enabled ? "checked" : ""}/> ${this._esc(this._t("enable_brands_folder"))}</label>
       <button id="folder-manage-brands" ${this._folderOptions.brands_enabled ? "" : "disabled"}>${this._esc(this._t("manage_brands_folder"))}</button>
       <h3>${this._esc(this._t("custom_folders"))}</h3>
-      <div class="folder-settings-list">${this._chatFolders.length ? this._chatFolders.map((folder, index) => `<div class="folder-settings-row"><span>${folder.icon ? this._esc(folder.icon) + " " : ""}${this._esc(folder.name)}</span><span><button data-move-folder-up="${this._esc(folder.id)}" ${index === 0 ? "disabled" : ""} aria-label="${this._esc(this._t("move_folder_up"))}">↑</button><button data-move-folder-down="${this._esc(folder.id)}" ${index === this._chatFolders.length - 1 ? "disabled" : ""} aria-label="${this._esc(this._t("move_folder_down"))}">↓</button><button data-edit-folder="${this._esc(folder.id)}">${this._esc(this._t("edit_folder"))}</button><button data-delete-folder="${this._esc(folder.id)}">${this._esc(this._t("delete_folder"))}</button></span></div>`).join("") : `<p class="form-help">${this._esc(this._t("no_custom_folders"))}</p>`}</div>
+      <div class="folder-settings-list">${this._folderTabDefinitions().length ? this._folderTabDefinitions().map((folder, index, all) => `<div class="folder-settings-row"><span>${folder.icon ? this._esc(folder.icon) + " " : ""}${this._esc(folder.name)}</span><span><button data-move-folder-up="${this._esc(folder.id)}" ${index === 0 ? "disabled" : ""} aria-label="${this._esc(this._t("move_folder_up"))}">↑</button><button data-move-folder-down="${this._esc(folder.id)}" ${index === all.length - 1 ? "disabled" : ""} aria-label="${this._esc(this._t("move_folder_down"))}">↓</button>${folder.system ? "" : `<button data-edit-folder="${this._esc(folder.id)}">${this._esc(this._t("edit_folder"))}</button><button data-delete-folder="${this._esc(folder.id)}">${this._esc(this._t("delete_folder"))}</button>`}</span></div>`).join("") : `<p class="form-help">${this._esc(this._t("no_custom_folders"))}</p>`}</div>
       <button id="folder-create">＋ ${this._esc(this._t("new_folder"))}</button>
       <div class="contact-form-actions"><button id="folder-settings-cancel">${this._esc(this._t("cancel"))}</button><button class="primary" id="folder-settings-save">${this._esc(this._t("save"))}</button></div>
     </div>`;
@@ -3763,13 +3773,15 @@ class SmsGammuPanel extends HTMLElement {
       this._openFolderEditor();
     });
     const moveFolder = async (folderId, direction) => {
-      const index = this._chatFolders.findIndex((item) => item.id === folderId);
+      const currentTabs = this._folderTabDefinitions();
+      const index = currentTabs.findIndex((item) => item.id === folderId);
       const nextIndex = index + direction;
-      if (index < 0 || nextIndex < 0 || nextIndex >= this._chatFolders.length) return;
-      const folders = [...this._chatFolders];
-      [folders[index], folders[nextIndex]] = [folders[nextIndex], folders[index]];
-      await this._api("save_chat_folders", "POST", { folders });
-      this._chatFolders = folders;
+      if (index < 0 || nextIndex < 0 || nextIndex >= currentTabs.length) return;
+      const order = currentTabs.map((item) => item.id);
+      [order[index], order[nextIndex]] = [order[nextIndex], order[index]];
+      const options = { ...this._folderOptions, folder_order: order };
+      await this._api("save_chat_folder_options", "POST", options);
+      this._folderOptions = options;
       close();
       this._renderContacts();
     };
@@ -3787,7 +3799,7 @@ class SmsGammuPanel extends HTMLElement {
       const folders = this._chatFolders.filter((item) => item.id !== folder.id);
       await this._api("save_chat_folders", "POST", { folders });
       this._chatFolders = folders;
-      if (this._activeFolderId === folder.id) this._activeFolderId = this._folderOptions.show_all !== false ? "all" : (this._folderOptions.brands_enabled ? "people" : "all");
+      if (this._activeFolderId === folder.id) this._activeFolderId = this._folderTabDefinitions()[0]?.id || "all";
       close();
       this._renderContacts();
     }));

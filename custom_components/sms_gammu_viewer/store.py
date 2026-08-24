@@ -455,7 +455,7 @@ class SmsStore:
     def get_chat_folder_options(self) -> dict[str, Any]:
         raw = self.get_setting("chat_folder_options")
         if not raw:
-            return {"show_all": True, "brands_enabled": False, "brands_manual": [], "brands_excluded": []}
+            return {"show_all": True, "brands_enabled": False, "brands_manual": [], "brands_excluded": [], "folder_order": []}
         try:
             value = json.loads(raw)
         except (TypeError, ValueError):
@@ -467,6 +467,7 @@ class SmsStore:
             "brands_enabled": bool(value.get("brands_enabled", False)),
             "brands_manual": value.get("brands_manual", []) if isinstance(value.get("brands_manual", []), list) else [],
             "brands_excluded": value.get("brands_excluded", []) if isinstance(value.get("brands_excluded", []), list) else [],
+            "folder_order": value.get("folder_order", []) if isinstance(value.get("folder_order", []), list) else [],
         }
 
     def set_chat_folder_options(self, options: dict[str, Any]) -> None:

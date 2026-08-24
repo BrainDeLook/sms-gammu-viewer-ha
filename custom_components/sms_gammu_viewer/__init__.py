@@ -1580,6 +1580,10 @@ class SmsApiView(HomeAssistantView):
                 if not isinstance(values, list) or len(values) > 1000:
                     return self._error("Invalid folder numbers", 400)
                 clean[key] = list(dict.fromkeys(str(value).strip() for value in values if str(value).strip() and len(str(value).strip()) <= 64))
+            order = body.get("folder_order") or []
+            if not isinstance(order, list) or len(order) > 200:
+                return self._error("Invalid folder order", 400)
+            clean["folder_order"] = list(dict.fromkeys(str(value).strip() for value in order if str(value).strip() and len(str(value).strip()) <= 64))
             await self.hass.async_add_executor_job(store.set_chat_folder_options, clean)
             return self._json(clean)
 
