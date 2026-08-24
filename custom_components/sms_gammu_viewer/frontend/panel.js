@@ -239,7 +239,7 @@ const CSS = `
   }
   .contact-list.brand-loading { visibility: hidden; }
   .folder-tabs { display: flex; align-items: center; gap: 6px; padding: 7px 12px 5px; overflow: visible; }
-  .folder-tab-shell { display: flex; align-items: center; gap: 6px; min-width: 0; width: 100%; }
+  .folder-tab-shell { display: flex; align-items: center; gap: 6px; min-width: 0; width: auto; box-sizing: border-box; }
   .folder-tab-scroll { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1 1 auto; overflow-x: auto; scrollbar-width: none; touch-action: pan-x; background: transparent; }
   .folder-tab-scroll::-webkit-scrollbar { display: none; }
   .folder-tab-scroll { cursor: grab; }
