@@ -235,11 +235,10 @@ const CSS = `
     letter-spacing: -.5px;
   }
   .contact-list.brand-loading { visibility: hidden; }
-  .folder-tabs {
-    display: flex; gap: 6px; padding: 7px 12px 5px; overflow-x: auto;
-    scrollbar-width: none; border-top: 1px solid var(--border); touch-action: pan-x;
-  }
-  .folder-tabs::-webkit-scrollbar { display: none; }
+  .folder-tabs { display: flex; align-items: center; gap: 6px; padding: 7px 12px 5px; overflow: hidden; border-top: 1px solid var(--border); }
+  .folder-tab-scroll { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1 1 auto; overflow-x: auto; scrollbar-width: none; touch-action: pan-x; }
+  .folder-tab-scroll::-webkit-scrollbar { display: none; }
+  .folder-tab-actions { display: flex; flex: 0 0 auto; align-items: center; padding-left: 4px; background: var(--panel); }
   .folder-tab {
     flex: 0 0 auto; border: 1px solid var(--border); border-radius: 16px;
     background: transparent; color: var(--sub); padding: 5px 10px;
@@ -247,7 +246,6 @@ const CSS = `
   }
   .folder-tab.active { color: var(--accent); border-color: var(--accent); background: rgba(3,169,244,.1); }
   .folder-tab.add { font-size: 17px; line-height: 15px; padding: 4px 9px; }
-  .folder-tab.settings { position: sticky; right: 0; z-index: 2; background: var(--panel); box-shadow: -8px 0 8px var(--panel); }
   .folder-editor-list { max-height: 260px; overflow: auto; margin-top: 12px; border-top: 1px solid var(--border); }
   .folder-editor-chat { display: flex; align-items: center; gap: 8px; padding: 8px 2px; border-bottom: 1px solid var(--border); }
   .folder-editor-chat input { width: 18px; height: 18px; }
@@ -3714,19 +3712,16 @@ class SmsGammuPanel extends HTMLElement {
     if (!host) return;
     const tabs = this._folderTabDefinitions();
     if (!tabs.some((item) => item.id === this._activeFolderId)) this._activeFolderId = tabs[0]?.id || "all";
-    host.innerHTML = tabs.map((folder) => `
+    host.innerHTML = `<div class="folder-tab-scroll">${tabs.map((folder) => `
       <button class="folder-tab ${this._activeFolderId === folder.id ? "active" : ""}" data-folder-id="${this._esc(folder.id)}">
         ${folder.icon ? this._esc(folder.icon) + " " : ""}${this._esc(folder.name)}
-      </button>`).join("") + `<button class="folder-tab add" id="folder-add" title="${this._esc(this._t("new_folder"))}">＋</button>`;
+      </button>`).join("")}<button class="folder-tab add" id="folder-add" title="${this._esc(this._t("new_folder"))}">＋</button></div><div class="folder-tab-actions"><button class="folder-tab add" id="folder-settings" title="${this._esc(this._t("folder_settings"))}">⚙</button></div>`;
     host.querySelectorAll("[data-folder-id]").forEach((button) => button.addEventListener("click", () => {
       this._activeFolderId = button.dataset.folderId;
       this._renderContacts();
     }));
     host.querySelector("#folder-add")?.addEventListener("click", () => this._openFolderEditor());
-    const settings = document.createElement("button");
-    settings.id = "folder-settings";
-    settings.className = "folder-tab add settings"; settings.title = this._t("folder_settings"); settings.textContent = "⚙";
-    settings.addEventListener("click", () => this._openFolderSettings()); host.appendChild(settings);
+    host.querySelector("#folder-settings")?.addEventListener("click", () => this._openFolderSettings());
     host.querySelectorAll("[data-folder-id]:not([data-folder-id=all])").forEach((button) => {
       button.addEventListener("dblclick", () => {
         const folder = this._chatFolders.find((item) => item.id === button.dataset.folderId);
