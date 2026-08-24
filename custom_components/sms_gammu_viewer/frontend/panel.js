@@ -244,7 +244,7 @@ const CSS = `
   .folder-tab-scroll::-webkit-scrollbar { display: none; }
   .folder-tab-scroll { cursor: grab; }
   .folder-tab-scroll:active { cursor: grabbing; }
-  .folder-tab-actions { display: flex; flex: 0 0 auto; align-items: center; padding-left: 4px; background: transparent; }
+  .folder-tab-actions { display: flex; flex: 0 0 30px; width: 30px; justify-content: center; align-items: center; padding-left: 0; background: transparent; }
   .folder-tab {
     flex: 0 0 auto; border: 1px solid var(--border); border-radius: 16px;
     background: transparent; color: var(--sub); padding: 5px 10px;
@@ -1069,7 +1069,7 @@ const CSS = `
     .folder-tab { border-color: transparent; border-radius: 999px; padding: 7px 12px; }
     .folder-tab.active { color: var(--accent); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent) inset; }
     .folder-tab.add { font-size: 16px; padding: 6px 10px; }
-    .folder-tab-actions { padding-left: 2px; }
+    .folder-tab-actions { flex-basis: 32px; width: 32px; padding-left: 0; }
     .folder-tab-actions .folder-tab { width: 32px; height: 32px; padding: 0; }
     .profile-actions { gap: 6px; padding: 13px 8px; flex-wrap: wrap; }
     .profile-action { min-width: 62px; flex: 1 1 62px; }
