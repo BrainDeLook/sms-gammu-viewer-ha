@@ -379,6 +379,13 @@ def _brand_asset_id(url: str) -> str:
     return hashlib.sha256(url.encode("utf-8")).hexdigest()
 
 
+def _svg_to_png(svg: bytes) -> bytes:
+    """Rasterize a catalog SVG for mobile notification attachments."""
+    import cairosvg
+
+    return cairosvg.svg2png(bytestring=svg, output_width=512, output_height=512)
+
+
 class BrandAssetView(HomeAssistantView):
     """Serve only previously downloaded brand assets from local HA storage."""
 
@@ -686,7 +693,11 @@ class SmsCoordinator:
 
         # Prefer PNG for iOS attachments; SVG is valid for the card but not a
         # reliably supported UNNotificationAttachment image type.
-        candidates = [selected.get("pngUrl"), selected.get("svgUrl")]
+        svg_url = str(selected.get("svgUrl") or "").strip()
+        derived_png = svg_url.replace("/assets/logos/svgs/", "/assets/logos/pngs/")
+        if derived_png.lower().endswith(".svg"):
+            derived_png = derived_png[:-4] + ".png"
+        candidates = [selected.get("pngUrl"), derived_png, svg_url]
         if source and source not in candidates:
             candidates.append(source)
         for asset_url in candidates:
@@ -718,7 +729,21 @@ class SmsCoordinator:
                 elif header.startswith(b"RIFF") and header[8:12] == b"WEBP":
                     content_type = "image/webp"
                 else:
-                    continue
+                    # Trace Logos often publishes only SVG. The HA frontend
+                    # can render it, but iOS notification attachments cannot.
+                    # Rasterize it once and persist the PNG beside the source.
+                    if b"<svg" not in header[:2048].lower():
+                        continue
+                    try:
+                        png_id = _brand_asset_id(asset_url + "|notification-png")
+                        png_path = _brand_asset_dir(self.hass) / png_id
+                        if not png_path.is_file():
+                            png_body = await self.hass.async_add_executor_job(_svg_to_png, header)
+                            await self.hass.async_add_executor_job(png_path.write_bytes, png_body)
+                        return {"url": f"/api/sms_gammu_viewer_brand/{png_id}.png", "content_type": "png"}
+                    except Exception as error:
+                        _LOGGER.debug("Could not rasterize brand SVG (%s): %s", asset_url, error)
+                        continue
                 suffix = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif"}[content_type]
                 return {"url": f"/api/sms_gammu_viewer_brand/{asset_id}.{suffix}", "content_type": suffix}
             except Exception as error:
