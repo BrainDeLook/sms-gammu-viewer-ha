@@ -30,6 +30,7 @@ from .const import (
     CONF_SHOW_PANEL,
     CONF_SHOW_SIDEBAR_BADGE,
     CONF_USE_BRAND_LOGOS,
+    BRAND_CATALOG_URL,
     DEFAULT_USE_BRAND_LOGOS,
     DEFAULT_LANGUAGE,
     DEFAULT_SHOW_PANEL,
@@ -62,6 +63,10 @@ from .sms_pipeline import (
 from .store import SmsStore
 
 _LOGGER = logging.getLogger(__name__)
+
+_BRAND_CATALOG_CACHE: dict | None = None
+_BRAND_CATALOG_CACHE_TS = 0.0
+_BRAND_CATALOG_CACHE_TTL = 6 * 60 * 60
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
@@ -1172,6 +1177,40 @@ class SmsApiView(HomeAssistantView):
                 "language": coord.entry.data.get("language", "ru"),
                 "use_brand_logos": bool(coord.entry.data.get(CONF_USE_BRAND_LOGOS, DEFAULT_USE_BRAND_LOGOS)),
             })
+
+        if action == "brand_catalog":
+            global _BRAND_CATALOG_CACHE, _BRAND_CATALOG_CACHE_TS
+            now = asyncio.get_running_loop().time()
+            if (
+                _BRAND_CATALOG_CACHE
+                and now - _BRAND_CATALOG_CACHE_TS < _BRAND_CATALOG_CACHE_TTL
+            ):
+                return self._json(_BRAND_CATALOG_CACHE)
+            try:
+                timeout = aiohttp.ClientTimeout(total=15)
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    async with session.get(
+                        BRAND_CATALOG_URL,
+                        headers={"Accept": "application/json"},
+                    ) as response:
+                        response.raise_for_status()
+                        payload = await response.json()
+                logos = [
+                    item for item in payload.get("logos", [])
+                    if isinstance(item, dict)
+                    and not item.get("comingSoon")
+                    and (item.get("svgUrl") or item.get("pngUrl"))
+                ]
+                _BRAND_CATALOG_CACHE = {
+                    "updated": payload.get("updated", ""),
+                    "logos": logos,
+                }
+                _BRAND_CATALOG_CACHE_TS = now
+                _LOGGER.info("Trace Logo catalog loaded: %d logos", len(logos))
+                return self._json(_BRAND_CATALOG_CACHE)
+            except Exception as err:
+                _LOGGER.warning("Trace Logo catalog unavailable: %s", err)
+                return self._json({"updated": "", "logos": []})
 
         if action == "poll_interval":
             return self._json({"interval": coord._interval})
