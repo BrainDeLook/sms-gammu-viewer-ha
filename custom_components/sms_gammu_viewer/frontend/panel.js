@@ -123,7 +123,8 @@ const CSS = `
     gap: 6px;
   }
   @media (max-width: 580px) {
-    .status-bar { position: relative; z-index: 9; transition: none; overflow: hidden; }
+    .status-bar { position: relative; z-index: 1; transition: none; overflow: hidden; }
+    .contact-list { position: relative; z-index: 2; }
   }
 
   .signal-dot {
@@ -3781,6 +3782,8 @@ class SmsGammuPanel extends HTMLElement {
       statusEl?.style.removeProperty("padding-top");
       statusEl?.style.removeProperty("padding-bottom");
       statusEl?.style.removeProperty("opacity");
+      statusEl?.style.removeProperty("transform");
+      this.shadowRoot.getElementById("contact-list")?.style.removeProperty("transform");
     }
     host.querySelectorAll("[data-folder-id]").forEach((button) => button.addEventListener("click", () => {
       this._activeFolderId = button.dataset.folderId;
@@ -3827,14 +3830,12 @@ class SmsGammuPanel extends HTMLElement {
     const expanded = this._statusExpandedHeight || status.offsetHeight || 1;
     const collapse = Math.min(Math.max(0, list.scrollTop), expanded);
     const remaining = expanded - collapse;
-    // Keep explicit dimensions at both ends of the scroll range. Removing
-    // max-height at scrollTop=0 switches back to intrinsic layout and causes
-    // a visible jump when the status row returns.
+    // Keep the status row's layout height fixed. Only move the rendered
+    // layers, so inertial scrolling never gets its scroll geometry changed.
     const ratio = remaining / expanded;
-    status.style.maxHeight = `${remaining}px`;
-    status.style.paddingTop = `${4 * ratio}px`;
-    status.style.paddingBottom = `${8 * ratio}px`;
+    status.style.transform = `translate3d(0, ${-collapse}px, 0)`;
     status.style.opacity = String(Math.max(0, ratio));
+    list.style.transform = `translate3d(0, ${-collapse}px, 0)`;
     const minTop = this._folderMinTop || 0;
     host.style.top = `${Math.max(minTop, (this._folderBaseTop || 0) - collapse)}px`;
   }
