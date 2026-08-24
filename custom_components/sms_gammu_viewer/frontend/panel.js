@@ -238,6 +238,8 @@ const CSS = `
   .folder-tabs { display: flex; align-items: center; gap: 6px; padding: 7px 12px 5px; overflow: hidden; border-top: 1px solid var(--border); }
   .folder-tab-scroll { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1 1 auto; overflow-x: auto; scrollbar-width: none; touch-action: pan-x; }
   .folder-tab-scroll::-webkit-scrollbar { display: none; }
+  .folder-tab-scroll { cursor: grab; }
+  .folder-tab-scroll:active { cursor: grabbing; }
   .folder-tab-actions { display: flex; flex: 0 0 auto; align-items: center; padding-left: 4px; background: var(--panel); }
   .folder-tab {
     flex: 0 0 auto; border: 1px solid var(--border); border-radius: 16px;
@@ -3720,6 +3722,14 @@ class SmsGammuPanel extends HTMLElement {
       this._activeFolderId = button.dataset.folderId;
       this._renderContacts();
     }));
+    const folderScroller = host.querySelector(".folder-tab-scroll");
+    folderScroller?.addEventListener("wheel", (event) => {
+      if (!folderScroller || folderScroller.scrollWidth <= folderScroller.clientWidth) return;
+      const delta = Math.abs(event.deltaY) > Math.abs(event.deltaX) ? event.deltaY : event.deltaX;
+      if (!delta) return;
+      event.preventDefault();
+      folderScroller.scrollLeft += delta;
+    }, { passive: false });
     host.querySelector("#folder-add")?.addEventListener("click", () => this._openFolderEditor());
     host.querySelector("#folder-settings")?.addEventListener("click", () => this._openFolderSettings());
     host.querySelectorAll("[data-folder-id]:not([data-folder-id=all])").forEach((button) => {
