@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import hashlib
 import json
 import logging
@@ -627,9 +628,38 @@ class SmsCoordinator:
         ).strip()
 
     async def _notification_brand_image(self, number: str, contact: dict | None) -> dict | None:
-        """Return a locally persisted PNG suitable for an iOS attachment."""
+        """Return a locally persisted image suitable for a mobile attachment.
+
+        A contact photo is preferred over a catalog logo. Contact photos are
+        stored as data URLs in the phonebook, so persist the decoded bytes in
+        the same local asset store used by brand logos and reuse its public
+        attachment endpoint.
+        """
         if not self._notify_images_enabled():
             return None
+        avatar = str((contact or {}).get("avatar") or "").strip()
+        avatar_match = re.fullmatch(
+            r"data:(image/(?:jpeg|png|webp|gif));base64,([A-Za-z0-9+/=]+)",
+            avatar,
+            flags=re.IGNORECASE,
+        )
+        if avatar_match:
+            try:
+                body = base64.b64decode(avatar_match.group(2), validate=True)
+                if body:
+                    asset_id = _brand_asset_id(avatar)
+                    asset_path = _brand_asset_dir(self.hass) / asset_id
+                    if not asset_path.is_file():
+                        await self.hass.async_add_executor_job(
+                            partial(asset_path.parent.mkdir, parents=True, exist_ok=True)
+                        )
+                        await self.hass.async_add_executor_job(asset_path.write_bytes, body)
+                    return {
+                        "url": f"/api/sms_gammu_viewer_brand/{asset_id}",
+                        "content_type": avatar_match.group(1).lower(),
+                    }
+            except Exception as error:
+                _LOGGER.debug("Contact avatar unavailable for notification: %s", error)
         source = str((contact or {}).get("brand_logo_url") or "").strip()
         catalog_path = Path(self.hass.config.config_dir) / ".storage" / "sms_gammu_viewer_brand_catalog.json"
         try:
@@ -680,6 +710,8 @@ class SmsCoordinator:
                     content_type = "image/jpeg"
                 elif header.startswith(b"GIF8"):
                     content_type = "image/gif"
+                elif header.startswith(b"RIFF") and header[8:12] == b"WEBP":
+                    content_type = "image/webp"
                 else:
                     continue
                 return {"url": f"/api/sms_gammu_viewer_brand/{asset_id}", "content_type": content_type}
