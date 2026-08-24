@@ -939,8 +939,8 @@ const CSS = `
   .profile-detail-value { font-size: 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
   .contact-form { padding: 18px 20px 20px; }
   .contact-form-title { font-size: 19px; font-weight: 600; margin-bottom: 16px; }
-  .contact-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .contact-field { display: flex; flex-direction: column; gap: 5px; }
+  .contact-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; min-width: 0; }
+  .contact-field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
   .contact-field.full { grid-column: 1 / -1; }
   .contact-field label { color: var(--sub); font-size: 12px; }
   .contact-field input, .contact-field textarea {
@@ -948,6 +948,7 @@ const CSS = `
     border-radius: 9px; background: var(--bg); color: var(--text); font: inherit; box-sizing: border-box; min-width: 0;
   }
   .contact-field input:focus, .contact-field textarea:focus { outline: none; border-color: var(--accent); }
+  .contact-field input[type="date"] { display: block; max-width: 100%; }
   .contact-photo-actions { display: flex; justify-content: center; gap: 8px; margin: -5px 0 17px; }
   .contact-photo-btn, .contact-form-btn {
     border: 0; border-radius: 9px; padding: 9px 13px; cursor: pointer;
