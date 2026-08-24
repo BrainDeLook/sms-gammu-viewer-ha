@@ -256,6 +256,14 @@ const CSS = `
   .folder-settings-row > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .folder-settings-row > span:last-child { display: flex; gap: 4px; flex: 0 0 auto; }
   .folder-settings-row button { padding: 4px 7px; }
+  .contact-form > button, .contact-form-actions button, .folder-settings-row button {
+    border: 0; border-radius: 12px; padding: 9px 13px; background: color-mix(in srgb, var(--accent) 13%, transparent);
+    color: var(--accent); font: inherit; cursor: pointer;
+  }
+  .contact-form > button:hover, .contact-form-actions button:hover, .folder-settings-row button:hover { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+  .contact-form-actions button.primary { background: var(--accent); color: #fff; }
+  .contact-form-actions button.secondary { background: transparent; color: var(--sub); }
+  .folder-settings-row button:disabled { opacity: .35; cursor: default; }
   /* Brand marks in the chat list use the same full circular treatment as the
      chat header; don't add the old white inset ring around the logo. */
   .avatar.brand-avatar { background: transparent; padding: 0; }
@@ -1039,6 +1047,16 @@ const CSS = `
   .brand-picker-empty { padding: 24px 8px; color: var(--sub); text-align: center; }
 
   @media (max-width: 580px) {
+    .folder-tabs {
+      margin: 6px 12px 7px; padding: 3px; gap: 3px; border: 1px solid var(--line);
+      border-radius: 999px; background: color-mix(in srgb, var(--text) 6%, var(--panel));
+    }
+    .folder-tab-scroll { gap: 3px; padding: 0 1px; }
+    .folder-tab { border-color: transparent; border-radius: 999px; padding: 7px 12px; }
+    .folder-tab.active { color: var(--text); border-color: transparent; background: color-mix(in srgb, var(--text) 13%, var(--panel)); }
+    .folder-tab.add { font-size: 16px; padding: 6px 10px; }
+    .folder-tab-actions { padding-left: 2px; }
+    .folder-tab-actions .folder-tab { width: 32px; height: 32px; padding: 0; }
     .profile-actions { gap: 6px; padding: 13px 8px; flex-wrap: wrap; }
     .profile-action { min-width: 62px; flex: 1 1 62px; }
     .contacts { width: 100%; border-right: none; }
