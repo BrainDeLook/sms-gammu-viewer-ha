@@ -235,7 +235,9 @@ const CSS = `
     letter-spacing: -.5px;
   }
   .contact-list.brand-loading { visibility: hidden; }
-  .avatar.brand-avatar { background: #fff; padding: 5px; }
+  /* Brand marks in the chat list use the same full circular treatment as the
+     chat header; don't add the old white inset ring around the logo. */
+  .avatar.brand-avatar { background: transparent; padding: 0; }
   .avatar img, .pb-avatar img, .chat-profile-avatar img,
   .profile-avatar img, .profile-avatar-edit img {
     width: 100%; height: 100%; border-radius: inherit;
