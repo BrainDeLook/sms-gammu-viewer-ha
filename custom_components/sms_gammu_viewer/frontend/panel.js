@@ -124,6 +124,7 @@ const CSS = `
   }
   @media (max-width: 580px) {
     .status-bar { position: relative; z-index: 9; transition: transform .18s ease, opacity .18s ease; }
+    .status-bar.mobile-collapsed { max-height: 0; padding-top: 0; padding-bottom: 0; overflow: hidden; opacity: 0; transform: translateY(-100%); }
   }
 
   .signal-dot {
@@ -3762,7 +3763,8 @@ class SmsGammuPanel extends HTMLElement {
       const status = this.shadowRoot.getElementById("status-bar");
       const contactList = this.shadowRoot.getElementById("contact-list");
       const shell = host.querySelector(".folder-tab-shell");
-      this._folderBaseTop = Math.max(0, (status?.offsetTop || 0) + (status?.offsetHeight || 0) - 8);
+      if (status && !this._statusExpandedHeight && status.offsetHeight) this._statusExpandedHeight = status.offsetHeight;
+      this._folderBaseTop = Math.max(0, (status?.offsetTop || 0) + (this._statusExpandedHeight || status?.offsetHeight || 0) - 8);
       host.style.top = `${this._folderBaseTop}px`;
       if (contactList && shell) contactList.style.paddingTop = `${shell.offsetHeight + 2}px`;
       if (contactList && !this._mobileChromeScrollBound) {
@@ -3773,8 +3775,7 @@ class SmsGammuPanel extends HTMLElement {
     } else {
       host.style.removeProperty("top");
       this.shadowRoot.getElementById("contact-list")?.style.removeProperty("padding-top");
-      this.shadowRoot.getElementById("status-bar")?.style.removeProperty("transform");
-      this.shadowRoot.getElementById("status-bar")?.style.removeProperty("opacity");
+      this.shadowRoot.getElementById("status-bar")?.classList.remove("mobile-collapsed");
     }
     host.querySelectorAll("[data-folder-id]").forEach((button) => button.addEventListener("click", () => {
       this._activeFolderId = button.dataset.folderId;
@@ -3808,10 +3809,14 @@ class SmsGammuPanel extends HTMLElement {
     const status = this.shadowRoot.getElementById("status-bar");
     const host = this.shadowRoot.getElementById("folder-tabs");
     if (!list || !status || !host || !window.matchMedia?.("(max-width: 580px)").matches) return;
-    const collapse = Math.min(list.scrollTop, status.offsetHeight + 8);
-    status.style.transform = `translateY(-${collapse}px)`;
-    status.style.opacity = collapse >= status.offsetHeight ? "0" : "1";
-    host.style.top = `${Math.max(0, (this._folderBaseTop || 0) - collapse)}px`;
+    if (!this._statusExpandedHeight && status.offsetHeight) this._statusExpandedHeight = status.offsetHeight;
+    const collapsed = list.scrollTop > 8;
+    status.classList.toggle("mobile-collapsed", collapsed);
+    if (collapsed) {
+      host.style.top = `${Math.max(0, (this._folderBaseTop || 0) - (this._statusExpandedHeight || 0))}px`;
+    } else {
+      host.style.top = `${this._folderBaseTop || 0}px`;
+    }
   }
 
   _folderTabDefinitions() {
