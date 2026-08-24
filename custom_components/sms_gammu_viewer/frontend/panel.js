@@ -235,7 +235,8 @@ const CSS = `
     letter-spacing: -.5px;
   }
   .contact-list.brand-loading { visibility: hidden; }
-  .folder-tabs { display: flex; align-items: center; gap: 6px; padding: 7px 12px 5px; overflow: hidden; border-top: 1px solid var(--border); }
+  .folder-tabs { display: flex; align-items: center; gap: 6px; padding: 7px 12px 5px; overflow: visible; }
+  .folder-tab-shell { display: flex; align-items: center; gap: 6px; min-width: 0; width: 100%; }
   .folder-tab-scroll { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1 1 auto; overflow-x: auto; scrollbar-width: none; touch-action: pan-x; background: transparent; }
   .folder-tab-scroll::-webkit-scrollbar { display: none; }
   .folder-tab-scroll { cursor: grab; }
@@ -1055,7 +1056,10 @@ const CSS = `
 
   @media (max-width: 580px) {
     .folder-tabs {
-      margin: 6px 12px 7px; padding: 3px; gap: 3px; border: 1px solid var(--line);
+      margin: 6px 12px 7px; padding: 0; gap: 0; border: 0;
+    }
+    .folder-tab-shell {
+      padding: 3px; gap: 3px; border: 1px solid var(--line);
       border-radius: 999px; overflow: hidden; background: color-mix(in srgb, var(--text) 6%, var(--panel));
     }
     .folder-tab-scroll { gap: 3px; padding: 0 1px; }
@@ -3742,10 +3746,10 @@ class SmsGammuPanel extends HTMLElement {
     const scrollLeft = previousScroller ? previousScroller.scrollLeft : this._folderScrollLeft;
     const tabs = this._folderTabDefinitions();
     if (!tabs.some((item) => item.id === this._activeFolderId)) this._activeFolderId = tabs[0]?.id || "all";
-    host.innerHTML = `<div class="folder-tab-scroll">${tabs.map((folder) => `
+    host.innerHTML = `<div class="folder-tab-shell"><div class="folder-tab-scroll">${tabs.map((folder) => `
       <button class="folder-tab ${this._activeFolderId === folder.id ? "active" : ""}" data-folder-id="${this._esc(folder.id)}">
         ${folder.icon ? this._esc(folder.icon) + " " : ""}${this._esc(folder.name)}
-      </button>`).join("")}<button class="folder-tab add" id="folder-add" title="${this._esc(this._t("new_folder"))}">＋</button></div><div class="folder-tab-actions"><button class="folder-tab add" id="folder-settings" title="${this._esc(this._t("folder_settings"))}">⚙</button></div>`;
+      </button>`).join("")}<button class="folder-tab add" id="folder-add" title="${this._esc(this._t("new_folder"))}">＋</button></div><div class="folder-tab-actions"><button class="folder-tab add" id="folder-settings" title="${this._esc(this._t("folder_settings"))}">⚙</button></div></div>`;
     const newScroller = host.querySelector(".folder-tab-scroll");
     if (newScroller) {
       newScroller.scrollLeft = scrollLeft;
