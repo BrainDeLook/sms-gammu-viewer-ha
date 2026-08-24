@@ -124,7 +124,7 @@ const CSS = `
   }
   @media (max-width: 580px) {
     .status-bar { position: relative; z-index: 1; transition: none; overflow: hidden; }
-    .contact-list { position: relative; z-index: 2; }
+    .contact-list { position: relative; z-index: 2; transition: none; }
   }
 
   .signal-dot {
@@ -3784,6 +3784,7 @@ class SmsGammuPanel extends HTMLElement {
       statusEl?.style.removeProperty("opacity");
       statusEl?.style.removeProperty("transform");
       this.shadowRoot.getElementById("contact-list")?.style.removeProperty("transform");
+      this._mobileChromeCollapse = 0;
     }
     host.querySelectorAll("[data-folder-id]").forEach((button) => button.addEventListener("click", () => {
       this._activeFolderId = button.dataset.folderId;
@@ -3828,16 +3829,24 @@ class SmsGammuPanel extends HTMLElement {
     if (!list || !status || !host || !window.matchMedia?.("(max-width: 580px)").matches) return;
     if (!this._statusExpandedHeight && status.offsetHeight) this._statusExpandedHeight = status.offsetHeight;
     const expanded = this._statusExpandedHeight || status.offsetHeight || 1;
-    const collapse = Math.min(Math.max(0, list.scrollTop), expanded);
-    const remaining = expanded - collapse;
-    // Keep the status row's layout height fixed. Only move the rendered
-    // layers, so inertial scrolling never gets its scroll geometry changed.
-    const ratio = remaining / expanded;
-    status.style.transform = `translate3d(0, ${-collapse}px, 0)`;
-    status.style.opacity = String(Math.max(0, ratio));
-    list.style.transform = `translate3d(0, ${-collapse}px, 0)`;
-    const minTop = this._folderMinTop || 0;
-    host.style.top = `${Math.max(minTop, (this._folderBaseTop || 0) - collapse)}px`;
+    const desired = Math.min(Math.max(0, list.scrollTop), expanded);
+    const previous = Number.isFinite(this._mobileChromeCollapse) ? this._mobileChromeCollapse : desired;
+    // Follow normal scrolling 1:1, but cap a single-frame jump during a fast
+    // fling so the chrome cannot visibly shoot across the page.
+    const maxStep = 28;
+    const delta = desired - previous;
+    const collapse = Math.abs(delta) > maxStep ? previous + Math.sign(delta) * maxStep : desired;
+    this._mobileChromeCollapse = collapse;
+    const apply = () => {
+      const ratio = Math.max(0, 1 - (collapse / expanded));
+      status.style.transform = `translate3d(0, ${-collapse}px, 0)`;
+      status.style.opacity = String(ratio);
+      list.style.transform = `translate3d(0, ${-collapse}px, 0)`;
+      const minTop = this._folderMinTop || 0;
+      host.style.top = `${Math.max(minTop, (this._folderBaseTop || 0) - collapse)}px`;
+    };
+    apply();
+    if (Math.abs(desired - collapse) > 0.5) this._queueMobileChromeSync();
   }
 
   _folderTabDefinitions() {
