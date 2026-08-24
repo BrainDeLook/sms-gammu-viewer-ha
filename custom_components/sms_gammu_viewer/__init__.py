@@ -390,8 +390,10 @@ class BrandAssetView(HomeAssistantView):
         self.hass = hass
 
     async def get(self, request: web.Request, asset_id: str) -> web.Response:
-        if not re.fullmatch(r"[0-9a-f]{64}", asset_id):
+        asset_match = re.fullmatch(r"([0-9a-f]{64})(?:\.(?:png|jpe?g|webp|gif))?", asset_id)
+        if not asset_match:
             raise web.HTTPNotFound()
+        asset_id = asset_match.group(1)
         path = _brand_asset_dir(self.hass) / asset_id
         if not path.is_file():
             raise web.HTTPNotFound()
@@ -658,10 +660,9 @@ class SmsCoordinator:
                             partial(asset_path.parent.mkdir, parents=True, exist_ok=True)
                         )
                         await self.hass.async_add_executor_job(asset_path.write_bytes, body)
-                    return {
-                        "url": f"/api/sms_gammu_viewer_brand/{asset_id}",
-                        "content_type": avatar_match.group(1).lower(),
-                    }
+                    content_type = avatar_match.group(1).lower()
+                    suffix = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif"}[content_type]
+                    return {"url": f"/api/sms_gammu_viewer_brand/{asset_id}.{suffix}", "content_type": content_type}
             except Exception as error:
                 _LOGGER.debug("Contact avatar unavailable for notification: %s", error)
         source = str((contact or {}).get("brand_logo_url") or "").strip()
@@ -718,7 +719,8 @@ class SmsCoordinator:
                     content_type = "image/webp"
                 else:
                     continue
-                return {"url": f"/api/sms_gammu_viewer_brand/{asset_id}", "content_type": content_type}
+                suffix = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif"}[content_type]
+                return {"url": f"/api/sms_gammu_viewer_brand/{asset_id}.{suffix}", "content_type": content_type}
             except Exception as error:
                 _LOGGER.debug("Notification brand asset unavailable (%s): %s", asset_url, error)
         return None
