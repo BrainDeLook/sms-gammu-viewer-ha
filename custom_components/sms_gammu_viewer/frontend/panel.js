@@ -1073,6 +1073,12 @@ class SmsGammuPanel extends HTMLElement {
     this._avatarDraft = undefined;
     this._brandCatalog = null;
     this._brandCatalogPromise = null;
+    this._brandAssetPromises = new Map();
+    try {
+      this._brandAssets = JSON.parse(localStorage.getItem("sms_gammu_brand_assets_v1") || "{}");
+    } catch (_) {
+      this._brandAssets = {};
+    }
   }
 
   _t(key, ...args) {
@@ -1712,8 +1718,47 @@ class SmsGammuPanel extends HTMLElement {
 
   _brandAvatarFor(contact, className = "avatar") {
     const logo = this._brandLogoFor(contact);
-    const src = logo ? `/api/sms_gammu_viewer/brand_asset?url=${encodeURIComponent(logo)}` : "";
-    return src ? `<div class="${className} brand-avatar"><img src="${this._esc(src)}" alt="" loading="eager" /></div>` : "";
+    const src = logo ? this._brandAssets[logo] || "" : "";
+    if (logo && !src) this._ensureBrandAsset(logo);
+    return src ? `<div class="${className} brand-avatar"><img src="${this._esc(src)}" alt="" /></div>` : "";
+  }
+
+  async _ensureBrandAsset(logo) {
+    if (!logo || this._brandAssets[logo]) return this._brandAssets[logo] || "";
+    if (this._brandAssetPromises.has(logo)) return this._brandAssetPromises.get(logo);
+    const promise = (async () => {
+      try {
+        const response = await fetch(
+          `/api/sms_gammu_viewer/brand_asset?url=${encodeURIComponent(logo)}`,
+          { headers: { Authorization: `Bearer ${this._token()}` } },
+        );
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const blob = await response.blob();
+        const dataUrl = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+        this._brandAssets[logo] = dataUrl;
+        // Храним только реально использованные логотипы, максимум 50 штук.
+        const entries = Object.entries(this._brandAssets).slice(-50);
+        this._brandAssets = Object.fromEntries(entries);
+        try { localStorage.setItem("sms_gammu_brand_assets_v1", JSON.stringify(this._brandAssets)); } catch (_) {}
+        this._renderContacts();
+        this._renderMessages();
+        if (this.shadowRoot.getElementById("contact-modal-overlay")?.classList.contains("open")) {
+          this._renderContactProfile();
+        }
+        return dataUrl;
+      } catch (_) {
+        return "";
+      } finally {
+        this._brandAssetPromises.delete(logo);
+      }
+    })();
+    this._brandAssetPromises.set(logo, promise);
+    return promise;
   }
 
   _chatAvatarMarkup(contact) {
@@ -2353,12 +2398,14 @@ class SmsGammuPanel extends HTMLElement {
   _contactAvatar(contact, className = "profile-avatar") {
     const avatar = this._avatarFor(contact);
     const brand = avatar ? "" : this._brandLogoFor(contact);
+    const brandSrc = brand ? this._brandAssets[brand] || "" : "";
+    if (brand && !brandSrc) this._ensureBrandAsset(brand);
     const name = contact?.name || contact?.contact_name || contact?.number || "?";
     const fallback = this._esc(name.slice(0, 1).toUpperCase() || "?");
     return `<div class="${className}">${avatar
       ? `<img src="${this._esc(avatar)}" alt="" />`
-      : brand
-        ? `<img src="${this._esc(`/api/sms_gammu_viewer/brand_asset?url=${encodeURIComponent(brand)}`)}" alt="" loading="eager" />`
+      : brandSrc
+        ? `<img src="${this._esc(brandSrc)}" alt="" />`
       : fallback}</div>`;
   }
 
@@ -3644,11 +3691,13 @@ class SmsGammuPanel extends HTMLElement {
     if (profileAvatar) {
       const avatar = this._avatarFor(contact);
       const brand = avatar ? "" : this._brandLogoFor(contact);
+      const brandSrc = brand ? this._brandAssets[brand] || "" : "";
+      if (brand && !brandSrc) this._ensureBrandAsset(brand);
       profileAvatar.style.display = "flex";
       profileAvatar.innerHTML = avatar
         ? `<img src="${this._esc(avatar)}" alt="" />`
-        : brand
-          ? `<img src="${this._esc(`/api/sms_gammu_viewer/brand_asset?url=${encodeURIComponent(brand)}`)}" alt="" loading="eager" />`
+        : brandSrc
+          ? `<img src="${this._esc(brandSrc)}" alt="" />`
         : this._esc((contact?.contact_name || this._activeNumber).slice(0, 1).toUpperCase());
     }
     delBtn && (delBtn.style.display = "");
