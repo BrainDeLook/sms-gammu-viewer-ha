@@ -3764,7 +3764,8 @@ class SmsGammuPanel extends HTMLElement {
       const shell = host.querySelector(".folder-tab-shell");
       if (status && !this._statusExpandedHeight && status.offsetHeight) this._statusExpandedHeight = status.offsetHeight;
       this._folderBaseTop = Math.max(0, (status?.offsetTop || 0) + (this._statusExpandedHeight || status?.offsetHeight || 0) - 8);
-      this._folderMinTop = Math.max(0, (status?.offsetTop || 0) + 6);
+      // Keep only a hairline gap below the header while the status row collapses.
+      this._folderMinTop = Math.max(0, (status?.offsetTop || 0) + 3);
       host.style.top = `${this._folderBaseTop}px`;
       if (contactList && shell) contactList.style.paddingTop = `${shell.offsetHeight + 2}px`;
       if (contactList && !this._mobileChromeScrollBound) {
