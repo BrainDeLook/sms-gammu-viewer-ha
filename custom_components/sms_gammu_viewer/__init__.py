@@ -6,6 +6,7 @@ import hashlib
 import json
 import logging
 import re
+from functools import partial
 from urllib.parse import urlparse
 from datetime import datetime
 from pathlib import Path
@@ -1260,7 +1261,7 @@ class SmsApiView(HomeAssistantView):
                 _BRAND_CATALOG_CACHE_TS = now
                 if not catalog_path.is_file():
                     await self.hass.async_add_executor_job(
-                        catalog_path.parent.mkdir, parents=True, exist_ok=True
+                        partial(catalog_path.parent.mkdir, parents=True, exist_ok=True)
                     )
                     await self.hass.async_add_executor_job(
                         catalog_path.write_text,
@@ -1294,7 +1295,9 @@ class SmsApiView(HomeAssistantView):
                         response.raise_for_status()
                         body = await response.read()
                         content_type = response.headers.get("Content-Type", "image/svg+xml").split(";", 1)[0]
-                await self.hass.async_add_executor_job(asset_dir.mkdir, parents=True, exist_ok=True)
+                await self.hass.async_add_executor_job(
+                    partial(asset_dir.mkdir, parents=True, exist_ok=True)
+                )
                 await self.hass.async_add_executor_job(asset_path.write_bytes, body)
                 _LOGGER.info("Stored Trace Logo locally: %s", asset_id)
                 return self._json({"url": f"/api/sms_gammu_viewer_brand/{asset_id}"})
