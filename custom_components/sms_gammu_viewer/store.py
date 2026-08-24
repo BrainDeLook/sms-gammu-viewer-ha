@@ -438,6 +438,20 @@ class SmsStore:
                 (key, value),
             )
 
+    def get_chat_folders(self) -> list[dict[str, Any]]:
+        """Return persisted chat folders, keeping malformed data safe."""
+        raw = self.get_setting("chat_folders")
+        if not raw:
+            return []
+        try:
+            value = json.loads(raw)
+        except (TypeError, ValueError):
+            return []
+        return value if isinstance(value, list) else []
+
+    def set_chat_folders(self, folders: list[dict[str, Any]]) -> None:
+        self.set_setting("chat_folders", json.dumps(folders, ensure_ascii=False))
+
     def set_brand_logo_override(self, number: str, source_url: str) -> None:
         """Persist or clear the manually selected logo for an SMS sender."""
         number = self._sanitize_number(number)
