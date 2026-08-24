@@ -1737,7 +1737,7 @@ class SmsApiView(HomeAssistantView):
                     return self._error("invalid avatar", 400)
                 if avatar and not avatar.startswith(("data:image/jpeg;base64,", "data:image/png;base64,", "data:image/webp;base64,")):
                     return self._error("invalid avatar format", 400)
-                if len(avatar) > 700_000:
+                if len(avatar) > 350_000:
                     return self._error("avatar too large", 413)
             await self.hass.async_add_executor_job(
                 store.add_contact, number, name, label, email, company,
