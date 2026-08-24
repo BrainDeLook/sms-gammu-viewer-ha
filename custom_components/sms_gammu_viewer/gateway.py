@@ -225,9 +225,29 @@ class GatewayClient:
     async def get_modem(self) -> dict | None:
         try:
             if self._lean_api_supported is True:
-                data = await self._request("GET", "/v1/modem", timeout=45)
-                return data if isinstance(data, dict) else None
-            return await self._request("GET", "/status/modem")
+                try:
+                    data = await self._request("GET", "/v1/modem", timeout=45)
+                except aiohttp.ClientResponseError as error:
+                    if error.status != 404:
+                        raise
+                    # Older lean gateway builds expose modem details inside
+                    # /v1/status but do not have a separate /v1/modem route.
+                    status = await self._get_lean_status()
+                    data = status.get("modem") if isinstance(status, dict) else None
+                if not isinstance(data, dict):
+                    return None
+                # The lean gateway returns lower-case JSON fields while the
+                # legacy status endpoint uses Gammu's title-case names.
+                # Normalize both shapes for the status card.
+                return {
+                    **data,
+                    "Manufacturer": data.get("Manufacturer") or data.get("manufacturer") or data.get("vendor"),
+                    "Model": data.get("Model") or data.get("model") or data.get("device"),
+                    "Firmware": data.get("Firmware") or data.get("firmware") or data.get("firmware_version") or data.get("revision"),
+                    "IMEI": data.get("IMEI") or data.get("imei"),
+                }
+            data = await self._request("GET", "/status/modem")
+            return data if isinstance(data, dict) else None
         except Exception:
             return None
 
