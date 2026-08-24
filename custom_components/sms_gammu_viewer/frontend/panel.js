@@ -1652,12 +1652,7 @@ class SmsGammuPanel extends HTMLElement {
         }
       } catch (_) {}
       try {
-        const response = await fetch("https://trace-logos.ru/logos.json", {
-          headers: { "Accept": "application/json" },
-          credentials: "omit",
-        });
-        if (!response.ok) throw new Error(`Trace Logo's HTTP ${response.status}`);
-        const data = await response.json();
+        const data = await this._api("brand_catalog");
         if (!Array.isArray(data.logos)) throw new Error("Invalid Trace Logo's catalog");
         this._brandCatalog = data.logos.filter((logo) =>
           logo && !logo.comingSoon && (logo.svgUrl || logo.pngUrl)
