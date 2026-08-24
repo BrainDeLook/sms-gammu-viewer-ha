@@ -1060,11 +1060,11 @@ const CSS = `
     }
     .folder-tab-shell {
       width: auto; margin: 6px 12px 7px; padding: 3px; gap: 3px; border: 1px solid var(--line);
-      border-radius: 999px; overflow: hidden; background: color-mix(in srgb, var(--text) 6%, var(--panel));
+      border-radius: 999px; overflow: hidden; background: color-mix(in srgb, var(--card) 86%, var(--text) 14%);
     }
     .folder-tab-scroll { gap: 3px; padding: 0 1px; }
     .folder-tab { border-color: transparent; border-radius: 999px; padding: 7px 12px; }
-    .folder-tab.active { color: var(--text); border-color: transparent; background: color-mix(in srgb, var(--text) 13%, var(--panel)); }
+    .folder-tab.active { color: var(--accent); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent) inset; }
     .folder-tab.add { font-size: 16px; padding: 6px 10px; }
     .folder-tab-actions { padding-left: 2px; }
     .folder-tab-actions .folder-tab { width: 32px; height: 32px; padding: 0; }
