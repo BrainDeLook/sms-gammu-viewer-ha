@@ -2,9 +2,12 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 import re
+from functools import partial
+from urllib.parse import urlparse
 from datetime import datetime
 from pathlib import Path
 
@@ -29,6 +32,9 @@ from .const import (
     CONF_LANGUAGE,
     CONF_SHOW_PANEL,
     CONF_SHOW_SIDEBAR_BADGE,
+    CONF_USE_BRAND_LOGOS,
+    BRAND_CATALOG_URL,
+    DEFAULT_USE_BRAND_LOGOS,
     DEFAULT_LANGUAGE,
     DEFAULT_SHOW_PANEL,
     DEFAULT_SHOW_SIDEBAR_BADGE,
@@ -60,6 +66,10 @@ from .sms_pipeline import (
 from .store import SmsStore
 
 _LOGGER = logging.getLogger(__name__)
+
+_BRAND_CATALOG_CACHE: dict | None = None
+_BRAND_CATALOG_CACHE_TS = 0.0
+_BRAND_CATALOG_CACHE_TTL = 6 * 60 * 60
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
@@ -134,6 +144,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await _register_services(hass)
 
     hass.http.register_view(SmsApiView(hass))
+    hass.http.register_view(BrandAssetView(hass))
     await coordinator.start()
     await hass.config_entries.async_forward_entry_setups(entry, ["sensor", "cover", "button"])
     entry.async_on_unload(entry.add_update_listener(_options_updated))
@@ -354,6 +365,44 @@ class CardJsView(HomeAssistantView):
                 "Cache-Control": "no-cache, must-revalidate",
                 "Content-Type": "application/javascript; charset=utf-8",
             },
+        )
+
+
+def _brand_asset_dir(hass: HomeAssistant) -> Path:
+    return Path(hass.config.config_dir) / ".storage" / "sms_gammu_viewer_brand_assets"
+
+
+def _brand_asset_id(url: str) -> str:
+    return hashlib.sha256(url.encode("utf-8")).hexdigest()
+
+
+class BrandAssetView(HomeAssistantView):
+    """Serve only previously downloaded brand assets from local HA storage."""
+
+    url = "/api/sms_gammu_viewer_brand/{asset_id}"
+    name = "api:sms_gammu_viewer:brand_asset"
+    requires_auth = False
+
+    def __init__(self, hass: HomeAssistant) -> None:
+        self.hass = hass
+
+    async def get(self, request: web.Request, asset_id: str) -> web.Response:
+        if not re.fullmatch(r"[0-9a-f]{64}", asset_id):
+            raise web.HTTPNotFound()
+        path = _brand_asset_dir(self.hass) / asset_id
+        if not path.is_file():
+            raise web.HTTPNotFound()
+        body = await self.hass.async_add_executor_job(path.read_bytes)
+        if body.startswith(b"\x89PNG"):
+            content_type = "image/png"
+        elif body.startswith(b"RIFF") and body[8:12] == b"WEBP":
+            content_type = "image/webp"
+        else:
+            content_type = "image/svg+xml"
+        return web.Response(
+            body=body,
+            content_type=content_type,
+            headers={"Cache-Control": "public, max-age=31536000, immutable"},
         )
 
 
@@ -611,6 +660,9 @@ class SmsCoordinator:
                 "call_enabled": bool(self.entry.data.get(CONF_CALL_DEVICE, "").strip()),
                 "language":   self.entry.data.get(CONF_LANGUAGE, DEFAULT_LANGUAGE),
                 "show_panel": self.entry.data.get(CONF_SHOW_PANEL, DEFAULT_SHOW_PANEL),
+                "use_brand_logos": self.entry.data.get(
+                    CONF_USE_BRAND_LOGOS, DEFAULT_USE_BRAND_LOGOS
+                ),
             }
             _LOGGER.debug("Status cache refreshed")
         except Exception as e:
@@ -1139,6 +1191,7 @@ class SmsApiView(HomeAssistantView):
                     "call_enabled":  cache.get("call_enabled"),
                     "language":      cache.get("language"),
                     "show_panel":    cache.get("show_panel"),
+                    "use_brand_logos": cache.get("use_brand_logos", False),
                     "poll_interval_hint": coord._interval,
                     "cached": True,
                 })
@@ -1164,7 +1217,93 @@ class SmsApiView(HomeAssistantView):
                 "call_enabled": bool(coord.entry.data.get("call_device", "").strip()),
                 "sim_phone_number": sim_phone_number,
                 "language": coord.entry.data.get("language", "ru"),
+                "use_brand_logos": bool(coord.entry.data.get(CONF_USE_BRAND_LOGOS, DEFAULT_USE_BRAND_LOGOS)),
             })
+
+        if action == "brand_catalog":
+            global _BRAND_CATALOG_CACHE, _BRAND_CATALOG_CACHE_TS
+            now = asyncio.get_running_loop().time()
+            if (
+                _BRAND_CATALOG_CACHE
+                and now - _BRAND_CATALOG_CACHE_TS < _BRAND_CATALOG_CACHE_TTL
+            ):
+                return self._json(_BRAND_CATALOG_CACHE)
+            try:
+                catalog_path = Path(self.hass.config.config_dir) / ".storage" / "sms_gammu_viewer_brand_catalog.json"
+                if catalog_path.is_file():
+                    payload = json.loads(await self.hass.async_add_executor_job(catalog_path.read_text, "utf-8"))
+                    _LOGGER.debug("Loaded persistent Trace Logo catalog from HA storage")
+                else:
+                    timeout = aiohttp.ClientTimeout(total=15)
+                    async with aiohttp.ClientSession(timeout=timeout) as session:
+                        async with session.get(
+                            BRAND_CATALOG_URL,
+                            headers={"Accept": "application/json"},
+                        ) as response:
+                            response.raise_for_status()
+                            payload = await response.json()
+                logos = [
+                    item for item in payload.get("logos", [])
+                    if isinstance(item, dict)
+                    and not item.get("comingSoon")
+                    and (item.get("svgUrl") or item.get("pngUrl"))
+                ]
+                asset_dir = _brand_asset_dir(self.hass)
+                for item in logos:
+                    source_url = item.get("svgUrl") or item.get("pngUrl")
+                    asset_id = _brand_asset_id(source_url)
+                    if (asset_dir / asset_id).is_file():
+                        item["localUrl"] = f"/api/sms_gammu_viewer_brand/{asset_id}"
+                _BRAND_CATALOG_CACHE = {
+                    "updated": payload.get("updated", ""),
+                    "logos": logos,
+                }
+                _BRAND_CATALOG_CACHE_TS = now
+                if not catalog_path.is_file():
+                    await self.hass.async_add_executor_job(
+                        partial(catalog_path.parent.mkdir, parents=True, exist_ok=True)
+                    )
+                    await self.hass.async_add_executor_job(
+                        catalog_path.write_text,
+                        json.dumps(payload, ensure_ascii=False),
+                        "utf-8",
+                    )
+                _LOGGER.info("Trace Logo catalog loaded: %d logos", len(logos))
+                return self._json(_BRAND_CATALOG_CACHE)
+            except Exception as err:
+                _LOGGER.warning("Trace Logo catalog unavailable: %s", err)
+                return self._json({"updated": "", "logos": []})
+
+        if action == "brand_asset":
+            asset_url = request.rel_url.query.get("url", "")
+            parsed = urlparse(asset_url)
+            if (
+                parsed.scheme != "https"
+                or parsed.netloc != "trace-logos.ru"
+                or not parsed.path.startswith("/assets/logos/")
+            ):
+                return self._error("Invalid brand asset URL", 400)
+            try:
+                asset_id = _brand_asset_id(asset_url)
+                asset_dir = _brand_asset_dir(self.hass)
+                asset_path = asset_dir / asset_id
+                if asset_path.is_file():
+                    return self._json({"url": f"/api/sms_gammu_viewer_brand/{asset_id}"})
+                timeout = aiohttp.ClientTimeout(total=15)
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    async with session.get(asset_url) as response:
+                        response.raise_for_status()
+                        body = await response.read()
+                        content_type = response.headers.get("Content-Type", "image/svg+xml").split(";", 1)[0]
+                await self.hass.async_add_executor_job(
+                    partial(asset_dir.mkdir, parents=True, exist_ok=True)
+                )
+                await self.hass.async_add_executor_job(asset_path.write_bytes, body)
+                _LOGGER.info("Stored Trace Logo locally: %s", asset_id)
+                return self._json({"url": f"/api/sms_gammu_viewer_brand/{asset_id}"})
+            except Exception as err:
+                _LOGGER.debug("Trace Logo asset unavailable (%s): %s", asset_url, err)
+                return self._error("Brand asset unavailable", 502)
 
         if action == "poll_interval":
             return self._json({"interval": coord._interval})
@@ -1351,6 +1490,32 @@ class SmsApiView(HomeAssistantView):
                 store.set_setting, "sim_phone_number", number
             )
             return self._json({"ok": True, "number": number})
+
+        if action == "brand_logo_override":
+            try:
+                body = await request.json()
+            except Exception:
+                return self._error("Invalid JSON", 400)
+            number = str(body.get("number") or "").strip()
+            source_url = str(body.get("url") or "").strip()
+            if not number or len(number) > 64:
+                return self._error("invalid sender", 400)
+            if source_url:
+                parsed = urlparse(source_url)
+                if (
+                    parsed.scheme != "https"
+                    or parsed.netloc != "trace-logos.ru"
+                    or not parsed.path.startswith("/assets/logos/")
+                    or len(source_url) > 1000
+                ):
+                    return self._error("Invalid brand asset URL", 400)
+            await self.hass.async_add_executor_job(
+                store.set_brand_logo_override, number, source_url
+            )
+            coord.push_event(
+                "brand_logo_changed", {"number": number, "custom": bool(source_url)}
+            )
+            return self._json({"ok": True, "number": number, "url": source_url})
 
         if action == "add_contact":
             try:
