@@ -1074,11 +1074,7 @@ class SmsGammuPanel extends HTMLElement {
     this._brandCatalog = null;
     this._brandCatalogPromise = null;
     this._brandAssetPromises = new Map();
-    try {
-      this._brandAssets = JSON.parse(localStorage.getItem("sms_gammu_brand_assets_v1") || "{}");
-    } catch (_) {
-      this._brandAssets = {};
-    }
+    this._brandAssets = {};
   }
 
   _t(key, ...args) {
@@ -1702,7 +1698,7 @@ class SmsGammuPanel extends HTMLElement {
         )
       ));
     });
-    return found?.svgUrl || found?.pngUrl || "";
+    return found?.localUrl || found?.svgUrl || found?.pngUrl || "";
   }
 
   _normalizeBrandText(value) {
@@ -1718,9 +1714,13 @@ class SmsGammuPanel extends HTMLElement {
 
   _brandAvatarFor(contact, className = "avatar") {
     const logo = this._brandLogoFor(contact);
-    const src = logo ? this._brandAssets[logo] || "" : "";
+    const src = this._brandAssetSrc(logo);
     if (logo && !src) this._ensureBrandAsset(logo);
     return src ? `<div class="${className} brand-avatar"><img src="${this._esc(src)}" alt="" /></div>` : "";
+  }
+
+  _brandAssetSrc(logo) {
+    return logo ? this._brandAssets[logo] || (logo.startsWith("/") ? logo : "") : "";
   }
 
   async _ensureBrandAsset(logo) {
@@ -1728,29 +1728,15 @@ class SmsGammuPanel extends HTMLElement {
     if (this._brandAssetPromises.has(logo)) return this._brandAssetPromises.get(logo);
     const promise = (async () => {
       try {
-        const response = await fetch(
-          `/api/sms_gammu_viewer/brand_asset?url=${encodeURIComponent(logo)}`,
-          { headers: { Authorization: `Bearer ${this._token()}` } },
-        );
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const blob = await response.blob();
-        const dataUrl = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result);
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        });
-        this._brandAssets[logo] = dataUrl;
-        // Храним только реально использованные логотипы, максимум 50 штук.
-        const entries = Object.entries(this._brandAssets).slice(-50);
-        this._brandAssets = Object.fromEntries(entries);
-        try { localStorage.setItem("sms_gammu_brand_assets_v1", JSON.stringify(this._brandAssets)); } catch (_) {}
+        const response = await this._api(`brand_asset?url=${encodeURIComponent(logo)}`);
+        if (!response?.url) throw new Error("brand asset URL missing");
+        this._brandAssets[logo] = response.url;
         this._renderContacts();
         this._renderMessages();
         if (this.shadowRoot.getElementById("contact-modal-overlay")?.classList.contains("open")) {
           this._renderContactProfile();
         }
-        return dataUrl;
+        return response.url;
       } catch (_) {
         return "";
       } finally {
@@ -2398,7 +2384,7 @@ class SmsGammuPanel extends HTMLElement {
   _contactAvatar(contact, className = "profile-avatar") {
     const avatar = this._avatarFor(contact);
     const brand = avatar ? "" : this._brandLogoFor(contact);
-    const brandSrc = brand ? this._brandAssets[brand] || "" : "";
+    const brandSrc = this._brandAssetSrc(brand);
     if (brand && !brandSrc) this._ensureBrandAsset(brand);
     const name = contact?.name || contact?.contact_name || contact?.number || "?";
     const fallback = this._esc(name.slice(0, 1).toUpperCase() || "?");
@@ -3691,7 +3677,7 @@ class SmsGammuPanel extends HTMLElement {
     if (profileAvatar) {
       const avatar = this._avatarFor(contact);
       const brand = avatar ? "" : this._brandLogoFor(contact);
-      const brandSrc = brand ? this._brandAssets[brand] || "" : "";
+      const brandSrc = this._brandAssetSrc(brand);
       if (brand && !brandSrc) this._ensureBrandAsset(brand);
       profileAvatar.style.display = "flex";
       profileAvatar.innerHTML = avatar
