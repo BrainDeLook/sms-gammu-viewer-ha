@@ -1073,6 +1073,8 @@ class SmsGammuPanel extends HTMLElement {
     this._avatarDraft = undefined;
     this._brandCatalog = null;
     this._brandCatalogPromise = null;
+    this._brandAssetPromises = new Map();
+    this._brandAssets = {};
   }
 
   _t(key, ...args) {
@@ -1696,7 +1698,7 @@ class SmsGammuPanel extends HTMLElement {
         )
       ));
     });
-    return found?.svgUrl || found?.pngUrl || "";
+    return found?.localUrl || found?.svgUrl || found?.pngUrl || "";
   }
 
   _normalizeBrandText(value) {
@@ -1712,8 +1714,37 @@ class SmsGammuPanel extends HTMLElement {
 
   _brandAvatarFor(contact, className = "avatar") {
     const logo = this._brandLogoFor(contact);
-    const src = logo ? `/api/sms_gammu_viewer/brand_asset?url=${encodeURIComponent(logo)}` : "";
-    return src ? `<div class="${className} brand-avatar"><img src="${this._esc(src)}" alt="" loading="eager" /></div>` : "";
+    const src = this._brandAssetSrc(logo);
+    if (logo && !src) this._ensureBrandAsset(logo);
+    return src ? `<div class="${className} brand-avatar"><img src="${this._esc(src)}" alt="" /></div>` : "";
+  }
+
+  _brandAssetSrc(logo) {
+    return logo ? this._brandAssets[logo] || (logo.startsWith("/") ? logo : "") : "";
+  }
+
+  async _ensureBrandAsset(logo) {
+    if (!logo || this._brandAssets[logo]) return this._brandAssets[logo] || "";
+    if (this._brandAssetPromises.has(logo)) return this._brandAssetPromises.get(logo);
+    const promise = (async () => {
+      try {
+        const response = await this._api(`brand_asset?url=${encodeURIComponent(logo)}`);
+        if (!response?.url) throw new Error("brand asset URL missing");
+        this._brandAssets[logo] = response.url;
+        this._renderContacts();
+        this._renderMessages();
+        if (this.shadowRoot.getElementById("contact-modal-overlay")?.classList.contains("open")) {
+          this._renderContactProfile();
+        }
+        return response.url;
+      } catch (_) {
+        return "";
+      } finally {
+        this._brandAssetPromises.delete(logo);
+      }
+    })();
+    this._brandAssetPromises.set(logo, promise);
+    return promise;
   }
 
   _chatAvatarMarkup(contact) {
@@ -2353,12 +2384,14 @@ class SmsGammuPanel extends HTMLElement {
   _contactAvatar(contact, className = "profile-avatar") {
     const avatar = this._avatarFor(contact);
     const brand = avatar ? "" : this._brandLogoFor(contact);
+    const brandSrc = this._brandAssetSrc(brand);
+    if (brand && !brandSrc) this._ensureBrandAsset(brand);
     const name = contact?.name || contact?.contact_name || contact?.number || "?";
     const fallback = this._esc(name.slice(0, 1).toUpperCase() || "?");
     return `<div class="${className}">${avatar
       ? `<img src="${this._esc(avatar)}" alt="" />`
-      : brand
-        ? `<img src="${this._esc(`/api/sms_gammu_viewer/brand_asset?url=${encodeURIComponent(brand)}`)}" alt="" loading="eager" />`
+      : brandSrc
+        ? `<img src="${this._esc(brandSrc)}" alt="" />`
       : fallback}</div>`;
   }
 
@@ -3644,11 +3677,13 @@ class SmsGammuPanel extends HTMLElement {
     if (profileAvatar) {
       const avatar = this._avatarFor(contact);
       const brand = avatar ? "" : this._brandLogoFor(contact);
+      const brandSrc = this._brandAssetSrc(brand);
+      if (brand && !brandSrc) this._ensureBrandAsset(brand);
       profileAvatar.style.display = "flex";
       profileAvatar.innerHTML = avatar
         ? `<img src="${this._esc(avatar)}" alt="" />`
-        : brand
-          ? `<img src="${this._esc(`/api/sms_gammu_viewer/brand_asset?url=${encodeURIComponent(brand)}`)}" alt="" loading="eager" />`
+        : brandSrc
+          ? `<img src="${this._esc(brandSrc)}" alt="" />`
         : this._esc((contact?.contact_name || this._activeNumber).slice(0, 1).toUpperCase());
     }
     delBtn && (delBtn.style.display = "");
