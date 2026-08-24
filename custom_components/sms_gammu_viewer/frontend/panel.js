@@ -1056,10 +1056,10 @@ const CSS = `
 
   @media (max-width: 580px) {
     .folder-tabs {
-      margin: 6px 12px 7px; padding: 0; gap: 0; border: 0;
+      display: contents;
     }
     .folder-tab-shell {
-      padding: 3px; gap: 3px; border: 1px solid var(--line);
+      width: auto; margin: 6px 12px 7px; padding: 3px; gap: 3px; border: 1px solid var(--line);
       border-radius: 999px; overflow: hidden; background: color-mix(in srgb, var(--text) 6%, var(--panel));
     }
     .folder-tab-scroll { gap: 3px; padding: 0 1px; }
