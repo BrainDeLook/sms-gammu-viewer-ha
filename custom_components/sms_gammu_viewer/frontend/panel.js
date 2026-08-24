@@ -123,8 +123,7 @@ const CSS = `
     gap: 6px;
   }
   @media (max-width: 580px) {
-    .status-bar { position: relative; z-index: 9; transition: transform .18s ease, opacity .18s ease; }
-    .status-bar.mobile-collapsed { max-height: 0; padding-top: 0; padding-bottom: 0; overflow: hidden; opacity: 0; transform: translateY(-100%); }
+    .status-bar { position: relative; z-index: 9; transition: max-height .12s linear, padding .12s linear, opacity .12s linear; overflow: hidden; }
   }
 
   .signal-dot {
@@ -1060,7 +1059,7 @@ const CSS = `
 
   @media (max-width: 580px) {
     .folder-tabs {
-      position: absolute; left: 0; right: 0; z-index: 8; display: block;
+      position: absolute; left: 0; right: 0; z-index: 8; display: block; transition: top .12s linear;
     }
     .folder-tab-shell {
       width: auto; margin: 0 12px 7px; padding: 3px; gap: 3px; border: 1px solid var(--line);
@@ -3775,7 +3774,11 @@ class SmsGammuPanel extends HTMLElement {
     } else {
       host.style.removeProperty("top");
       this.shadowRoot.getElementById("contact-list")?.style.removeProperty("padding-top");
-      this.shadowRoot.getElementById("status-bar")?.classList.remove("mobile-collapsed");
+      const statusEl = this.shadowRoot.getElementById("status-bar");
+      statusEl?.style.removeProperty("max-height");
+      statusEl?.style.removeProperty("padding-top");
+      statusEl?.style.removeProperty("padding-bottom");
+      statusEl?.style.removeProperty("opacity");
     }
     host.querySelectorAll("[data-folder-id]").forEach((button) => button.addEventListener("click", () => {
       this._activeFolderId = button.dataset.folderId;
@@ -3810,13 +3813,22 @@ class SmsGammuPanel extends HTMLElement {
     const host = this.shadowRoot.getElementById("folder-tabs");
     if (!list || !status || !host || !window.matchMedia?.("(max-width: 580px)").matches) return;
     if (!this._statusExpandedHeight && status.offsetHeight) this._statusExpandedHeight = status.offsetHeight;
-    const collapsed = list.scrollTop > 8;
-    status.classList.toggle("mobile-collapsed", collapsed);
-    if (collapsed) {
-      host.style.top = `${Math.max(0, (this._folderBaseTop || 0) - (this._statusExpandedHeight || 0))}px`;
+    const expanded = this._statusExpandedHeight || status.offsetHeight || 1;
+    const collapse = Math.min(Math.max(0, list.scrollTop), expanded);
+    const remaining = expanded - collapse;
+    if (collapse <= 0) {
+      status.style.removeProperty("max-height");
+      status.style.removeProperty("padding-top");
+      status.style.removeProperty("padding-bottom");
+      status.style.removeProperty("opacity");
     } else {
-      host.style.top = `${this._folderBaseTop || 0}px`;
+      const ratio = remaining / expanded;
+      status.style.maxHeight = `${remaining}px`;
+      status.style.paddingTop = `${4 * ratio}px`;
+      status.style.paddingBottom = `${8 * ratio}px`;
+      status.style.opacity = String(Math.max(0, ratio));
     }
+    host.style.top = `${Math.max(0, (this._folderBaseTop || 0) - collapse)}px`;
   }
 
   _folderTabDefinitions() {
