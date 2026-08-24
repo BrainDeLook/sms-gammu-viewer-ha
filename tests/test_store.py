@@ -109,5 +109,29 @@ class ContactProfileTests(unittest.TestCase):
             self.assertEqual("", store.get_contact("+7000")["avatar"])
 
 
+class ChatFolderSettingsTests(unittest.TestCase):
+    def test_folder_options_have_safe_defaults_and_are_persistent(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = SmsStore(Path(directory) / "sms.db")
+            store.init()
+            self.assertEqual(
+                {
+                    "show_all": True,
+                    "brands_enabled": False,
+                    "brands_manual": [],
+                    "brands_excluded": [],
+                },
+                store.get_chat_folder_options(),
+            )
+            options = {
+                "show_all": False,
+                "brands_enabled": True,
+                "brands_manual": ["Mom"],
+                "brands_excluded": ["VK.RU"],
+            }
+            store.set_chat_folder_options(options)
+            self.assertEqual(options, store.get_chat_folder_options())
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1135,6 +1135,7 @@ class SmsGammuPanel extends HTMLElement {
     this._brandPickerContact = null;
     this._chatFolders = [];
     this._activeFolderId = "all";
+    this._folderOptions = { show_all: true, brands_enabled: false, brands_manual: [], brands_excluded: [] };
   }
 
   _t(key, ...args) {
@@ -1302,10 +1303,11 @@ class SmsGammuPanel extends HTMLElement {
     this._updateRefreshBtn();
     let contactsChanged = true;
     try {
-      const [contacts, folders] = await Promise.all([
-        this._api("contacts"), this._api("chat_folders"),
+      const [contacts, folders, folderOptions] = await Promise.all([
+        this._api("contacts"), this._api("chat_folders"), this._api("chat_folder_options"),
       ]);
       this._chatFolders = Array.isArray(folders) ? folders : [];
+      if (folderOptions && typeof folderOptions === "object") this._folderOptions = folderOptions;
       const signature = JSON.stringify((contacts || []).map((c) => [
         c.number, c.contact_name, c.last_text, c.last_date, c.unread,
         c.is_muted, c.is_pinned, c.total, c.brand_logo_url,
@@ -1876,7 +1878,11 @@ class SmsGammuPanel extends HTMLElement {
 
   _filteredContacts() {
     let contacts = this._contacts;
-    if (this._activeFolderId !== "all") {
+    if (this._activeFolderId === "brands") {
+      contacts = contacts.filter((contact) => this._isInBrandsFolder(contact));
+    } else if (this._activeFolderId === "people") {
+      contacts = contacts.filter((contact) => !this._isInBrandsFolder(contact));
+    } else if (this._activeFolderId !== "all") {
       const folder = this._chatFolders.find((item) => item.id === this._activeFolderId);
       const numbers = new Set(folder?.numbers || []);
       contacts = contacts.filter((c) => numbers.has(c.number));
@@ -1889,6 +1895,16 @@ class SmsGammuPanel extends HTMLElement {
         (c.contact_name || "").toLowerCase().includes(q) ||
         (c.last_text || "").toLowerCase().includes(q)
     );
+  }
+
+  _isBrandChat(contact) {
+    return Boolean(contact?.brand_logo_url || this._brandLogoFor(contact));
+  }
+
+  _isInBrandsFolder(contact) {
+    const manual = new Set(this._folderOptions.brands_manual || []);
+    const excluded = new Set(this._folderOptions.brands_excluded || []);
+    return !excluded.has(contact?.number) && (manual.has(contact?.number) || this._isBrandChat(contact));
   }
 
   _updateMenuBtn() {
@@ -3690,7 +3706,14 @@ class SmsGammuPanel extends HTMLElement {
   _renderFolders() {
     const host = this.shadowRoot.getElementById("folder-tabs");
     if (!host) return;
-    const tabs = [{ id: "all", name: this._t("all_chats"), icon: "" }, ...this._chatFolders];
+    const tabs = [];
+    if (this._folderOptions.show_all !== false) tabs.push({ id: "all", name: this._t("all_chats"), icon: "" });
+    if (this._folderOptions.brands_enabled) {
+      tabs.push({ id: "people", name: this._t("people_folder"), icon: "👤" });
+      tabs.push({ id: "brands", name: this._t("brands_folder"), icon: "🏷️" });
+    }
+    tabs.push(...this._chatFolders);
+    if (!tabs.some((item) => item.id === this._activeFolderId)) this._activeFolderId = tabs[0]?.id || "all";
     host.innerHTML = tabs.map((folder) => `
       <button class="folder-tab ${this._activeFolderId === folder.id ? "active" : ""}" data-folder-id="${this._esc(folder.id)}">
         ${folder.icon ? this._esc(folder.icon) + " " : ""}${this._esc(folder.name)}
@@ -3700,11 +3723,83 @@ class SmsGammuPanel extends HTMLElement {
       this._renderContacts();
     }));
     host.querySelector("#folder-add")?.addEventListener("click", () => this._openFolderEditor());
+    const settings = document.createElement("button");
+    settings.className = "folder-tab add"; settings.title = this._t("folder_settings"); settings.textContent = "⚙";
+    settings.addEventListener("click", () => this._openFolderSettings()); host.appendChild(settings);
     host.querySelectorAll("[data-folder-id]:not([data-folder-id=all])").forEach((button) => {
       button.addEventListener("dblclick", () => {
         const folder = this._chatFolders.find((item) => item.id === button.dataset.folderId);
         if (folder) this._openFolderEditor(folder);
+        else if (button.dataset.folderId === "brands") this._openBrandsEditor();
       });
+    });
+  }
+
+  _openFolderSettings() {
+    const overlay = this.shadowRoot.getElementById("contact-modal-overlay");
+    const modal = this.shadowRoot.getElementById("contact-modal");
+    if (!overlay || !modal) return;
+    modal.innerHTML = `<div class="contact-form" style="padding:20px">
+      <div class="contact-form-header"><h2>${this._esc(this._t("folder_settings"))}</h2><button class="icon-btn" id="folder-settings-close">×</button></div>
+      <label class="folder-editor-chat"><input type="checkbox" id="folder-show-all" ${this._folderOptions.show_all !== false ? "checked" : ""}/> ${this._esc(this._t("show_all_chats"))}</label>
+      <label class="folder-editor-chat"><input type="checkbox" id="folder-brands-enabled" ${this._folderOptions.brands_enabled ? "checked" : ""}/> ${this._esc(this._t("enable_brands_folder"))}</label>
+      <button id="folder-manage-brands" ${this._folderOptions.brands_enabled ? "" : "disabled"}>${this._esc(this._t("manage_brands_folder"))}</button>
+      <div class="contact-form-actions"><button id="folder-settings-cancel">${this._esc(this._t("cancel"))}</button><button class="primary" id="folder-settings-save">${this._esc(this._t("save"))}</button></div>
+    </div>`;
+    overlay.classList.add("open");
+    const close = () => overlay.classList.remove("open");
+    modal.querySelector("#folder-settings-close")?.addEventListener("click", close);
+    modal.querySelector("#folder-settings-cancel")?.addEventListener("click", close);
+    modal.querySelector("#folder-brands-enabled")?.addEventListener("change", (event) => {
+      const button = modal.querySelector("#folder-manage-brands");
+      if (button) button.disabled = !event.target.checked;
+    });
+    modal.querySelector("#folder-manage-brands")?.addEventListener("click", async () => {
+      const options = { ...this._folderOptions,
+        show_all: modal.querySelector("#folder-show-all")?.checked !== false,
+        brands_enabled: modal.querySelector("#folder-brands-enabled")?.checked === true,
+      };
+      await this._api("save_chat_folder_options", "POST", options);
+      this._folderOptions = options;
+      close();
+      this._openBrandsEditor();
+    });
+    modal.querySelector("#folder-settings-save")?.addEventListener("click", async () => {
+      const options = { ...this._folderOptions,
+        show_all: modal.querySelector("#folder-show-all")?.checked !== false,
+        brands_enabled: modal.querySelector("#folder-brands-enabled")?.checked === true,
+      };
+      await this._api("save_chat_folder_options", "POST", options);
+      this._folderOptions = options;
+      close(); this._renderContacts();
+    });
+  }
+
+  _openBrandsEditor() {
+    const overlay = this.shadowRoot.getElementById("contact-modal-overlay");
+    const modal = this.shadowRoot.getElementById("contact-modal");
+    if (!overlay || !modal) return;
+    const manual = new Set(this._folderOptions.brands_manual || []);
+    const excluded = new Set(this._folderOptions.brands_excluded || []);
+    modal.innerHTML = `<div class="contact-form" style="padding:20px">
+      <div class="contact-form-header"><h2>🏷️ ${this._esc(this._t("brands_folder"))}</h2><button class="icon-btn" id="brands-close">×</button></div>
+      <p class="form-help">${this._esc(this._t("brands_folder_help"))}</p>
+      <div class="folder-editor-list">${this._contacts.map((chat) => { const checked = !excluded.has(chat.number) && (manual.has(chat.number) || this._isBrandChat(chat)); return `<label class="folder-editor-chat"><input type="checkbox" data-brand-number="${this._esc(chat.number)}" ${checked ? "checked" : ""}/><span>${this._esc(chat.contact_name || chat.number)}</span></label>`; }).join("")}</div>
+      <div class="contact-form-actions"><button id="brands-cancel">${this._esc(this._t("cancel"))}</button><button class="primary" id="brands-save">${this._esc(this._t("save"))}</button></div>
+    </div>`;
+    overlay.classList.add("open");
+    const close = () => overlay.classList.remove("open");
+    modal.querySelector("#brands-close")?.addEventListener("click", close);
+    modal.querySelector("#brands-cancel")?.addEventListener("click", close);
+    modal.querySelector("#brands-save")?.addEventListener("click", async () => {
+      const selected = new Set([...modal.querySelectorAll("[data-brand-number]:checked")].map((el) => el.dataset.brandNumber));
+      const auto = new Set(this._contacts.filter((chat) => this._isBrandChat(chat)).map((chat) => chat.number));
+      const options = { ...this._folderOptions,
+        brands_manual: [...selected].filter((number) => !auto.has(number)),
+        brands_excluded: [...auto].filter((number) => !selected.has(number)),
+      };
+      await this._api("save_chat_folder_options", "POST", options);
+      this._folderOptions = options; close(); this._renderContacts();
     });
   }
 

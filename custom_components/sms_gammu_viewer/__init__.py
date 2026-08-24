@@ -1328,6 +1328,10 @@ class SmsApiView(HomeAssistantView):
             data = await self.hass.async_add_executor_job(store.get_chat_folders)
             return self._json(data)
 
+        if action == "chat_folder_options":
+            data = await self.hass.async_add_executor_job(store.get_chat_folder_options)
+            return self._json(data)
+
         if action == "save_chat_folders":
             try:
                 body = await request.json()
@@ -1562,6 +1566,22 @@ class SmsApiView(HomeAssistantView):
         if not coord:
             return self._error("Not configured", 503)
         store = coord.store
+
+        if action == "save_chat_folder_options":
+            try:
+                body = await request.json()
+            except Exception:
+                return self._error("Invalid JSON", 400)
+            if not isinstance(body, dict):
+                return self._error("Invalid options", 400)
+            clean = {"show_all": bool(body.get("show_all", True)), "brands_enabled": bool(body.get("brands_enabled", False))}
+            for key in ("brands_manual", "brands_excluded"):
+                values = body.get(key) or []
+                if not isinstance(values, list) or len(values) > 1000:
+                    return self._error("Invalid folder numbers", 400)
+                clean[key] = list(dict.fromkeys(str(value).strip() for value in values if str(value).strip() and len(str(value).strip()) <= 64))
+            await self.hass.async_add_executor_job(store.set_chat_folder_options, clean)
+            return self._json(clean)
 
         if action == "save_chat_folders":
             try:
