@@ -979,6 +979,41 @@ const CSS = `
   .custom-method-add { align-self: flex-start; }
   .contact-form-btn.primary { background: var(--accent); color: #fff; }
   .contact-form-btn.secondary { background: transparent; color: var(--sub); }
+  .brand-picker { padding: 18px 20px 22px; }
+  .brand-picker-header { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .brand-picker-back {
+    width: 36px; height: 36px; flex: 0 0 auto; border: 0; border-radius: 50%;
+    background: color-mix(in srgb, var(--accent) 13%, transparent); color: var(--accent);
+    font-size: 22px; cursor: pointer;
+  }
+  .brand-picker-title { min-width: 0; font-size: 19px; font-weight: 600; }
+  .brand-picker-search {
+    width: 100%; box-sizing: border-box; padding: 11px 12px; margin-bottom: 12px;
+    border: 1px solid var(--line); border-radius: 10px; background: var(--bg);
+    color: var(--text); font: inherit;
+  }
+  .brand-picker-search:focus { outline: none; border-color: var(--accent); }
+  .brand-picker-auto {
+    width: 100%; margin-bottom: 13px; padding: 11px 12px; border: 1px solid var(--line);
+    border-radius: 10px; background: transparent; color: var(--text); cursor: pointer;
+    text-align: left; font: inherit;
+  }
+  .brand-picker-auto.selected { border-color: var(--accent); color: var(--accent); }
+  .brand-picker-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
+  .brand-option {
+    min-width: 0; min-height: 112px; padding: 9px 7px; border: 1px solid var(--line);
+    border-radius: 12px; background: var(--bg); color: var(--text); cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px;
+  }
+  .brand-option:hover, .brand-option.selected { border-color: var(--accent); }
+  .brand-option.selected { box-shadow: 0 0 0 1px var(--accent) inset; }
+  .brand-option-logo {
+    width: 54px; height: 54px; display: flex; align-items: center; justify-content: center;
+    border-radius: 50%; overflow: hidden; background: #fff; padding: 5px; box-sizing: border-box;
+  }
+  .brand-option-logo img { width: 100%; height: 100%; object-fit: contain; }
+  .brand-option-name { width: 100%; font-size: 11px; line-height: 1.2; text-align: center; overflow-wrap: anywhere; }
+  .brand-picker-empty { padding: 24px 8px; color: var(--sub); text-align: center; }
 
   @media (max-width: 580px) {
     .contacts { width: 100%; border-right: none; }
@@ -1078,6 +1113,7 @@ class SmsGammuPanel extends HTMLElement {
     this._brandAssets = {};
     this._contactsLoaded = false;
     this._brandReady = false;
+    this._brandPickerContact = null;
   }
 
   _t(key, ...args) {
@@ -1248,7 +1284,7 @@ class SmsGammuPanel extends HTMLElement {
       const contacts = await this._api("contacts");
       const signature = JSON.stringify((contacts || []).map((c) => [
         c.number, c.contact_name, c.last_text, c.last_date, c.unread,
-        c.is_muted, c.is_pinned, c.total,
+        c.is_muted, c.is_pinned, c.total, c.brand_logo_url,
       ]));
       contactsChanged = signature !== this._contactsSignature;
       this._contactsSignature = signature;
@@ -1392,6 +1428,9 @@ class SmsGammuPanel extends HTMLElement {
           needContacts = true;
           needMessages = true;
         } else if (ev.type === "contact_saved" || ev.type === "contact_deleted_pb") {
+          needContacts = true;
+          needPhonebook = true;
+        } else if (ev.type === "brand_logo_changed") {
           needContacts = true;
           needPhonebook = true;
         } else if (ev.type === "modem_status") {
@@ -1696,6 +1735,11 @@ class SmsGammuPanel extends HTMLElement {
     if (!this._status?.use_brand_logos || !this._brandCatalog?.length || !contact) return "";
     const value = String(contact.contact_name || contact.number || "").trim().toLowerCase();
     if (!value || !this._isAlphaTag(contact.number)) return "";
+    const override = String(contact.brand_logo_url || "").trim();
+    if (override) {
+      const selected = this._brandCatalog.find((logo) => this._brandSourceUrl(logo) === override);
+      return selected?.localUrl || override;
+    }
     const normalized = this._normalizeBrandText(value);
     const found = this._brandCatalog.find((logo) => {
       const haystack = this._normalizeBrandText(
@@ -1710,6 +1754,36 @@ class SmsGammuPanel extends HTMLElement {
       ));
     });
     return found?.localUrl || found?.svgUrl || found?.pngUrl || "";
+  }
+
+  _brandSourceUrl(logo) {
+    return String(logo?.svgUrl || logo?.pngUrl || "");
+  }
+
+  _brandCandidates(query, limit = 36) {
+    const needle = this._normalizeBrandText(query);
+    if (!needle || !this._brandCatalog?.length) return [];
+    const inputTokens = needle.split(/\s+/).filter((token) => token.length >= 2);
+    return this._brandCatalog
+      .map((logo, index) => {
+        const primary = this._normalizeBrandText(logo.name || logo.name_en || "");
+        const haystack = this._normalizeBrandText(
+          `${logo.name || ""} ${logo.name_en || ""} ${logo.tags || ""}`
+        );
+        const tokens = haystack.split(/\s+/).filter(Boolean);
+        let score = 0;
+        if (primary === needle) score = 1000;
+        else if (primary.startsWith(needle)) score = 800;
+        else if (tokens.includes(needle)) score = 700;
+        else if (haystack.includes(needle)) score = 500;
+        else if (inputTokens.some((token) => tokens.includes(token))) score = 300;
+        else if (inputTokens.some((token) => haystack.includes(token))) score = 100;
+        return { logo, index, score };
+      })
+      .filter((item) => item.score > 0 && this._brandSourceUrl(item.logo))
+      .sort((a, b) => b.score - a.score || a.index - b.index)
+      .slice(0, limit)
+      .map((item) => item.logo);
   }
 
   _normalizeBrandText(value) {
@@ -1744,7 +1818,7 @@ class SmsGammuPanel extends HTMLElement {
         this._brandAssets[logo] = response.url;
         this._renderContacts();
         this._renderMessages();
-        if (this.shadowRoot.getElementById("contact-modal-overlay")?.classList.contains("open")) {
+        if (!this._brandPickerContact && this.shadowRoot.getElementById("contact-modal-overlay")?.classList.contains("open")) {
           this._renderContactProfile();
         }
         return response.url;
@@ -2419,6 +2493,7 @@ class SmsGammuPanel extends HTMLElement {
         name: chat?.contact_name || number,
         label: chat?.contact_label || "",
         avatar: this._avatarFor(chat),
+        brand_logo_url: chat?.brand_logo_url || "",
         email: "", company: "", birthday: "", notes: "",
         _saved: false,
       };
@@ -2466,6 +2541,9 @@ class SmsGammuPanel extends HTMLElement {
         <button class="profile-action" id="profile-edit">
           <span class="profile-action-icon">✎</span><span>${c._saved ? this._t("edit") : this._t("add_to_contacts")}</span>
         </button>
+        ${this._status?.use_brand_logos && this._isAlphaTag(c.number) ? `<button class="profile-action" id="profile-brand">
+          <span class="profile-action-icon">▣</span><span>${this._t("change_brand_logo")}</span>
+        </button>` : ""}
       </div>
       <div class="profile-details">
         ${details.length || customMethods.length ? `${details.map(([label, value]) => `
@@ -2491,6 +2569,93 @@ class SmsGammuPanel extends HTMLElement {
       this._callNumber(c.number);
     });
     modal.querySelector("#profile-edit")?.addEventListener("click", () => this._openContactEditor(c));
+    modal.querySelector("#profile-brand")?.addEventListener("click", () => this._openBrandLogoPicker(c));
+  }
+
+  async _openBrandLogoPicker(contact) {
+    if (!contact?.number) return;
+    await this._ensureBrandCatalog();
+    this._brandPickerContact = contact;
+    this._renderBrandLogoPicker(String(contact.contact_name || contact.name || contact.number));
+  }
+
+  _renderBrandLogoPicker(query) {
+    const modal = this.shadowRoot.getElementById("contact-modal");
+    if (!modal || !this._brandPickerContact) return;
+    const contact = this._brandPickerContact;
+    const selectedUrl = String(contact.brand_logo_url || "");
+    const candidates = this._brandCandidates(query);
+    modal.innerHTML = `
+      <div class="brand-picker">
+        <div class="brand-picker-header">
+          <button class="brand-picker-back" id="brand-picker-back" title="${this._t("back")}">‹</button>
+          <div class="brand-picker-title">${this._t("choose_brand_logo")}</div>
+        </div>
+        <input class="brand-picker-search" id="brand-picker-search" value="${this._esc(query || "")}" placeholder="${this._esc(this._t("search_brand_logos"))}" />
+        <button class="brand-picker-auto ${selectedUrl ? "" : "selected"}" id="brand-picker-auto">${this._t("brand_logo_auto")}</button>
+        <div class="brand-picker-grid">
+          ${candidates.length ? candidates.map((logo) => {
+            const source = this._brandSourceUrl(logo);
+            const src = this._brandAssetSrc(logo.localUrl || source);
+            const name = logo.name || logo.name_en || this._t("brand_logo");
+            return `<button class="brand-option ${selectedUrl === source ? "selected" : ""}" data-brand-source="${this._esc(source)}">
+              <span class="brand-option-logo">${src ? `<img src="${this._esc(src)}" alt="" />` : "…"}</span>
+              <span class="brand-option-name">${this._esc(name)}</span>
+            </button>`;
+          }).join("") : `<div class="brand-picker-empty">${this._t("no_brand_logos")}</div>`}
+        </div>
+      </div>`;
+    modal.querySelector("#brand-picker-back")?.addEventListener("click", () => {
+      const c = this._brandPickerContact;
+      this._brandPickerContact = null;
+      this._profileContact = c;
+      this._renderContactProfile();
+    });
+    const search = modal.querySelector("#brand-picker-search");
+    search?.addEventListener("input", (event) => {
+      const value = event.target.value;
+      this._renderBrandLogoPicker(value);
+      const next = this.shadowRoot.querySelector("#brand-picker-search");
+      if (next) {
+        next.focus();
+        next.setSelectionRange(value.length, value.length);
+      }
+    });
+    modal.querySelector("#brand-picker-auto")?.addEventListener("click", () => this._saveBrandLogoOverride(contact, ""));
+    modal.querySelectorAll("[data-brand-source]").forEach((button) => {
+      button.addEventListener("click", () => this._saveBrandLogoOverride(contact, button.dataset.brandSource || ""));
+    });
+
+    // Загружаем только варианты, видимые в окне выбора, а не весь каталог.
+    const remote = candidates
+      .map((logo) => this._brandSourceUrl(logo))
+      .filter((source) => source && !this._brandAssetSrc(source));
+    if (remote.length) {
+      Promise.all(remote.map((source) => this._ensureBrandAsset(source))).then(() => {
+        if (this._brandPickerContact === contact) this._renderBrandLogoPicker(search?.value || query);
+      });
+    }
+  }
+
+  async _saveBrandLogoOverride(contact, sourceUrl) {
+    const button = this.shadowRoot.querySelector("#brand-picker-auto") || this.shadowRoot.querySelector("[data-brand-source]");
+    if (button) button.disabled = true;
+    try {
+      if (sourceUrl) await this._ensureBrandAsset(sourceUrl);
+      await this._api("brand_logo_override", "POST", { number: contact.number, url: sourceUrl });
+      const update = (item) => item && item.number === contact.number ? { ...item, brand_logo_url: sourceUrl } : item;
+      this._contacts = this._contacts.map(update);
+      this._phonebook = this._phonebook.map(update);
+      this._profileContact = { ...contact, brand_logo_url: sourceUrl };
+      this._brandPickerContact = null;
+      this._renderContacts();
+      this._renderMessages();
+      this._renderContactProfile();
+      this._showToast(this._t("brand_logo_saved"));
+    } catch (error) {
+      this._showToast(`${this._t("send_error")}: ${error.message}`);
+      if (button) button.disabled = false;
+    }
   }
 
   _openContactEditor(contact = null) {
