@@ -40,11 +40,13 @@ from .const import (
     DEFAULT_SHOW_SIDEBAR_BADGE,
     CONF_COLLECT_INTERVAL,
     CONF_NOTIFY_TARGETS,
+    CONF_NOTIFY_IMAGES,
     CONF_POLL_INTERVAL,
     DB_FILENAME,
     DEFAULT_COLLECT_EMPTY_MAX,
     DEFAULT_COLLECT_INTERVAL,
     DEFAULT_POLL_INTERVAL,
+    DEFAULT_NOTIFY_IMAGES,
     DOMAIN,
     EVENT_SMS_RECEIVED,
     EVENT_SMS_SENT,
@@ -610,6 +612,81 @@ class SmsCoordinator:
     def _notify_targets(self) -> list[str]:
         return self.entry.data.get(CONF_NOTIFY_TARGETS, [])
 
+    def _notify_images_enabled(self) -> bool:
+        return bool(self.entry.data.get(CONF_NOTIFY_IMAGES, DEFAULT_NOTIFY_IMAGES))
+
+    @staticmethod
+    def _brand_match_text(value: str) -> str:
+        return re.sub(
+            r"\s+", " ", re.sub(
+                r"[«»\"'’.,()\[\]{}_/\\-]+", " ", re.sub(
+                    r"\b(?:ru|рф|com|net|org|io|su|me|tv|online)\b", " ",
+                    str(value or "").lower(), flags=re.IGNORECASE,
+                )
+            )
+        ).strip()
+
+    async def _notification_brand_image(self, number: str, contact: dict | None) -> dict | None:
+        """Return a locally persisted PNG suitable for an iOS attachment."""
+        if not self._notify_images_enabled():
+            return None
+        source = str((contact or {}).get("brand_logo_url") or "").strip()
+        catalog_path = Path(self.hass.config.config_dir) / ".storage" / "sms_gammu_viewer_brand_catalog.json"
+        try:
+            payload = json.loads(await self.hass.async_add_executor_job(catalog_path.read_text, "utf-8"))
+            logos = [item for item in payload.get("logos", []) if isinstance(item, dict) and not item.get("comingSoon")]
+        except Exception:
+            logos = []
+
+        selected = next((item for item in logos if source and source in (item.get("svgUrl"), item.get("pngUrl"))), None)
+        if selected is None and self.entry.data.get(CONF_USE_BRAND_LOGOS, DEFAULT_USE_BRAND_LOGOS):
+            value = str((contact or {}).get("name") or number).strip()
+            if value and not re.match(r"^[+\d\s\-()]+$", number.strip()):
+                normalized = self._brand_match_text(value)
+                selected = next((item for item in logos if normalized and normalized in self._brand_match_text(
+                    f"{item.get('name', '')} {item.get('name_en', '')} {item.get('tags', '')}"
+                )), None)
+        if selected is None:
+            return None
+
+        # Prefer PNG for iOS attachments; SVG is valid for the card but not a
+        # reliably supported UNNotificationAttachment image type.
+        candidates = [selected.get("pngUrl"), selected.get("svgUrl")]
+        if source and source not in candidates:
+            candidates.append(source)
+        for asset_url in candidates:
+            if not asset_url:
+                continue
+            parsed = urlparse(asset_url)
+            if parsed.scheme != "https" or parsed.netloc != "trace-logos.ru" or not parsed.path.startswith("/assets/logos/"):
+                continue
+            asset_id = _brand_asset_id(asset_url)
+            asset_path = _brand_asset_dir(self.hass) / asset_id
+            try:
+                if not asset_path.is_file():
+                    timeout = aiohttp.ClientTimeout(total=15)
+                    async with aiohttp.ClientSession(timeout=timeout) as session:
+                        async with session.get(asset_url) as response:
+                            response.raise_for_status()
+                            body = await response.read()
+                    await self.hass.async_add_executor_job(
+                        partial(asset_path.parent.mkdir, parents=True, exist_ok=True)
+                    )
+                    await self.hass.async_add_executor_job(asset_path.write_bytes, body)
+                header = await self.hass.async_add_executor_job(asset_path.read_bytes)
+                if header.startswith(b"\x89PNG"):
+                    content_type = "image/png"
+                elif header.startswith(b"\xff\xd8"):
+                    content_type = "image/jpeg"
+                elif header.startswith(b"GIF8"):
+                    content_type = "image/gif"
+                else:
+                    continue
+                return {"url": f"/api/sms_gammu_viewer_brand/{asset_id}", "content_type": content_type}
+            except Exception as error:
+                _LOGGER.debug("Notification brand asset unavailable (%s): %s", asset_url, error)
+        return None
+
     def register_sensor_listener(self, callback_fn) -> None:
         self._sensor_listeners.append(callback_fn)
 
@@ -1062,11 +1139,14 @@ class SmsCoordinator:
             _LOGGER.debug("is_muted check failed: %s", e)
 
         # Имя из телефонной книги если есть, иначе сам номер/alphaTag
+        contact = None
         try:
             contact = await self.hass.async_add_executor_job(self.store.get_contact, number)
             display_name = contact["name"] if contact else number
         except Exception:
             display_name = number
+
+        notification_image = await self._notification_brand_image(number, contact)
 
         preview = text if len(text) <= 150 else text[:150] + "…"
 
@@ -1100,18 +1180,26 @@ class SmsCoordinator:
             parts = target.split(".", 1)
             if len(parts) != 2:
                 continue
+            notification_data = {
+                "url": "/sms-viewer",
+                "tag": notif_tag,
+                "group": "sms_gammu_viewer",
+                "actions": actions,
+            }
+            # Attachments are understood by the Home Assistant mobile_app
+            # notifier. Keep other notify targets byte-for-byte compatible.
+            if notification_image and parts[0] == "notify" and parts[1].startswith("mobile_app_"):
+                notification_data["attachment"] = {
+                    "url": notification_image["url"],
+                    "content-type": notification_image["content_type"],
+                }
             try:
                 await self.hass.services.async_call(
                     parts[0], parts[1],
                     {
                         "title": f"SMS: {display_name}",
                         "message": preview,
-                        "data": {
-                            "url": "/sms-viewer",
-                            "tag": notif_tag,
-                            "group": "sms_gammu_viewer",
-                            "actions": actions,
-                        },
+                        "data": notification_data,
                     },
                     blocking=False,
                 )
