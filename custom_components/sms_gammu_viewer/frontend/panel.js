@@ -962,7 +962,6 @@ const CSS = `
     width: 100% !important; height: 100% !important; opacity: 0;
     cursor: pointer; min-width: 0 !important; margin: 0; padding: 0;
     box-sizing: border-box !important; border: 0 !important;
-    -webkit-appearance: none; appearance: none;
   }
   .contact-photo-actions { display: flex; justify-content: center; gap: 8px; margin: -5px 0 17px; }
   .contact-photo-btn, .contact-form-btn {
@@ -2403,7 +2402,11 @@ class SmsGammuPanel extends HTMLElement {
     };
     (Array.isArray(c.custom_methods) ? c.custom_methods : []).forEach(addMethodRow);
     modal.querySelector("#custom-method-add")?.addEventListener("click", () => addMethodRow());
-    modal.querySelector("#contact-birthday")?.addEventListener("change", (event) => {
+    const birthdayInput = modal.querySelector("#contact-birthday");
+    birthdayInput?.addEventListener("click", () => {
+      try { birthdayInput.showPicker?.(); } catch (_) {}
+    });
+    birthdayInput?.addEventListener("change", (event) => {
       const input = event.currentTarget;
       const display = modal.querySelector("#contact-birthday-display");
       if (!display) return;

@@ -6,7 +6,7 @@
 
 > 🇷🇺 [Русская версия](README_RU.md)
 
-A native panel for **SMS messaging and voice calls** directly in Home Assistant. Works with the [sms-gammu-gateway](https://github.com/PavelVe/home-assistant-addons/tree/main/sms-gammu-gateway) add-on and any compatible gateway based on [pajikos/sms-gammu-gateway](https://github.com/pajikos/sms-gammu-gateway).
+A native panel for **SMS messaging and voice calls** directly in Home Assistant. It is designed for the companion [SMS Modem Gateway](https://github.com/BrainDeLook/sms-modem-gateway-ha), which safely assembles multipart SMS and hands complete messages to Home Assistant through a durable REST queue.
 
 > 💬 **Send & receive SMS** · 📞 **Outgoing voice calls** · 📇 **Phonebook** · 🔔 **Push notifications** · 🚪 **Call entities for gates & intercoms**
 
@@ -32,7 +32,7 @@ After installation, an **SMS** tab appears in the sidebar. Messages are stored i
 - 👆 **Long press** (mobile) / **right click** (desktop) — copy, star, delete message
 - 👈 **Swipe actions** (mobile) — swipe left: mute/delete, swipe right: mark read/pin
 - 📞 **Outgoing voice calls** via AT interface
-- 📖 **Contact profiles** — name, photo, label, email, company, birthday and notes, available from the conversation list and chat header
+- 📖 **Contact profiles** — name, photo, label, email, company, birthday, notes and custom social/contact methods
 - 📡 **Modem status page** — signal, network, SIM, memory, firmware, IMEI
 - 💾 **Storage stats** — DB size and message count, with clear-all button
 - 🏠 **HA sensors** — unread count, last SMS, signal quality %, network operator
@@ -43,13 +43,23 @@ After installation, an **SMS** tab appears in the sidebar. Messages are stored i
 ## Requirements
 
 - Home Assistant 2024.3+
-- One of the compatible SMS gateway add-ons (see **Compatible Add-ons** below)
+- [SMS Modem Gateway](https://github.com/BrainDeLook/sms-modem-gateway-ha) add-on
 - USB GSM modem supported by Gammu (e.g. Huawei E1550, E3372, ZTE MF823)
 - For push notifications: [Home Assistant Companion](https://companion.home-assistant.io/) app
 
 ## Installation
 
-### Via HACS (recommended)
+### 1. Install SMS Modem Gateway
+
+1. Open **Settings → Add-ons → Add-on Store**
+2. Open ⋮ → **Repositories**
+3. Add `https://github.com/BrainDeLook/sms-modem-gateway-ha`
+4. Install **SMS Modem Gateway**
+5. Select the modem serial device, set a username and password, then start the add-on
+
+Do not run another SMS gateway against the same modem port at the same time.
+
+### 2. Install SMS Gammu Viewer via HACS (recommended)
 
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=BrainDeLook&repository=sms-gammu-viewer-ha&category=integration)
 
@@ -61,7 +71,7 @@ Or manually:
 4. Find **SMS Gammu Viewer** → **Download**
 5. Restart Home Assistant
 
-### Manual installation
+### Manual integration installation
 
 1. Download the [latest release](https://github.com/BrainDeLook/sms-gammu-viewer-ha/releases)
 2. Copy `custom_components/sms_gammu_viewer/` to `<config>/custom_components/`
@@ -165,7 +175,7 @@ If the modem stops responding (5 consecutive failed polls), the integration **au
 
 ## Voice Calls (Dial-Only)
 
-Some USB GSM modems (notably Huawei) expose **multiple serial interfaces** over a single USB connection — typically one for data/SMS and a separate one for voice AT commands (e.g. `/dev/serial/by-id/...-if00-port0` for data, `...-if02-port0` for voice). When that's the case, this integration can dial calls directly over the voice interface, completely independent of sms-gammu-gateway's REST API, with **no risk of port conflicts**.
+Some USB GSM modems (notably Huawei) expose **multiple serial interfaces** over one USB connection — typically one for SMS and a separate one for voice AT commands. The integration can dial directly over the voice interface, independently of SMS Modem Gateway's REST API, with **no risk of port conflicts**.
 
 > This feature is **dial-only** — the call connects and rings on the recipient's end, but no audio is routed through Home Assistant. Useful for "ring my phone" style automations (doorbell-style notifications, alerts) rather than two-way conversations.
 
@@ -175,7 +185,7 @@ Some USB GSM modems (notably Huawei) expose **multiple serial interfaces** over 
    ```
    ls -la /dev/serial/by-id/
    ```
-   Look for a second device path alongside the one used by sms-gammu-gateway.
+   Look for a second device path alongside the one used by SMS Modem Gateway.
 2. Go to **Settings → Devices & Services → SMS Gammu Viewer → Configure**
 3. Fill in the **voice call serial port** field with that path
 4. Save and restart Home Assistant
@@ -227,8 +237,8 @@ Sender's phone
        ↓ SMS
 USB GSM modem
        ↓
-sms-gammu-gateway (REST API :5000)
-       ↓ GET /sms (observe) + GET /sms/getsms (atomic consume)
+SMS Modem Gateway (REST API :5000)
+       ↓ durable logical-message queue + ID acknowledgement
 SMS Gammu Viewer (custom component)
        ↓ one already-linked logical SMS at a time
 SQLite database (/config/sms_gammu_viewer.db)
@@ -238,18 +248,9 @@ SMS panel in sidebar  +  Push notification  +  sensor.sms_unread_count
 
 ### Long SMS Assembly
 
-Messages over 160 Latin / 70 Cyrillic characters are split by the carrier into transport parts. The gateway reads the physical records with `GetNextSMS` and calls `gammu.LinkSMS`, so each `/sms` array item is already one **logical SMS**. The integration must never concatenate separate array items merely because they have the same sender.
+Messages over 160 Latin / 70 Cyrillic characters are split by the carrier into physical transport parts. SMS Modem Gateway reads those records without relying on `gammu.LinkSMS`, parses standard 8-bit and 16-bit concatenation UDH and waits for an exact, conflict-free set of parts.
 
-The integration handles this by:
-
-1. Keeping every gateway array item separate and in gateway order
-2. Waiting for `Complete=true` when the gateway exposes multipart metadata
-3. Falling back to **M identical snapshots** (configurable, default 5) for older gateway responses
-4. Confirming the snapshot once more before consuming it
-5. Retrieving and deleting one logical message atomically through `/sms/getsms`; never using a list index followed by `deleteall`
-6. Saving and notifying only after the atomic consume succeeds
-
-Both the stability-check delay and identical-snapshot threshold are configurable in **Settings → SMS Gammu Viewer → Configure**. See [the experimental AT pipeline notes](docs/EXPERIMENTAL_AT_PIPELINE.md) for limitations and testing guidance.
+Before deleting anything from the modem, the gateway commits the complete logical message and its cleanup journal to SQLite. It then deletes only physical records whose location fingerprint still matches and exposes the message through a durable ID-based REST queue. SMS Gammu Viewer stores it in its own SQLite database before acknowledging the queue ID. Retries are therefore safe across network errors, restarts and delayed multipart delivery.
 
 ### Multi-language UI
 
@@ -262,12 +263,12 @@ The panel UI text (not just config flow) is fully translatable, independent of H
 
 ---
 
-## Compatible Add-ons
+## Gateway compatibility
 
 | Project | Compatibility |
 |---|---|
-| [PavelVe/home-assistant-addons sms-gammu-gateway](https://github.com/PavelVe/home-assistant-addons) | ✅ |
-| [pajikos/sms-gammu-gateway](https://github.com/pajikos/sms-gammu-gateway) | ✅ |
+| [BrainDeLook/SMS Modem Gateway](https://github.com/BrainDeLook/sms-modem-gateway-ha) | ✅ Recommended: durable queue and reliable multipart UDH assembly |
+| Legacy pajikos-compatible gateways | ⚠️ Compatibility fallback only; they do not provide the same delivery guarantees |
 
 ---
 
@@ -312,7 +313,7 @@ by default.
 
 This project builds on the work of several open-source projects:
 
-- **[pajikos/sms-gammu-gateway](https://github.com/pajikos/sms-gammu-gateway)** and **[PavelVe/home-assistant-addons](https://github.com/PavelVe/home-assistant-addons)** — the underlying SMS gateway add-on this integration connects to via REST API.
+- **[Gammu](https://wammu.eu/gammu/)** and **python-gammu** — low-level modem communication used by SMS Modem Gateway. Multipart assembly, persistence and delivery are implemented by the companion gateway rather than delegated to `gammu.LinkSMS`.
 - **[Daring-Designs/meshtastic-ui-ha](https://github.com/Daring-Designs/meshtastic-ui-ha)** — the native HA sidebar panel architecture (custom panel registration via `async_register_built_in_panel`, static path serving) was modeled after this project.
 - **[black-roland/homeassistant-gsm-call](https://github.com/black-roland/homeassistant-gsm-call)** — the original voice call dialing logic (AT command sequences, `AT+CLCC` polling for call state, serial connection parameters) that this integration's call feature is closely based on. All credit for figuring out the working AT dialing approach for GSM modems goes to this project.
 - **[frenck/home-assistant-doom](https://github.com/frenck/home-assistant-doom)** — the technique for bundling a Lovelace dashboard card directly inside an integration (registering frontend JS globally via `add_extra_js_url`, the same way static assets are served for the sidebar panel) is based on this project's approach.
