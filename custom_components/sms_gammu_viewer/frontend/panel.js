@@ -974,6 +974,10 @@ const CSS = `
   .profile-detail-label { color: var(--sub); font-size: 11px; margin-bottom: 3px; }
   .profile-detail-value { font-size: 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
   .contact-form { padding: 18px 20px 20px; }
+  .contact-form-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: -4px -4px 12px; }
+  .contact-form-header h2 { margin: 0; min-width: 0; font-size: 19px; font-weight: 650; }
+  .contact-form-header .icon-btn { width: 34px; height: 34px; flex: 0 0 auto; justify-content: center; padding: 0; font-size: 22px; line-height: 1; background: color-mix(in srgb, var(--text) 8%, transparent); }
+  .contact-form-header .icon-btn:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
   .contact-form-title { font-size: 19px; font-weight: 600; margin-bottom: 16px; }
   .contact-form-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; min-width: 0; }
   .contact-field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
