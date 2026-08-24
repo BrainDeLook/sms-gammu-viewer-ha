@@ -1739,11 +1739,21 @@ class SmsApiView(HomeAssistantView):
                     return self._error("invalid avatar format", 400)
                 if len(avatar) > 350_000:
                     return self._error("avatar too large", 413)
+            old_contact = await self.hass.async_add_executor_job(
+                store.get_contact, number
+            )
+            old_avatar = str((old_contact or {}).get("avatar") or "")
             await self.hass.async_add_executor_job(
                 store.add_contact, number, name, label, email, company,
                 birthday, notes, avatar,
                 normalized_methods,
             )
+            if avatar is not None and old_avatar and old_avatar != avatar:
+                old_asset = _brand_asset_dir(self.hass) / _brand_asset_id(old_avatar)
+                await self.hass.async_add_executor_job(
+                    partial(old_asset.unlink, missing_ok=True)
+                )
+                _LOGGER.debug("Removed replaced contact avatar asset: %s", old_asset.name)
             contact = await self.hass.async_add_executor_job(store.get_contact, number)
             coord.push_event("contact_saved", {"number": number, "name": name})
             return self._json({"ok": True, "contact": contact})
