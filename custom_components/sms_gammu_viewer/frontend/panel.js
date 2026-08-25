@@ -308,6 +308,7 @@ const CSS = `
     width: min(520px, 100%); max-height: 46vh; margin: 0; overflow: hidden;
     border: 1px solid var(--line); border-radius: 24px; background: var(--card);
     box-shadow: 0 12px 38px rgba(0,0,0,.38); display: flex; flex-direction: column;
+    user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
   }
   .chat-folder-preview-head { display: flex; align-items: center; gap: 12px; padding: 14px 16px 10px; }
   .chat-folder-preview-avatar { width: 52px; height: 52px; flex: 0 0 52px; }
@@ -316,6 +317,7 @@ const CSS = `
   .chat-folder-preview-number { margin-top: 2px; color: var(--sub); font-size: 12px; }
   .chat-folder-preview-messages { min-height: 0; flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding: 4px 16px 16px; display: flex; flex-direction: column; gap: 6px; }
   .chat-folder-preview-message { align-self: flex-start; max-width: 88%; padding: 8px 11px; border-radius: 5px 13px 13px 13px; background: color-mix(in srgb, var(--bg) 78%, var(--card)); color: var(--text); font-size: 13px; line-height: 1.35; white-space: pre-wrap; word-break: break-word; }
+  .chat-folder-preview-message.unread-preview { box-shadow: inset 2px 0 var(--accent); }
   .chat-folder-preview-message.outgoing { align-self: flex-end; border-radius: 13px 5px 13px 13px; background: color-mix(in srgb, var(--accent) 18%, var(--card)); }
   .chat-folder-menu-sheet { position: static; width: min(520px, 100%); max-width: none; max-height: min(48vh, 440px); margin: 0 auto; box-sizing: border-box; border-radius: 24px; padding: 8px; }
   .chat-folder-menu-sheet .chat-folder-menu-title { padding: 8px 12px 10px; }
@@ -4126,7 +4128,24 @@ class SmsGammuPanel extends HTMLElement {
       this._api(`messages/${encodeURIComponent(number)}`).then((messages) => {
         if (!previewMessages || !previewMessages.isConnected || !Array.isArray(messages)) return;
         if (!messages.length) return;
-        previewMessages.innerHTML = messages.map((message) => `<div class="chat-folder-preview-message ${message.type === "sent" || message.direction === "outgoing" ? "outgoing" : ""}">${this._esc(String(message.text || message.body || message.Text || message.message || "").slice(0, 220))}</div>`).join("");
+        previewMessages.innerHTML = messages.map((message) => {
+          const outgoing = message.direction === "out" || message.direction === "outgoing" || message.type === "sent";
+          const unread = !outgoing && !message.is_read;
+          const text = String(message.text || message.body || message.Text || message.message || "").slice(0, 220);
+          return `<div class="chat-folder-preview-message ${outgoing ? "outgoing" : ""} ${unread ? "unread-preview" : ""}">${this._esc(text)}</div>`;
+        }).join("");
+        // Keep unread state untouched: this is a read-only preview. Position
+        // the scroll at the latest unread message, or at the newest message
+        // when the conversation has no unread incoming messages.
+        const lastUnread = messages.reduce((index, message, current) => {
+          const outgoing = message.direction === "out" || message.direction === "outgoing" || message.type === "sent";
+          return !outgoing && !message.is_read ? current : index;
+        }, -1);
+        requestAnimationFrame(() => {
+          const target = previewMessages.children[lastUnread >= 0 ? lastUnread : previewMessages.children.length - 1];
+          if (target) previewMessages.scrollTop = Math.max(0, target.offsetTop - previewMessages.clientHeight + target.offsetHeight + 8);
+          else previewMessages.scrollTop = previewMessages.scrollHeight;
+        });
       }).catch(() => {});
     }
     menu.querySelector("#chat-folder-create")?.addEventListener("click", () => { close(); this._openFolderEditor(null, number); });
