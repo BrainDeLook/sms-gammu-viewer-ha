@@ -297,6 +297,28 @@ const CSS = `
   .chat-folder-menu-row:disabled { opacity: .55; cursor: default; }
   .chat-folder-menu-row input { width: 16px; height: 16px; accent-color: var(--accent); }
   .chat-folder-menu-new { margin-top: 6px; border-top: 1px solid var(--line); padding-top: 8px; color: var(--accent); }
+  .chat-folder-preview-overlay {
+    position: fixed; inset: 0; z-index: 1000; display: flex; flex-direction: column;
+    justify-content: flex-end; padding: 18px 12px calc(12px + var(--safe-area-inset-bottom, 0px));
+    box-sizing: border-box; background: rgba(0,0,0,.42); backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px); animation: ctx-in .16s ease;
+  }
+  .chat-folder-preview-card {
+    width: min(520px, 100%); max-height: 42vh; margin: 0 auto 10px; overflow: hidden;
+    border: 1px solid var(--line); border-radius: 24px; background: var(--card);
+    box-shadow: 0 12px 38px rgba(0,0,0,.38); display: flex; flex-direction: column;
+  }
+  .chat-folder-preview-head { display: flex; align-items: center; gap: 12px; padding: 14px 16px 10px; }
+  .chat-folder-preview-avatar { width: 52px; height: 52px; flex: 0 0 52px; }
+  .chat-folder-preview-avatar .avatar { width: 52px; height: 52px; padding: 0; }
+  .chat-folder-preview-name { min-width: 0; font-size: 16px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .chat-folder-preview-number { margin-top: 2px; color: var(--sub); font-size: 12px; }
+  .chat-folder-preview-messages { overflow: auto; padding: 4px 16px 16px; display: flex; flex-direction: column; gap: 6px; }
+  .chat-folder-preview-message { align-self: flex-start; max-width: 88%; padding: 8px 11px; border-radius: 5px 13px 13px 13px; background: color-mix(in srgb, var(--bg) 78%, var(--card)); color: var(--text); font-size: 13px; line-height: 1.35; white-space: pre-wrap; word-break: break-word; }
+  .chat-folder-preview-message.outgoing { align-self: flex-end; border-radius: 13px 5px 13px 13px; background: color-mix(in srgb, var(--accent) 18%, var(--card)); }
+  .chat-folder-menu-sheet { position: static; width: min(520px, 100%); max-width: none; max-height: min(48vh, 440px); margin: 0 auto; box-sizing: border-box; border-radius: 24px; padding: 8px; }
+  .chat-folder-menu-sheet .chat-folder-menu-title { padding: 8px 12px 10px; }
+  @media (min-width: 581px) { .chat-folder-preview-overlay { display: none; } }
   .contact-form-actions button.primary { background: var(--accent); color: #fff; }
   .contact-form-actions button.secondary { background: transparent; color: var(--sub); }
   .folder-settings-row button:disabled { opacity: .35; cursor: default; }
@@ -4003,8 +4025,10 @@ class SmsGammuPanel extends HTMLElement {
   _showChatFolderMenu(event, number) {
     if (!number) return;
     this.shadowRoot.querySelector(".chat-folder-menu")?.remove();
+    this.shadowRoot.querySelector(".chat-folder-preview-overlay")?.remove();
     const contact = this._contacts.find((item) => item.number === number);
     if (!contact) return;
+    const mobile = window.matchMedia?.("(max-width: 580px)").matches === true;
     const folders = this._folderTabDefinitions().filter((folder) => folder.id !== "all");
     const brandSelected = this._isInBrandsFolder(contact);
     const rows = folders.map((folder) => {
@@ -4015,22 +4039,47 @@ class SmsGammuPanel extends HTMLElement {
       return `<label class="chat-folder-menu-row"${isPeople ? ` title="${this._esc(this._t("folder_auto"))}"` : ""}><input type="checkbox" data-menu-folder="${this._esc(folder.id)}" ${checked ? "checked" : ""} ${isPeople ? "disabled" : ""}/><span>${folder.icon ? this._esc(folder.icon) + " " : ""}${this._esc(folder.name)}</span></label>`;
     }).join("");
     const menu = document.createElement("div");
-    menu.className = "chat-folder-menu";
+    menu.className = mobile ? "chat-folder-menu chat-folder-menu-sheet" : "chat-folder-menu";
     menu.innerHTML = `<div class="chat-folder-menu-title">${this._esc(this._t("add_to_folder"))}: ${this._esc(contact.contact_name || number)}</div>${rows || `<div class="form-help">${this._esc(this._t("no_custom_folders"))}</div>`}<button class="chat-folder-menu-row chat-folder-menu-new" id="chat-folder-create">＋ ${this._esc(this._t("new_folder_with_contact"))}</button>`;
-    this.shadowRoot.appendChild(menu);
-    const point = event?.clientX != null ? { x: event.clientX, y: event.clientY } : { x: 20, y: 80 };
-    const margin = 8;
-    menu.style.left = `${Math.max(margin, Math.min(point.x, window.innerWidth - menu.offsetWidth - margin))}px`;
-    menu.style.top = `${Math.max(margin, Math.min(point.y, window.innerHeight - menu.offsetHeight - margin))}px`;
+    let host = menu;
+    let previewMessages = null;
+    if (mobile) {
+      const overlay = document.createElement("div");
+      overlay.className = "chat-folder-preview-overlay";
+      const preview = document.createElement("div");
+      preview.className = "chat-folder-preview-card";
+      preview.innerHTML = `<div class="chat-folder-preview-head"><div class="chat-folder-preview-avatar">${this._chatAvatarMarkup(contact)}</div><div><div class="chat-folder-preview-name">${this._esc(contact.contact_name || number)}</div><div class="chat-folder-preview-number">${this._esc(number)}</div></div></div><div class="chat-folder-preview-messages" id="chat-folder-preview-messages"><div class="chat-folder-preview-message">${this._esc((contact.last_text || this._t("no_messages")).slice(0, 220))}</div></div>`;
+      previewMessages = preview.querySelector("#chat-folder-preview-messages");
+      preview.appendChild(menu);
+      overlay.appendChild(preview);
+      this.shadowRoot.appendChild(overlay);
+      host = overlay;
+    } else {
+      this.shadowRoot.appendChild(menu);
+      const point = event?.clientX != null ? { x: event.clientX, y: event.clientY } : { x: 20, y: 80 };
+      const margin = 8;
+      menu.style.left = `${Math.max(margin, Math.min(point.x, window.innerWidth - menu.offsetWidth - margin))}px`;
+      menu.style.top = `${Math.max(margin, Math.min(point.y, window.innerHeight - menu.offsetHeight - margin))}px`;
+    }
     let closed = false;
-    const onOutside = (pointerEvent) => { if (!menu.contains(pointerEvent.target)) close(); };
     const close = () => {
       if (closed) return;
       closed = true;
-      menu.remove();
+      host.remove();
       this.shadowRoot.removeEventListener("pointerdown", onOutside);
     };
+    const onOutside = (pointerEvent) => {
+      if (mobile ? pointerEvent.target === host : !menu.contains(pointerEvent.target)) close();
+    };
     setTimeout(() => this.shadowRoot.addEventListener("pointerdown", onOutside), 0);
+    if (mobile) {
+      this._api(`messages/${encodeURIComponent(number)}`).then((messages) => {
+        if (!previewMessages || !previewMessages.isConnected || !Array.isArray(messages)) return;
+        const recent = messages.slice(-4);
+        if (!recent.length) return;
+        previewMessages.innerHTML = recent.map((message) => `<div class="chat-folder-preview-message ${message.type === "sent" || message.direction === "outgoing" ? "outgoing" : ""}">${this._esc(String(message.text || message.body || "").slice(0, 220))}</div>`).join("");
+      }).catch(() => {});
+    }
     menu.querySelector("#chat-folder-create")?.addEventListener("click", () => { close(); this._openFolderEditor(null, number); });
     menu.querySelectorAll("[data-menu-folder]").forEach((input) => input.addEventListener("change", async () => {
       const folderId = input.dataset.menuFolder;
