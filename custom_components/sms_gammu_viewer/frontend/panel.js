@@ -303,7 +303,9 @@ const CSS = `
     padding: 18px 12px calc(12px + var(--safe-area-inset-bottom, 0px));
     box-sizing: border-box; background: rgba(0,0,0,.42); backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px); animation: ctx-in .16s ease;
+    user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
   }
+  .chat-folder-preview-overlay * { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
   .chat-folder-preview-card {
     width: min(520px, 100%); max-height: 46vh; margin: 0; overflow: hidden;
     border: 1px solid var(--line); border-radius: 24px; background: var(--card);
@@ -4078,11 +4080,7 @@ class SmsGammuPanel extends HTMLElement {
       this.shadowRoot.removeEventListener("pointerdown", onOutside);
     };
     const onOutside = (pointerEvent) => {
-      if (mobile && pointerEvent.target === host) {
-        pointerEvent.preventDefault();
-        pointerEvent.stopPropagation();
-        close();
-      } else if (!mobile && !menu.contains(pointerEvent.target)) {
+      if (!mobile && !menu.contains(pointerEvent.target)) {
         close();
       }
     };
@@ -4102,20 +4100,34 @@ class SmsGammuPanel extends HTMLElement {
       }, 80);
       window.addEventListener("pointerup", armMenu, { once: true, capture: true });
       window.addEventListener("pointercancel", armMenu, { once: true, capture: true });
-      const dismissFromBackdrop = (pointerEvent) => {
+      let backdropPointer = null;
+      const beginBackdropDismiss = (pointerEvent) => {
         if (pointerEvent.target !== host || !menuReady) return;
         pointerEvent.preventDefault();
         pointerEvent.stopPropagation();
+        backdropPointer = pointerEvent.pointerId;
+        try { host.setPointerCapture?.(pointerEvent.pointerId); } catch (_) {}
         this._suppressNextChatClick = true;
         clearTimeout(this._suppressNextChatClickTimer);
         this._suppressNextChatClickTimer = setTimeout(() => { this._suppressNextChatClick = false; }, 700);
-        close();
       };
-      host.addEventListener("pointerdown", dismissFromBackdrop, { capture: true });
+      const finishBackdropDismiss = (pointerEvent) => {
+        if (backdropPointer == null || pointerEvent.pointerId !== backdropPointer) return;
+        pointerEvent.preventDefault();
+        pointerEvent.stopPropagation();
+        try { host.releasePointerCapture?.(pointerEvent.pointerId); } catch (_) {}
+        backdropPointer = null;
+        // Keep the overlay mounted until pointerup has fully finished so the
+        // release cannot be retargeted to Search or another control below.
+        setTimeout(close, 80);
+      };
+      host.addEventListener("pointerdown", beginBackdropDismiss, { capture: true });
+      host.addEventListener("pointerup", finishBackdropDismiss, { capture: true });
+      host.addEventListener("pointercancel", finishBackdropDismiss, { capture: true });
       host.addEventListener("click", (clickEvent) => {
         clickEvent.preventDefault();
         clickEvent.stopPropagation();
-        if (clickEvent.target === host && menuReady) close();
+        if (clickEvent.target === host && menuReady) setTimeout(close, 0);
       }, { capture: true });
       const preview = host.querySelector(".chat-folder-preview-card");
       preview?.addEventListener("click", (clickEvent) => {
