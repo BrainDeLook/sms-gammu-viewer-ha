@@ -173,6 +173,14 @@ const CSS = `
   .swipe-btn.mute { background: #888780; }
   .swipe-btn.swipe-del { background: #E24B4A; }
   .swipe-inner { position: relative; z-index: 2; background-color: var(--card) !important; will-change: transform; }
+  /* A long press opens the chat-folder menu.  Keep the browser from starting
+     its native text-selection gesture while the press is pending. */
+  .swipe-inner.long-press-pending,
+  .swipe-inner.long-press-pending * {
+    user-select: none !important;
+    -webkit-user-select: none !important;
+    -webkit-touch-callout: none !important;
+  }
   .swipe-inner.active { background-color: rgba(3,169,244,.1) !important; }
   .swipe-inner.snapping { transition: transform 0.25s ease; }
   .contact-item {
@@ -3712,12 +3720,17 @@ class SmsGammuPanel extends HTMLElement {
       const cancelLongPress = () => {
         if (longPressTimer) clearTimeout(longPressTimer);
         longPressTimer = null;
+        el.classList.remove("long-press-pending");
       };
       el.addEventListener("pointerdown", (event) => {
         if (event.pointerType === "mouse" || event.button !== 0) return;
         pressX = event.clientX; pressY = event.clientY;
+        el.classList.add("long-press-pending");
         longPressTimer = setTimeout(() => {
           longPressTimer = null;
+          // Remove a range that a mobile browser may have created just before
+          // the timer fired.  The menu itself remains fully interactive.
+          window.getSelection?.()?.removeAllRanges?.();
           this._suppressNextChatClick = true;
           clearTimeout(this._suppressNextChatClickTimer);
           this._suppressNextChatClickTimer = setTimeout(() => { this._suppressNextChatClick = false; }, 1000);
@@ -3731,6 +3744,8 @@ class SmsGammuPanel extends HTMLElement {
       ["pointerup", "pointercancel", "pointerleave"].forEach((name) => el.addEventListener(name, cancelLongPress, { passive: true }));
       el.addEventListener("contextmenu", (event) => {
         event.preventDefault();
+        window.getSelection?.()?.removeAllRanges?.();
+        el.classList.remove("long-press-pending");
         this._suppressNextChatClick = true;
         clearTimeout(this._suppressNextChatClickTimer);
         this._suppressNextChatClickTimer = setTimeout(() => { this._suppressNextChatClick = false; }, 1000);
