@@ -117,6 +117,7 @@ class ChatFolderSettingsTests(unittest.TestCase):
             self.assertEqual(
                 {
                     "show_all": True,
+                    "people_enabled": False,
                     "brands_enabled": False,
                     "brands_manual": [],
                     "brands_excluded": [],
@@ -126,6 +127,7 @@ class ChatFolderSettingsTests(unittest.TestCase):
             )
             options = {
                 "show_all": False,
+                "people_enabled": False,
                 "brands_enabled": True,
                 "brands_manual": ["Mom"],
                 "brands_excluded": ["VK.RU"],
@@ -133,6 +135,60 @@ class ChatFolderSettingsTests(unittest.TestCase):
             }
             store.set_chat_folder_options(options)
             self.assertEqual(options, store.get_chat_folder_options())
+
+    def test_legacy_brands_switch_migrates_to_both_system_folders(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = SmsStore(Path(directory) / "sms.db")
+            store.init()
+
+            # This is the shape written by releases before the independent
+            # People switch existed.
+            store.set_setting(
+                "chat_folder_options",
+                '{"show_all": false, "brands_enabled": true}',
+            )
+            self.assertEqual(
+                {
+                    "show_all": False,
+                    "people_enabled": True,
+                    "brands_enabled": True,
+                    "brands_manual": [],
+                    "brands_excluded": [],
+                    "folder_order": [],
+                },
+                store.get_chat_folder_options(),
+            )
+
+    def test_people_and_brands_switches_persist_independently(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = SmsStore(Path(directory) / "sms.db")
+            store.init()
+            store.set_chat_folder_options(
+                {"people_enabled": True, "brands_enabled": False}
+            )
+            options = store.get_chat_folder_options()
+            self.assertTrue(options["people_enabled"])
+            self.assertFalse(options["brands_enabled"])
+
+            # A subsequent update of only Brands must not reset People.
+            store.set_chat_folder_options(
+                {"people_enabled": True, "brands_enabled": True}
+            )
+            options = store.get_chat_folder_options()
+            self.assertTrue(options["people_enabled"])
+            self.assertTrue(options["brands_enabled"])
+
+    def test_legacy_false_switch_keeps_both_system_folders_disabled(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = SmsStore(Path(directory) / "sms.db")
+            store.init()
+            store.set_setting(
+                "chat_folder_options",
+                '{"brands_enabled": false}',
+            )
+            options = store.get_chat_folder_options()
+            self.assertFalse(options["people_enabled"])
+            self.assertFalse(options["brands_enabled"])
 
 
 if __name__ == "__main__":

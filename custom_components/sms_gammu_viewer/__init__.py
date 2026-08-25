@@ -1574,7 +1574,29 @@ class SmsApiView(HomeAssistantView):
                 return self._error("Invalid JSON", 400)
             if not isinstance(body, dict):
                 return self._error("Invalid options", 400)
-            clean = {"show_all": bool(body.get("show_all", True)), "brands_enabled": bool(body.get("brands_enabled", False))}
+            # ``brands_enabled`` used to be the single switch for both
+            # system folders.  Keep that request shape working by applying
+            # its value to People when the new independent key is omitted.
+            # For a modern partial update, an omitted key keeps its current
+            # value instead of unexpectedly disabling the other folder.
+            current = await self.hass.async_add_executor_job(store.get_chat_folder_options)
+            has_legacy_brands = "brands_enabled" in body
+            has_people = "people_enabled" in body
+            brands_enabled = (
+                bool(body.get("brands_enabled"))
+                if has_legacy_brands
+                else bool(current.get("brands_enabled", False))
+            )
+            people_enabled = (
+                bool(body.get("people_enabled"))
+                if has_people
+                else (brands_enabled if has_legacy_brands else bool(current.get("people_enabled", False)))
+            )
+            clean = {
+                "show_all": bool(body.get("show_all", current.get("show_all", True))),
+                "people_enabled": people_enabled,
+                "brands_enabled": brands_enabled,
+            }
             for key in ("brands_manual", "brands_excluded"):
                 values = body.get(key) or []
                 if not isinstance(values, list) or len(values) > 1000:

@@ -452,26 +452,64 @@ class SmsStore:
     def set_chat_folders(self, folders: list[dict[str, Any]]) -> None:
         self.set_setting("chat_folders", json.dumps(folders, ensure_ascii=False))
 
+    @staticmethod
+    def _normalize_chat_folder_options(value: Any) -> dict[str, Any]:
+        """Return a safe, forward-compatible chat-folder options object.
+
+        Before independent system-folder switches were introduced,
+        ``brands_enabled`` controlled both the People and Brands tabs.  When
+        either of the new keys is absent we therefore fall back to that legacy
+        value.  This keeps existing installations visually unchanged while
+        allowing newer clients to persist the two switches independently.
+        """
+        if not isinstance(value, dict):
+            value = {}
+
+        legacy_present = "brands_enabled" in value
+        legacy_enabled = bool(value.get("brands_enabled", False))
+        people_enabled = (
+            bool(value.get("people_enabled"))
+            if "people_enabled" in value
+            else legacy_enabled
+        )
+        brands_enabled = (
+            bool(value.get("brands_enabled"))
+            if legacy_present
+            else False
+        )
+
+        brands_manual = value.get("brands_manual", [])
+        if not isinstance(brands_manual, list):
+            brands_manual = []
+        brands_excluded = value.get("brands_excluded", [])
+        if not isinstance(brands_excluded, list):
+            brands_excluded = []
+        folder_order = value.get("folder_order", [])
+        if not isinstance(folder_order, list):
+            folder_order = []
+
+        return {
+            "show_all": bool(value.get("show_all", True)),
+            "people_enabled": people_enabled,
+            "brands_enabled": brands_enabled,
+            "brands_manual": brands_manual,
+            "brands_excluded": brands_excluded,
+            "folder_order": folder_order,
+        }
+
     def get_chat_folder_options(self) -> dict[str, Any]:
         raw = self.get_setting("chat_folder_options")
         if not raw:
-            return {"show_all": True, "brands_enabled": False, "brands_manual": [], "brands_excluded": [], "folder_order": []}
+            return self._normalize_chat_folder_options({})
         try:
             value = json.loads(raw)
         except (TypeError, ValueError):
             value = {}
-        if not isinstance(value, dict):
-            value = {}
-        return {
-            "show_all": bool(value.get("show_all", True)),
-            "brands_enabled": bool(value.get("brands_enabled", False)),
-            "brands_manual": value.get("brands_manual", []) if isinstance(value.get("brands_manual", []), list) else [],
-            "brands_excluded": value.get("brands_excluded", []) if isinstance(value.get("brands_excluded", []), list) else [],
-            "folder_order": value.get("folder_order", []) if isinstance(value.get("folder_order", []), list) else [],
-        }
+        return self._normalize_chat_folder_options(value)
 
     def set_chat_folder_options(self, options: dict[str, Any]) -> None:
-        self.set_setting("chat_folder_options", json.dumps(options, ensure_ascii=False))
+        normalized = self._normalize_chat_folder_options(options)
+        self.set_setting("chat_folder_options", json.dumps(normalized, ensure_ascii=False))
 
     def set_brand_logo_override(self, number: str, source_url: str) -> None:
         """Persist or clear the manually selected logo for an SMS sender."""
