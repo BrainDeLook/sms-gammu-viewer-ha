@@ -181,6 +181,13 @@ const CSS = `
     -webkit-user-select: none !important;
     -webkit-touch-callout: none !important;
   }
+  .swipe-inner.long-press-pending::after {
+    content: ''; position: absolute; inset: 0; border-radius: inherit;
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 28%, transparent);
+    pointer-events: none; animation: chat-press-in .14s ease-out;
+  }
+  @keyframes chat-press-in { from { opacity: 0; } to { opacity: 1; } }
   .swipe-inner.active { background-color: rgba(3,169,244,.1) !important; }
   .swipe-inner.snapping { transition: transform 0.25s ease; }
   .contact-item {
@@ -3769,6 +3776,7 @@ class SmsGammuPanel extends HTMLElement {
         el.classList.add("long-press-pending");
         longPressTimer = setTimeout(() => {
           longPressTimer = null;
+          el.classList.remove("long-press-pending");
           // Remove a range that a mobile browser may have created just before
           // the timer fired.  The menu itself remains fully interactive.
           window.getSelection?.()?.removeAllRanges?.();
