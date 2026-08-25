@@ -141,11 +141,14 @@ const CSS = `
   .contact-list {
     flex: 1;
     overflow-y: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
     padding-bottom: calc(80px + var(--safe-area-inset-bottom, 0px));
     position: relative;
     -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 60px), transparent 100%);
     mask-image: linear-gradient(to bottom, black calc(100% - 60px), transparent 100%);
   }
+  .contact-list::-webkit-scrollbar { display: none; width: 0; height: 0; }
 
 
   .swipe-wrap { position: relative; overflow: hidden; border-bottom: 0.5px solid var(--line); background: var(--card); }
