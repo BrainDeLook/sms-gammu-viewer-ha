@@ -4128,11 +4128,15 @@ class SmsGammuPanel extends HTMLElement {
       this._api(`messages/${encodeURIComponent(number)}`).then((messages) => {
         if (!previewMessages || !previewMessages.isConnected || !Array.isArray(messages)) return;
         if (!messages.length) return;
-        previewMessages.innerHTML = messages.map((message) => {
+        let lastLabel = "";
+        previewMessages.innerHTML = messages.map((message, index) => {
           const outgoing = message.direction === "out" || message.direction === "outgoing" || message.type === "sent";
           const unread = !outgoing && !message.is_read;
           const text = String(message.text || message.body || message.Text || message.message || "").slice(0, 220);
-          return `<div class="chat-folder-preview-message ${outgoing ? "outgoing" : ""} ${unread ? "unread-preview" : ""}">${this._esc(text)}</div>`;
+          const label = this._fmtDateLabel(message.date);
+          const divider = label && label !== lastLabel ? `<div class="date-divider"><span>${this._esc(label)}</span></div>` : "";
+          if (label) lastLabel = label;
+          return `${divider}<div class="chat-folder-preview-message ${outgoing ? "outgoing" : ""} ${unread ? "unread-preview" : ""}" data-preview-index="${index}">${this._esc(text)}</div>`;
         }).join("");
         // Keep unread state untouched: this is a read-only preview. Position
         // the scroll at the latest unread message, or at the newest message
@@ -4142,7 +4146,9 @@ class SmsGammuPanel extends HTMLElement {
           return !outgoing && !message.is_read ? current : index;
         }, -1);
         requestAnimationFrame(() => {
-          const target = previewMessages.children[lastUnread >= 0 ? lastUnread : previewMessages.children.length - 1];
+          const target = lastUnread >= 0
+            ? previewMessages.querySelector(`[data-preview-index="${lastUnread}"]`)
+            : previewMessages.querySelector("[data-preview-index]:last-of-type");
           if (target) previewMessages.scrollTop = Math.max(0, target.offsetTop - previewMessages.clientHeight + target.offsetHeight + 8);
           else previewMessages.scrollTop = previewMessages.scrollHeight;
         });
