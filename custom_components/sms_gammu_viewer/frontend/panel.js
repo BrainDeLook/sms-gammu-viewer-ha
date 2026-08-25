@@ -257,6 +257,7 @@ const CSS = `
     flex: 0 0 auto; border: 1px solid var(--border); border-radius: 16px;
     background: transparent; color: var(--sub); padding: 5px 10px;
     font: inherit; font-size: 12px; cursor: pointer; white-space: nowrap;
+    transition: color .22s ease, background-color .22s ease, border-color .22s ease, box-shadow .22s ease;
   }
   .folder-tab.active { color: var(--accent); border-color: var(--accent); background: rgba(3,169,244,.1); }
   .folder-tab.add { font-size: 17px; line-height: 15px; padding: 4px 9px; }
@@ -1182,7 +1183,7 @@ class SmsGammuPanel extends HTMLElement {
     this._brandPickerContact = null;
     this._chatFolders = [];
     this._activeFolderId = "all";
-    this._folderOptions = { show_all: true, brands_enabled: false, brands_manual: [], brands_excluded: [], folder_order: [] };
+    this._folderOptions = { show_all: true, people_enabled: false, brands_enabled: false, brands_manual: [], brands_excluded: [], folder_order: [] };
     this._folderScrollLeft = 0;
   }
 
@@ -1355,7 +1356,18 @@ class SmsGammuPanel extends HTMLElement {
         this._api("contacts"), this._api("chat_folders"), this._api("chat_folder_options"),
       ]);
       this._chatFolders = Array.isArray(folders) ? folders : [];
-      if (folderOptions && typeof folderOptions === "object") this._folderOptions = folderOptions;
+      if (folderOptions && typeof folderOptions === "object") {
+        // Keep older gateways compatible: before independent switches,
+        // brands_enabled controlled both system folders.
+        this._folderOptions = {
+          ...this._folderOptions,
+          ...folderOptions,
+          people_enabled: "people_enabled" in folderOptions
+            ? Boolean(folderOptions.people_enabled)
+            : Boolean(folderOptions.brands_enabled),
+          brands_enabled: Boolean(folderOptions.brands_enabled),
+        };
+      }
       const signature = JSON.stringify((contacts || []).map((c) => [
         c.number, c.contact_name, c.last_text, c.last_date, c.unread,
         c.is_muted, c.is_pinned, c.total, c.brand_logo_url,
@@ -3576,14 +3588,14 @@ class SmsGammuPanel extends HTMLElement {
     `;
   }
 
-  _renderContacts() {
+  _renderContacts(skipFolders = false) {
     const scrollList = this.shadowRoot.getElementById("contact-list");
     const list = this.shadowRoot.getElementById("contact-items");
     if (!scrollList || !list) return;
     const brandLoading = !this._status || (this._status.use_brand_logos && !this._brandReady);
     scrollList.classList.toggle("brand-loading", brandLoading);
     if (brandLoading) return;
-    this._renderFolders();
+    if (!skipFolders) this._renderFolders();
 
     // Локальная сортировка: закреплённые вверху
     this._contacts.sort((a, b) => (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0) || new Date(b.last_activity) - new Date(a.last_activity));
@@ -3774,8 +3786,11 @@ class SmsGammuPanel extends HTMLElement {
     }
     host.style.removeProperty("top");
     host.querySelectorAll("[data-folder-id]").forEach((button) => button.addEventListener("click", () => {
+      const previous = host.querySelector(".folder-tab.active");
+      previous?.classList.remove("active");
+      button.classList.add("active");
       this._activeFolderId = button.dataset.folderId;
-      this._renderContacts();
+      this._renderContacts(true);
     }));
     const folderScroller = host.querySelector(".folder-tab-scroll");
     folderScroller?.addEventListener("wheel", (event) => {
@@ -3803,8 +3818,10 @@ class SmsGammuPanel extends HTMLElement {
   _folderTabDefinitions() {
     const tabs = [];
     if (this._folderOptions.show_all !== false) tabs.push({ id: "all", name: this._t("all_chats"), icon: "", system: true });
-    if (this._folderOptions.brands_enabled) {
+    if (this._folderOptions.people_enabled) {
       tabs.push({ id: "people", name: this._t("people_folder"), icon: "👤", system: true });
+    }
+    if (this._folderOptions.brands_enabled) {
       tabs.push({ id: "brands", name: this._t("brands_folder"), icon: "🏷️", system: true });
     }
     tabs.push(...this._chatFolders.map((folder) => ({ ...folder, system: false })));
@@ -3823,6 +3840,7 @@ class SmsGammuPanel extends HTMLElement {
     modal.innerHTML = `<div class="contact-form" style="padding:20px">
       <div class="contact-form-header"><h2>${this._esc(this._t("folder_settings"))}</h2></div>
       <label class="folder-editor-chat"><input type="checkbox" id="folder-show-all" ${this._folderOptions.show_all !== false ? "checked" : ""}/> ${this._esc(this._t("show_all_chats"))}</label>
+      <label class="folder-editor-chat"><input type="checkbox" id="folder-people-enabled" ${this._folderOptions.people_enabled ? "checked" : ""}/> ${this._esc(this._t("enable_people_folder"))}</label>
       <label class="folder-editor-chat"><input type="checkbox" id="folder-brands-enabled" ${this._folderOptions.brands_enabled ? "checked" : ""}/> ${this._esc(this._t("enable_brands_folder"))}</label>
       <button id="folder-manage-brands" ${this._folderOptions.brands_enabled ? "" : "disabled"}>${this._esc(this._t("manage_brands_folder"))}</button>
       <h3>${this._esc(this._t("custom_folders"))}</h3>
@@ -3876,6 +3894,7 @@ class SmsGammuPanel extends HTMLElement {
     modal.querySelector("#folder-manage-brands")?.addEventListener("click", async () => {
       const options = { ...this._folderOptions,
         show_all: modal.querySelector("#folder-show-all")?.checked !== false,
+        people_enabled: modal.querySelector("#folder-people-enabled")?.checked === true,
         brands_enabled: modal.querySelector("#folder-brands-enabled")?.checked === true,
       };
       await this._api("save_chat_folder_options", "POST", options);
@@ -3886,6 +3905,7 @@ class SmsGammuPanel extends HTMLElement {
     modal.querySelector("#folder-settings-save")?.addEventListener("click", async () => {
       const options = { ...this._folderOptions,
         show_all: modal.querySelector("#folder-show-all")?.checked !== false,
+        people_enabled: modal.querySelector("#folder-people-enabled")?.checked === true,
         brands_enabled: modal.querySelector("#folder-brands-enabled")?.checked === true,
       };
       await this._api("save_chat_folder_options", "POST", options);
