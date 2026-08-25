@@ -302,6 +302,7 @@ const CSS = `
   .chat-folder-menu-new { margin-top: 6px; border-top: 1px solid var(--line); padding-top: 8px; color: var(--accent); }
   .chat-folder-menu-track { display: flex; width: 200%; align-items: flex-start; transform: translateX(0); transition: transform .24s cubic-bezier(.2,.7,.2,1); }
   .chat-folder-menu.folders-open .chat-folder-menu-track { transform: translateX(-50%); }
+  .chat-folder-menu.folders-open .chat-folder-menu-main { pointer-events: none; visibility: hidden; }
   .chat-folder-menu-page { flex: 0 0 50%; width: 50%; min-width: 0; box-sizing: border-box; max-height: min(46vh, 420px); overflow-y: auto; }
   .chat-folder-menu-back { border-bottom: 1px solid var(--line); margin-bottom: 4px; font-weight: 600; }
   .chat-folder-preview-overlay {
@@ -314,7 +315,7 @@ const CSS = `
   }
   .chat-folder-preview-overlay * { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
   .chat-folder-preview-card {
-    width: min(520px, 100%); max-height: 46vh; margin: 0; overflow: hidden;
+    width: min(520px, 100%); height: min(42vh, 380px); max-height: min(42vh, 380px); margin: 0; overflow: hidden;
     border: 1px solid var(--line); border-radius: 24px; background: var(--card);
     box-shadow: 0 12px 38px rgba(0,0,0,.38); display: flex; flex-direction: column;
     user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
@@ -4161,9 +4162,8 @@ class SmsGammuPanel extends HTMLElement {
         close();
         this._selectContact(number);
       });
-      this._api(`messages/${encodeURIComponent(number)}`).then((messages) => {
-        if (!previewMessages || !previewMessages.isConnected || !Array.isArray(messages)) return;
-        if (!messages.length) return;
+      const renderPreviewMessages = (messages) => {
+        if (!previewMessages || !previewMessages.isConnected || !Array.isArray(messages) || !messages.length) return;
         let lastLabel = "";
         previewMessages.innerHTML = messages.map((message, index) => {
           const outgoing = message.direction === "out" || message.direction === "outgoing" || message.type === "sent";
@@ -4188,9 +4188,18 @@ class SmsGammuPanel extends HTMLElement {
           if (target) previewMessages.scrollTop = Math.max(0, target.offsetTop - previewMessages.clientHeight + target.offsetHeight + 8);
           else previewMessages.scrollTop = previewMessages.scrollHeight;
         });
-      }).catch(() => {});
+      };
+      // Reuse an already loaded chat immediately, avoiding an empty frame
+      // while the network request for the preview is in flight.
+      if (this._activeNumber === number && Array.isArray(this._messages) && this._messages.length) {
+        renderPreviewMessages(this._messages);
+      }
+      this._api(`messages/${encodeURIComponent(number)}`).then(renderPreviewMessages).catch(() => {});
     }
-    menu.querySelector("#chat-action-folders")?.addEventListener("click", () => menu.classList.add("folders-open"));
+    menu.querySelector("#chat-action-folders")?.addEventListener("click", (event) => {
+      event.currentTarget.blur();
+      menu.classList.add("folders-open");
+    });
     menu.querySelector("#chat-folder-back")?.addEventListener("click", () => menu.classList.remove("folders-open"));
     menu.querySelector("#chat-action-unread")?.addEventListener("click", async () => {
       close();
