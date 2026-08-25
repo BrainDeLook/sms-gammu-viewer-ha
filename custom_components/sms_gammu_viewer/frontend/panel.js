@@ -122,9 +122,11 @@ const CSS = `
     align-items: center;
     gap: 6px;
   }
-  @media (max-width: 580px) {
-    .status-bar { position: relative; z-index: 1; transition: none; overflow: hidden; }
-    .contact-list { position: relative; z-index: 2; transition: none; }
+  .contact-scroll-chrome {
+    position: sticky;
+    top: 0;
+    z-index: 8;
+    background: var(--card);
   }
 
   .signal-dot {
@@ -151,7 +153,8 @@ const CSS = `
     .swipe-wrap { border-bottom: none; margin-bottom: 6px; }
     .swipe-wrap:last-child { margin-bottom: 0; }
     .swipe-inner { border: 1px solid var(--line); border-radius: 22px; }
-    .contact-list { padding-top: 48px; padding-bottom: calc(90px + var(--safe-area-inset-bottom, 0px)); }
+    .contact-list { padding-bottom: calc(90px + var(--safe-area-inset-bottom, 0px)); }
+    .contact-scroll-chrome { display: contents; }
   }
   @media (min-width: 581px) {
     .swipe-actions-left, .swipe-actions-right { display: none !important; }
@@ -1060,7 +1063,7 @@ const CSS = `
 
   @media (max-width: 580px) {
     .folder-tabs {
-      position: absolute; left: 0; right: 0; z-index: 8; display: block; transition: none;
+      position: sticky; top: 3px; left: auto; right: auto; z-index: 8; display: block;
     }
     .folder-tab-shell {
       width: auto; margin: 0 12px 7px; padding: 3px; gap: 3px; border: 1px solid var(--line);
@@ -3177,9 +3180,13 @@ class SmsGammuPanel extends HTMLElement {
             </div>
             <input class="search" id="search" type="text" />
           </div>
-          <div class="status-bar" id="status-bar">${this._t("loading_status")}</div>
-          <div class="folder-tabs" id="folder-tabs"></div>
-          <div class="contact-list" id="contact-list"></div>
+          <div class="contact-list" id="contact-list">
+            <div class="contact-scroll-chrome">
+              <div class="status-bar" id="status-bar">${this._t("loading_status")}</div>
+              <div class="folder-tabs" id="folder-tabs"></div>
+            </div>
+            <div class="contact-items" id="contact-items"></div>
+          </div>
 
           <button class="fab" id="fab-new-chat" title="New message">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
@@ -3565,10 +3572,11 @@ class SmsGammuPanel extends HTMLElement {
   }
 
   _renderContacts() {
-    const list = this.shadowRoot.getElementById("contact-list");
-    if (!list) return;
+    const scrollList = this.shadowRoot.getElementById("contact-list");
+    const list = this.shadowRoot.getElementById("contact-items");
+    if (!scrollList || !list) return;
     const brandLoading = !this._status || (this._status.use_brand_logos && !this._brandReady);
-    list.classList.toggle("brand-loading", brandLoading);
+    scrollList.classList.toggle("brand-loading", brandLoading);
     if (brandLoading) return;
     this._renderFolders();
 
@@ -3759,33 +3767,7 @@ class SmsGammuPanel extends HTMLElement {
       newScroller.scrollLeft = scrollLeft;
       this._folderScrollLeft = scrollLeft;
     }
-    if (window.matchMedia?.("(max-width: 580px)").matches) {
-      const status = this.shadowRoot.getElementById("status-bar");
-      const contactList = this.shadowRoot.getElementById("contact-list");
-      const shell = host.querySelector(".folder-tab-shell");
-      if (status && !this._statusExpandedHeight && status.offsetHeight) this._statusExpandedHeight = status.offsetHeight;
-      this._folderBaseTop = Math.max(0, (status?.offsetTop || 0) + (this._statusExpandedHeight || status?.offsetHeight || 0) - 8);
-      // Keep only a hairline gap below the header while the status row collapses.
-      this._folderMinTop = Math.max(0, (status?.offsetTop || 0) + 3);
-      host.style.top = `${this._folderBaseTop}px`;
-      if (contactList && shell) contactList.style.paddingTop = `${shell.offsetHeight + 2}px`;
-      if (contactList && !this._mobileChromeScrollBound) {
-        this._mobileChromeScrollBound = true;
-        contactList.addEventListener("scroll", () => this._queueMobileChromeSync(), { passive: true });
-      }
-      this._syncMobileChrome();
-    } else {
-      host.style.removeProperty("top");
-      this.shadowRoot.getElementById("contact-list")?.style.removeProperty("padding-top");
-      const statusEl = this.shadowRoot.getElementById("status-bar");
-      statusEl?.style.removeProperty("max-height");
-      statusEl?.style.removeProperty("padding-top");
-      statusEl?.style.removeProperty("padding-bottom");
-      statusEl?.style.removeProperty("opacity");
-      statusEl?.style.removeProperty("transform");
-      this.shadowRoot.getElementById("contact-list")?.style.removeProperty("transform");
-      this._mobileChromeCollapse = 0;
-    }
+    host.style.removeProperty("top");
     host.querySelectorAll("[data-folder-id]").forEach((button) => button.addEventListener("click", () => {
       this._activeFolderId = button.dataset.folderId;
       this._renderContacts();
@@ -3811,42 +3793,6 @@ class SmsGammuPanel extends HTMLElement {
         else if (button.dataset.folderId === "brands") this._openBrandsEditor();
       });
     });
-  }
-
-  _queueMobileChromeSync() {
-    if (this._mobileChromeRaf) return;
-    const schedule = window.requestAnimationFrame || ((callback) => window.setTimeout(callback, 16));
-    this._mobileChromeRaf = schedule(() => {
-      this._mobileChromeRaf = 0;
-      this._syncMobileChrome();
-    });
-  }
-
-  _syncMobileChrome() {
-    const list = this.shadowRoot.getElementById("contact-list");
-    const status = this.shadowRoot.getElementById("status-bar");
-    const host = this.shadowRoot.getElementById("folder-tabs");
-    if (!list || !status || !host || !window.matchMedia?.("(max-width: 580px)").matches) return;
-    if (!this._statusExpandedHeight && status.offsetHeight) this._statusExpandedHeight = status.offsetHeight;
-    const expanded = this._statusExpandedHeight || status.offsetHeight || 1;
-    const desired = Math.min(Math.max(0, list.scrollTop), expanded);
-    const previous = Number.isFinite(this._mobileChromeCollapse) ? this._mobileChromeCollapse : desired;
-    // Follow normal scrolling 1:1, but cap a single-frame jump during a fast
-    // fling so the chrome cannot visibly shoot across the page.
-    const maxStep = 28;
-    const delta = desired - previous;
-    const collapse = Math.abs(delta) > maxStep ? previous + Math.sign(delta) * maxStep : desired;
-    this._mobileChromeCollapse = collapse;
-    const apply = () => {
-      const ratio = Math.max(0, 1 - (collapse / expanded));
-      status.style.transform = `translate3d(0, ${-collapse}px, 0)`;
-      status.style.opacity = String(ratio);
-      list.style.transform = `translate3d(0, ${-collapse}px, 0)`;
-      const minTop = this._folderMinTop || 0;
-      host.style.top = `${Math.max(minTop, (this._folderBaseTop || 0) - collapse)}px`;
-    };
-    apply();
-    if (Math.abs(desired - collapse) > 0.5) this._queueMobileChromeSync();
   }
 
   _folderTabDefinitions() {
