@@ -4125,9 +4125,10 @@ class SmsGammuPanel extends HTMLElement {
       host.addEventListener("pointerup", finishBackdropDismiss, { capture: true });
       host.addEventListener("pointercancel", finishBackdropDismiss, { capture: true });
       host.addEventListener("click", (clickEvent) => {
+        if (clickEvent.target !== host) return;
         clickEvent.preventDefault();
         clickEvent.stopPropagation();
-        if (clickEvent.target === host && menuReady) setTimeout(close, 0);
+        if (menuReady) setTimeout(close, 0);
       }, { capture: true });
       const preview = host.querySelector(".chat-folder-preview-card");
       preview?.addEventListener("click", (clickEvent) => {
