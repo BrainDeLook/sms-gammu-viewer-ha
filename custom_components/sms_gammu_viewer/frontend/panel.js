@@ -299,12 +299,13 @@ const CSS = `
   .chat-folder-menu-new { margin-top: 6px; border-top: 1px solid var(--line); padding-top: 8px; color: var(--accent); }
   .chat-folder-preview-overlay {
     position: fixed; inset: 0; z-index: 1000; display: flex; flex-direction: column;
-    justify-content: flex-end; padding: 18px 12px calc(12px + var(--safe-area-inset-bottom, 0px));
+    justify-content: center; align-items: center; gap: 10px;
+    padding: 18px 12px calc(12px + var(--safe-area-inset-bottom, 0px));
     box-sizing: border-box; background: rgba(0,0,0,.42); backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px); animation: ctx-in .16s ease;
   }
   .chat-folder-preview-card {
-    width: min(520px, 100%); max-height: 42vh; margin: 0 auto 10px; overflow: hidden;
+    width: min(520px, 100%); max-height: 42vh; margin: 0; overflow: hidden;
     border: 1px solid var(--line); border-radius: 24px; background: var(--card);
     box-shadow: 0 12px 38px rgba(0,0,0,.38); display: flex; flex-direction: column;
   }
@@ -1225,7 +1226,7 @@ class SmsGammuPanel extends HTMLElement {
     this._brandPickerContact = null;
     this._chatFolders = [];
     this._activeFolderId = "all";
-    this._folderOptions = { show_all: true, people_enabled: false, brands_enabled: false, brands_manual: [], brands_excluded: [], folder_order: [] };
+    this._folderOptions = { show_all: true, people_enabled: false, brands_enabled: false, brands_manual: [], brands_excluded: [], people_manual: [], people_excluded: [], folder_order: [] };
     this._folderScrollLeft = 0;
   }
 
@@ -1983,7 +1984,7 @@ class SmsGammuPanel extends HTMLElement {
     if (this._activeFolderId === "brands") {
       contacts = contacts.filter((contact) => this._isInBrandsFolder(contact));
     } else if (this._activeFolderId === "people") {
-      contacts = contacts.filter((contact) => !this._isInBrandsFolder(contact));
+      contacts = contacts.filter((contact) => this._isInPeopleFolder(contact));
     } else if (this._activeFolderId !== "all") {
       const folder = this._chatFolders.find((item) => item.id === this._activeFolderId);
       const numbers = new Set(folder?.numbers || []);
@@ -2007,6 +2008,12 @@ class SmsGammuPanel extends HTMLElement {
     const manual = new Set(this._folderOptions.brands_manual || []);
     const excluded = new Set(this._folderOptions.brands_excluded || []);
     return !excluded.has(contact?.number) && (manual.has(contact?.number) || this._isBrandChat(contact));
+  }
+
+  _isInPeopleFolder(contact) {
+    const manual = new Set(this._folderOptions.people_manual || []);
+    const excluded = new Set(this._folderOptions.people_excluded || []);
+    return !excluded.has(contact?.number) && (manual.has(contact?.number) || !this._isInBrandsFolder(contact));
   }
 
   _updateMenuBtn() {
@@ -4035,8 +4042,8 @@ class SmsGammuPanel extends HTMLElement {
       const isPeople = folder.id === "people";
       const isBrands = folder.id === "brands";
       const custom = !isPeople && !isBrands ? this._chatFolders.find((item) => item.id === folder.id) : null;
-      const checked = isBrands ? brandSelected : Boolean(custom?.numbers?.includes(number));
-      return `<label class="chat-folder-menu-row"${isPeople ? ` title="${this._esc(this._t("folder_auto"))}"` : ""}><input type="checkbox" data-menu-folder="${this._esc(folder.id)}" ${checked ? "checked" : ""} ${isPeople ? "disabled" : ""}/><span>${folder.icon ? this._esc(folder.icon) + " " : ""}${this._esc(folder.name)}</span></label>`;
+      const checked = isPeople ? this._isInPeopleFolder(contact) : isBrands ? brandSelected : Boolean(custom?.numbers?.includes(number));
+      return `<label class="chat-folder-menu-row"><input type="checkbox" data-menu-folder="${this._esc(folder.id)}" ${checked ? "checked" : ""}/><span>${folder.icon ? this._esc(folder.icon) + " " : ""}${this._esc(folder.name)}</span></label>`;
     }).join("");
     const menu = document.createElement("div");
     menu.className = mobile ? "chat-folder-menu chat-folder-menu-sheet" : "chat-folder-menu";
@@ -4050,8 +4057,8 @@ class SmsGammuPanel extends HTMLElement {
       preview.className = "chat-folder-preview-card";
       preview.innerHTML = `<div class="chat-folder-preview-head"><div class="chat-folder-preview-avatar">${this._chatAvatarMarkup(contact)}</div><div><div class="chat-folder-preview-name">${this._esc(contact.contact_name || number)}</div><div class="chat-folder-preview-number">${this._esc(number)}</div></div></div><div class="chat-folder-preview-messages" id="chat-folder-preview-messages"><div class="chat-folder-preview-message">${this._esc((contact.last_text || this._t("no_messages")).slice(0, 220))}</div></div>`;
       previewMessages = preview.querySelector("#chat-folder-preview-messages");
-      preview.appendChild(menu);
       overlay.appendChild(preview);
+      overlay.appendChild(menu);
       this.shadowRoot.appendChild(overlay);
       host = overlay;
     } else {
@@ -4083,8 +4090,22 @@ class SmsGammuPanel extends HTMLElement {
     menu.querySelector("#chat-folder-create")?.addEventListener("click", () => { close(); this._openFolderEditor(null, number); });
     menu.querySelectorAll("[data-menu-folder]").forEach((input) => input.addEventListener("change", async () => {
       const folderId = input.dataset.menuFolder;
-      if (folderId === "people") return;
-      if (folderId === "brands") {
+      if (folderId === "people") {
+        const manual = new Set(this._folderOptions.people_manual || []);
+        const excluded = new Set(this._folderOptions.people_excluded || []);
+        if (input.checked) {
+          excluded.delete(number);
+          if (this._isBrandChat(contact)) manual.add(number); else manual.delete(number);
+        } else if (this._isBrandChat(contact)) {
+          manual.delete(number);
+          excluded.add(number);
+        } else {
+          manual.delete(number);
+          excluded.add(number);
+        }
+        this._folderOptions = { ...this._folderOptions, people_manual: [...manual], people_excluded: [...excluded] };
+        await this._api("save_chat_folder_options", "POST", this._folderOptions);
+      } else if (folderId === "brands") {
         const manual = new Set(this._folderOptions.brands_manual || []);
         const excluded = new Set(this._folderOptions.brands_excluded || []);
         if (input.checked) {

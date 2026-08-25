@@ -484,6 +484,12 @@ class SmsStore:
         brands_excluded = value.get("brands_excluded", [])
         if not isinstance(brands_excluded, list):
             brands_excluded = []
+        people_manual = value.get("people_manual", [])
+        if not isinstance(people_manual, list):
+            people_manual = []
+        people_excluded = value.get("people_excluded", [])
+        if not isinstance(people_excluded, list):
+            people_excluded = []
         folder_order = value.get("folder_order", [])
         if not isinstance(folder_order, list):
             folder_order = []
@@ -494,6 +500,8 @@ class SmsStore:
             "brands_enabled": brands_enabled,
             "brands_manual": brands_manual,
             "brands_excluded": brands_excluded,
+            "people_manual": people_manual,
+            "people_excluded": people_excluded,
             "folder_order": folder_order,
         }
 

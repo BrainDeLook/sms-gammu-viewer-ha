@@ -121,6 +121,8 @@ class ChatFolderSettingsTests(unittest.TestCase):
                     "brands_enabled": False,
                     "brands_manual": [],
                     "brands_excluded": [],
+                    "people_manual": [],
+                    "people_excluded": [],
                     "folder_order": [],
                 },
                 store.get_chat_folder_options(),
@@ -131,6 +133,8 @@ class ChatFolderSettingsTests(unittest.TestCase):
                 "brands_enabled": True,
                 "brands_manual": ["Mom"],
                 "brands_excluded": ["VK.RU"],
+                "people_manual": [],
+                "people_excluded": [],
                 "folder_order": ["people", "brands", "folder-1"],
             }
             store.set_chat_folder_options(options)
@@ -154,6 +158,8 @@ class ChatFolderSettingsTests(unittest.TestCase):
                     "brands_enabled": True,
                     "brands_manual": [],
                     "brands_excluded": [],
+                    "people_manual": [],
+                    "people_excluded": [],
                     "folder_order": [],
                 },
                 store.get_chat_folder_options(),

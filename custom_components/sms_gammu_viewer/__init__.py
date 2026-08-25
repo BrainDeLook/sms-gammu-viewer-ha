@@ -1597,7 +1597,7 @@ class SmsApiView(HomeAssistantView):
                 "people_enabled": people_enabled,
                 "brands_enabled": brands_enabled,
             }
-            for key in ("brands_manual", "brands_excluded"):
+            for key in ("brands_manual", "brands_excluded", "people_manual", "people_excluded"):
                 values = body.get(key) or []
                 if not isinstance(values, list) or len(values) > 1000:
                     return self._error("Invalid folder numbers", 400)
