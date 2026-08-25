@@ -1656,6 +1656,14 @@ class SmsApiView(HomeAssistantView):
             coord.push_event("contact_read", {"number": number})
             return self._json({"ok": True})
 
+        if action.startswith("mark_unread/"):
+            from urllib.parse import unquote as _uq
+            number = _uq(action[len("mark_unread/"):])
+            changed = await self.hass.async_add_executor_job(store.mark_unread_by_number, number)
+            if changed:
+                coord.push_event("contact_unread", {"number": number})
+            return self._json({"ok": True, "changed": changed})
+
         if action.startswith("star/"):
             msg_id = self._parse_int(action[len("star/"):])
             if msg_id is None:

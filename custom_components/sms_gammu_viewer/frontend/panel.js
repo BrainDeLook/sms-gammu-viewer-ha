@@ -296,7 +296,14 @@ const CSS = `
   .chat-folder-menu-row:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
   .chat-folder-menu-row:disabled { opacity: .55; cursor: default; }
   .chat-folder-menu-row input { width: 16px; height: 16px; accent-color: var(--accent); }
+  .chat-folder-menu-icon { width: 26px; flex: 0 0 26px; text-align: center; font-size: 18px; }
+  .chat-folder-menu-chevron { margin-left: auto; color: var(--sub); font-size: 22px; }
+  .chat-folder-menu-row.danger { color: var(--danger); }
   .chat-folder-menu-new { margin-top: 6px; border-top: 1px solid var(--line); padding-top: 8px; color: var(--accent); }
+  .chat-folder-menu-track { display: flex; width: 200%; align-items: flex-start; transform: translateX(0); transition: transform .24s cubic-bezier(.2,.7,.2,1); }
+  .chat-folder-menu.folders-open .chat-folder-menu-track { transform: translateX(-50%); }
+  .chat-folder-menu-page { flex: 0 0 50%; width: 50%; min-width: 0; box-sizing: border-box; max-height: min(46vh, 420px); overflow-y: auto; }
+  .chat-folder-menu-back { border-bottom: 1px solid var(--line); margin-bottom: 4px; font-weight: 600; }
   .chat-folder-preview-overlay {
     position: fixed; inset: 0; z-index: 1000; display: flex; flex-direction: column;
     justify-content: center; align-items: center; gap: 10px;
@@ -321,7 +328,7 @@ const CSS = `
   .chat-folder-preview-message { align-self: flex-start; max-width: 88%; padding: 8px 11px; border-radius: 5px 13px 13px 13px; background: color-mix(in srgb, var(--bg) 78%, var(--card)); color: var(--text); font-size: 13px; line-height: 1.35; white-space: pre-wrap; word-break: break-word; }
   .chat-folder-preview-message.unread-preview { box-shadow: inset 2px 0 var(--accent); }
   .chat-folder-preview-message.outgoing { align-self: flex-end; border-radius: 13px 5px 13px 13px; background: color-mix(in srgb, var(--accent) 18%, var(--card)); }
-  .chat-folder-menu-sheet { position: static; width: min(520px, 100%); max-width: none; max-height: min(48vh, 440px); margin: 0 auto; box-sizing: border-box; border-radius: 24px; padding: 8px; }
+  .chat-folder-menu-sheet { position: static; width: min(520px, 100%); max-width: none; max-height: min(48vh, 440px); margin: 0 auto; box-sizing: border-box; border-radius: 24px; padding: 8px; overflow: hidden; }
   .chat-folder-menu-sheet .chat-folder-menu-title { padding: 8px 12px 10px; }
   @media (min-width: 581px) { .chat-folder-preview-overlay { display: none; } }
   .contact-form-actions button.primary { background: var(--accent); color: #fff; }
@@ -1557,7 +1564,7 @@ class SmsGammuPanel extends HTMLElement {
           if (ev.data.number === this._activeNumber) {
             needMessages = true;
           }
-        } else if (ev.type === "message_deleted" || ev.type === "contact_deleted") {
+        } else if (ev.type === "message_deleted" || ev.type === "contact_deleted" || ev.type === "contact_read" || ev.type === "contact_unread" || ev.type === "contact_muted") {
           needContacts = true;
           needMessages = true;
         } else if (ev.type === "contact_saved" || ev.type === "contact_deleted_pb") {
@@ -4051,7 +4058,23 @@ class SmsGammuPanel extends HTMLElement {
     }).join("");
     const menu = document.createElement("div");
     menu.className = mobile ? "chat-folder-menu chat-folder-menu-sheet" : "chat-folder-menu";
-    menu.innerHTML = `<div class="chat-folder-menu-title">${this._esc(this._t("add_to_folder"))}: ${this._esc(contact.contact_name || number)}</div>${rows || `<div class="form-help">${this._esc(this._t("no_custom_folders"))}</div>`}<button class="chat-folder-menu-row chat-folder-menu-new" id="chat-folder-create">＋ ${this._esc(this._t("new_folder_with_contact"))}</button>`;
+    const pinLabel = contact.is_pinned ? this._t("unpin") : this._t("pin");
+    const muteLabel = contact.is_muted ? this._t("notifications_on") : this._t("notifications_off");
+    menu.innerHTML = `<div class="chat-folder-menu-track">
+      <div class="chat-folder-menu-page chat-folder-menu-main">
+        <button class="chat-folder-menu-row" id="chat-action-folders"><span class="chat-folder-menu-icon">📁</span><span>${this._esc(this._t("add_to_folder"))}</span><span class="chat-folder-menu-chevron">›</span></button>
+        <button class="chat-folder-menu-row" id="chat-action-unread"><span class="chat-folder-menu-icon">☑</span><span>${this._esc(this._t("mark_unread"))}</span></button>
+        <button class="chat-folder-menu-row" id="chat-action-pin"><span class="chat-folder-menu-icon">📌</span><span>${this._esc(pinLabel)}</span></button>
+        <button class="chat-folder-menu-row" id="chat-action-mute"><span class="chat-folder-menu-icon">${contact.is_muted ? "🔔" : "🔕"}</span><span>${this._esc(muteLabel)}</span></button>
+        <button class="chat-folder-menu-row danger" id="chat-action-delete"><span class="chat-folder-menu-icon">🗑</span><span>${this._esc(this._t("delete_msg"))}</span></button>
+      </div>
+      <div class="chat-folder-menu-page chat-folder-menu-folders">
+        <button class="chat-folder-menu-row chat-folder-menu-back" id="chat-folder-back"><span class="chat-folder-menu-icon">‹</span><span>${this._esc(this._t("back"))}</span></button>
+        <div class="chat-folder-menu-title">${this._esc(this._t("add_to_folder"))}</div>
+        ${rows || `<div class="form-help">${this._esc(this._t("no_custom_folders"))}</div>`}
+        <button class="chat-folder-menu-row chat-folder-menu-new" id="chat-folder-create"><span class="chat-folder-menu-icon">＋</span><span>${this._esc(this._t("new_folder_with_contact"))}</span></button>
+      </div>
+    </div>`;
     let host = menu;
     let previewMessages = null;
     if (mobile) {
@@ -4167,6 +4190,34 @@ class SmsGammuPanel extends HTMLElement {
         });
       }).catch(() => {});
     }
+    menu.querySelector("#chat-action-folders")?.addEventListener("click", () => menu.classList.add("folders-open"));
+    menu.querySelector("#chat-folder-back")?.addEventListener("click", () => menu.classList.remove("folders-open"));
+    menu.querySelector("#chat-action-unread")?.addEventListener("click", async () => {
+      close();
+      await this._api(`mark_unread/${encodeURIComponent(number)}`, "POST").catch(() => {});
+      const item = this._contacts.find((entry) => entry.number === number);
+      if (item) item.unread = Math.max(1, item.unread || 0);
+      this._updateBadge();
+      this._renderContacts();
+    });
+    menu.querySelector("#chat-action-pin")?.addEventListener("click", async () => {
+      const wasPinned = Boolean(contact.is_pinned);
+      contact.is_pinned = !wasPinned;
+      close();
+      this._renderContacts();
+      await this._api(`${wasPinned ? "unpin" : "pin"}/${encodeURIComponent(number)}`, "POST").catch(() => {
+        contact.is_pinned = wasPinned;
+        this._renderContacts();
+      });
+    });
+    menu.querySelector("#chat-action-mute")?.addEventListener("click", () => {
+      close();
+      this._toggleMute(number);
+    });
+    menu.querySelector("#chat-action-delete")?.addEventListener("click", () => {
+      close();
+      this._deleteContact(number);
+    });
     menu.querySelector("#chat-folder-create")?.addEventListener("click", () => { close(); this._openFolderEditor(null, number); });
     menu.querySelectorAll("[data-menu-folder]").forEach((input) => input.addEventListener("change", async () => {
       const folderId = input.dataset.menuFolder;

@@ -237,6 +237,18 @@ class SmsStore:
         with self._conn() as conn:
             conn.execute("UPDATE messages SET is_read=1 WHERE number=?", (number,))
 
+    def mark_unread_by_number(self, number: str) -> bool:
+        """Mark the newest incoming message unread to flag the conversation."""
+        number = self._sanitize_number(number)
+        with self._conn() as conn:
+            cur = conn.execute(
+                "UPDATE messages SET is_read=0 WHERE id=("
+                "SELECT id FROM messages WHERE number=? AND direction='in' "
+                "ORDER BY id DESC LIMIT 1)",
+                (number,),
+            )
+            return cur.rowcount > 0
+
     def pin_number(self, number: str) -> None:
         with self._conn() as conn:
             conn.execute("INSERT OR IGNORE INTO pinned_numbers (number) VALUES (?)", (number,))

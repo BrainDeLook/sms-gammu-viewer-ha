@@ -47,6 +47,19 @@ class StoreContainsTests(unittest.TestCase):
             self.assertIsNone(store.add(*args))
             self.assertTrue(store.contains(*args))
 
+    def test_mark_unread_flags_only_latest_incoming_message(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = SmsStore(Path(directory) / "sms.db")
+            store.init()
+            first = store.add("Sender", "first", "2026-08-16T12:00:00")
+            latest = store.add("Sender", "latest", "2026-08-16T12:01:00")
+            store.mark_read_by_number("Sender")
+            self.assertTrue(store.mark_unread_by_number("Sender"))
+            messages = store.get_messages_with_starred("Sender")
+            unread = [message["id"] for message in messages if not message["is_read"]]
+            self.assertEqual([latest], unread)
+            self.assertNotEqual(first, latest)
+
 
 class ContactProfileTests(unittest.TestCase):
     def test_brand_logo_override_is_persistent_and_clearable(self) -> None:
