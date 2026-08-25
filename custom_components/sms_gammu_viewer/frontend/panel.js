@@ -277,6 +277,18 @@ const CSS = `
     color: var(--accent); font: inherit; cursor: pointer;
   }
   .contact-form > button:hover, .contact-form-actions button:hover, .folder-settings-row button:hover { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+  .chat-folder-menu {
+    position: fixed; z-index: 1000; min-width: 220px; max-width: min(300px, calc(100vw - 16px));
+    max-height: min(420px, calc(100vh - 16px)); overflow: auto; padding: 8px;
+    border: 1px solid var(--line); border-radius: 16px; background: var(--card); color: var(--text);
+    box-shadow: 0 8px 28px rgba(0,0,0,.35);
+  }
+  .chat-folder-menu-title { padding: 6px 8px 8px; font-size: 13px; font-weight: 600; border-bottom: 1px solid var(--line); }
+  .chat-folder-menu-row { display: flex; align-items: center; gap: 8px; width: 100%; padding: 9px 8px; border: 0; border-radius: 10px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+  .chat-folder-menu-row:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+  .chat-folder-menu-row:disabled { opacity: .55; cursor: default; }
+  .chat-folder-menu-row input { width: 16px; height: 16px; accent-color: var(--accent); }
+  .chat-folder-menu-new { margin-top: 6px; border-top: 1px solid var(--line); padding-top: 8px; color: var(--accent); }
   .contact-form-actions button.primary { background: var(--accent); color: #fff; }
   .contact-form-actions button.secondary { background: transparent; color: var(--sub); }
   .folder-settings-row button:disabled { opacity: .35; cursor: default; }
@@ -3694,8 +3706,39 @@ class SmsGammuPanel extends HTMLElement {
     });
 
     list.querySelectorAll(".swipe-inner").forEach((el) => {
+      let longPressTimer = null;
+      let pressX = 0;
+      let pressY = 0;
+      const cancelLongPress = () => {
+        if (longPressTimer) clearTimeout(longPressTimer);
+        longPressTimer = null;
+      };
+      el.addEventListener("pointerdown", (event) => {
+        if (event.pointerType === "mouse" || event.button !== 0) return;
+        pressX = event.clientX; pressY = event.clientY;
+        longPressTimer = setTimeout(() => {
+          longPressTimer = null;
+          this._suppressNextChatClick = true;
+          clearTimeout(this._suppressNextChatClickTimer);
+          this._suppressNextChatClickTimer = setTimeout(() => { this._suppressNextChatClick = false; }, 1000);
+          navigator.vibrate?.(18);
+          this._showChatFolderMenu(event, el.closest(".swipe-wrap")?.dataset.number);
+        }, 550);
+      }, { passive: true });
+      el.addEventListener("pointermove", (event) => {
+        if (Math.hypot(event.clientX - pressX, event.clientY - pressY) > 10) cancelLongPress();
+      }, { passive: true });
+      ["pointerup", "pointercancel", "pointerleave"].forEach((name) => el.addEventListener(name, cancelLongPress, { passive: true }));
+      el.addEventListener("contextmenu", (event) => {
+        event.preventDefault();
+        this._suppressNextChatClick = true;
+        clearTimeout(this._suppressNextChatClickTimer);
+        this._suppressNextChatClickTimer = setTimeout(() => { this._suppressNextChatClick = false; }, 1000);
+        this._showChatFolderMenu(event, el.closest(".swipe-wrap")?.dataset.number);
+      });
       el.addEventListener("click", (e) => {
         if (e.target.closest(".swipe-btn")) return;
+        if (this._suppressNextChatClick) { this._suppressNextChatClick = false; return; }
         const wrap = el.closest(".swipe-wrap");
         const snapVal = this._swipeState?.get(wrap) || 0;
         if (snapVal !== 0) {
@@ -3942,12 +3985,73 @@ class SmsGammuPanel extends HTMLElement {
     });
   }
 
-  _openFolderEditor(folder = null) {
+  _showChatFolderMenu(event, number) {
+    if (!number) return;
+    this.shadowRoot.querySelector(".chat-folder-menu")?.remove();
+    const contact = this._contacts.find((item) => item.number === number);
+    if (!contact) return;
+    const folders = this._folderTabDefinitions().filter((folder) => folder.id !== "all");
+    const brandSelected = this._isInBrandsFolder(contact);
+    const rows = folders.map((folder) => {
+      const isPeople = folder.id === "people";
+      const isBrands = folder.id === "brands";
+      const custom = !isPeople && !isBrands ? this._chatFolders.find((item) => item.id === folder.id) : null;
+      const checked = isBrands ? brandSelected : Boolean(custom?.numbers?.includes(number));
+      return `<label class="chat-folder-menu-row"${isPeople ? ` title="${this._esc(this._t("folder_auto"))}"` : ""}><input type="checkbox" data-menu-folder="${this._esc(folder.id)}" ${checked ? "checked" : ""} ${isPeople ? "disabled" : ""}/><span>${folder.icon ? this._esc(folder.icon) + " " : ""}${this._esc(folder.name)}</span></label>`;
+    }).join("");
+    const menu = document.createElement("div");
+    menu.className = "chat-folder-menu";
+    menu.innerHTML = `<div class="chat-folder-menu-title">${this._esc(this._t("add_to_folder"))}: ${this._esc(contact.contact_name || number)}</div>${rows || `<div class="form-help">${this._esc(this._t("no_custom_folders"))}</div>`}<button class="chat-folder-menu-row chat-folder-menu-new" id="chat-folder-create">＋ ${this._esc(this._t("new_folder_with_contact"))}</button>`;
+    this.shadowRoot.appendChild(menu);
+    const point = event?.clientX != null ? { x: event.clientX, y: event.clientY } : { x: 20, y: 80 };
+    const margin = 8;
+    menu.style.left = `${Math.max(margin, Math.min(point.x, window.innerWidth - menu.offsetWidth - margin))}px`;
+    menu.style.top = `${Math.max(margin, Math.min(point.y, window.innerHeight - menu.offsetHeight - margin))}px`;
+    let closed = false;
+    const onOutside = (pointerEvent) => { if (!menu.contains(pointerEvent.target)) close(); };
+    const close = () => {
+      if (closed) return;
+      closed = true;
+      menu.remove();
+      this.shadowRoot.removeEventListener("pointerdown", onOutside);
+    };
+    setTimeout(() => this.shadowRoot.addEventListener("pointerdown", onOutside), 0);
+    menu.querySelector("#chat-folder-create")?.addEventListener("click", () => { close(); this._openFolderEditor(null, number); });
+    menu.querySelectorAll("[data-menu-folder]").forEach((input) => input.addEventListener("change", async () => {
+      const folderId = input.dataset.menuFolder;
+      if (folderId === "people") return;
+      if (folderId === "brands") {
+        const manual = new Set(this._folderOptions.brands_manual || []);
+        const excluded = new Set(this._folderOptions.brands_excluded || []);
+        if (input.checked) {
+          if (this._isBrandChat(contact)) excluded.delete(number); else manual.add(number);
+        } else if (this._isBrandChat(contact)) {
+          excluded.add(number);
+        } else {
+          manual.delete(number);
+        }
+        this._folderOptions = { ...this._folderOptions, brands_manual: [...manual], brands_excluded: [...excluded] };
+        await this._api("save_chat_folder_options", "POST", this._folderOptions);
+      } else {
+        const folder = this._chatFolders.find((item) => item.id === folderId);
+        if (!folder) return;
+        const numbers = new Set(folder.numbers || []);
+        if (input.checked) numbers.add(number); else numbers.delete(number);
+        const foldersNext = this._chatFolders.map((item) => item.id === folderId ? { ...item, numbers: [...numbers] } : item);
+        await this._api("save_chat_folders", "POST", { folders: foldersNext });
+        this._chatFolders = foldersNext;
+      }
+      this._renderContacts();
+    }));
+  }
+
+  _openFolderEditor(folder = null, preselectedNumber = null) {
     const overlay = this.shadowRoot.getElementById("contact-modal-overlay");
     const modal = this.shadowRoot.getElementById("contact-modal");
     if (!overlay || !modal) return;
     const current = folder || { id: `folder-${Date.now()}`, name: "", icon: "", numbers: [] };
     const selected = new Set(current.numbers || []);
+    if (preselectedNumber) selected.add(preselectedNumber);
     modal.innerHTML = `<div class="contact-form" style="padding:20px">
       <div class="contact-form-header"><h2>${this._esc(folder ? this._t("edit_folder") : this._t("new_folder"))}</h2></div>
       <label class="folder-edit-field">${this._esc(this._t("folder_name"))}<input id="folder-name" maxlength="80" value="${this._esc(current.name)}" /></label>
