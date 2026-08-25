@@ -305,7 +305,7 @@ const CSS = `
     -webkit-backdrop-filter: blur(12px); animation: ctx-in .16s ease;
   }
   .chat-folder-preview-card {
-    width: min(520px, 100%); max-height: 42vh; margin: 0; overflow: hidden;
+    width: min(520px, 100%); max-height: 46vh; margin: 0; overflow: hidden;
     border: 1px solid var(--line); border-radius: 24px; background: var(--card);
     box-shadow: 0 12px 38px rgba(0,0,0,.38); display: flex; flex-direction: column;
   }
@@ -314,7 +314,7 @@ const CSS = `
   .chat-folder-preview-avatar .avatar { width: 52px; height: 52px; padding: 0; }
   .chat-folder-preview-name { min-width: 0; font-size: 16px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .chat-folder-preview-number { margin-top: 2px; color: var(--sub); font-size: 12px; }
-  .chat-folder-preview-messages { overflow: auto; padding: 4px 16px 16px; display: flex; flex-direction: column; gap: 6px; }
+  .chat-folder-preview-messages { min-height: 0; flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding: 4px 16px 16px; display: flex; flex-direction: column; gap: 6px; }
   .chat-folder-preview-message { align-self: flex-start; max-width: 88%; padding: 8px 11px; border-radius: 5px 13px 13px 13px; background: color-mix(in srgb, var(--bg) 78%, var(--card)); color: var(--text); font-size: 13px; line-height: 1.35; white-space: pre-wrap; word-break: break-word; }
   .chat-folder-preview-message.outgoing { align-self: flex-end; border-radius: 13px 5px 13px 13px; background: color-mix(in srgb, var(--accent) 18%, var(--card)); }
   .chat-folder-menu-sheet { position: static; width: min(520px, 100%); max-width: none; max-height: min(48vh, 440px); margin: 0 auto; box-sizing: border-box; border-radius: 24px; padding: 8px; }
@@ -4076,15 +4076,57 @@ class SmsGammuPanel extends HTMLElement {
       this.shadowRoot.removeEventListener("pointerdown", onOutside);
     };
     const onOutside = (pointerEvent) => {
-      if (mobile ? pointerEvent.target === host : !menu.contains(pointerEvent.target)) close();
+      if (mobile && pointerEvent.target === host) {
+        pointerEvent.preventDefault();
+        pointerEvent.stopPropagation();
+        close();
+      } else if (!mobile && !menu.contains(pointerEvent.target)) {
+        close();
+      }
     };
     setTimeout(() => this.shadowRoot.addEventListener("pointerdown", onOutside), 0);
     if (mobile) {
+      // The long-press pointer is still held when the sheet is inserted. Keep
+      // both panels inert until that pointer is released, otherwise its
+      // pointerup/click can activate the button under the finger (especially
+      // for chats near the bottom of the list).
+      let menuReady = false;
+      previewMessages?.closest(".chat-folder-preview-card")?.style.setProperty("pointer-events", "none");
+      menu.style.pointerEvents = "none";
+      const armMenu = () => setTimeout(() => {
+        menuReady = true;
+        previewMessages?.closest(".chat-folder-preview-card")?.style.removeProperty("pointer-events");
+        menu.style.pointerEvents = "";
+      }, 80);
+      window.addEventListener("pointerup", armMenu, { once: true, capture: true });
+      window.addEventListener("pointercancel", armMenu, { once: true, capture: true });
+      const dismissFromBackdrop = (pointerEvent) => {
+        if (pointerEvent.target !== host || !menuReady) return;
+        pointerEvent.preventDefault();
+        pointerEvent.stopPropagation();
+        this._suppressNextChatClick = true;
+        clearTimeout(this._suppressNextChatClickTimer);
+        this._suppressNextChatClickTimer = setTimeout(() => { this._suppressNextChatClick = false; }, 700);
+        close();
+      };
+      host.addEventListener("pointerdown", dismissFromBackdrop, { capture: true });
+      host.addEventListener("click", (clickEvent) => {
+        clickEvent.preventDefault();
+        clickEvent.stopPropagation();
+        if (clickEvent.target === host && menuReady) close();
+      }, { capture: true });
+      const preview = host.querySelector(".chat-folder-preview-card");
+      preview?.addEventListener("click", (clickEvent) => {
+        if (!menuReady || clickEvent.target.closest(".chat-folder-menu")) return;
+        clickEvent.preventDefault();
+        clickEvent.stopPropagation();
+        close();
+        this._selectContact(number);
+      });
       this._api(`messages/${encodeURIComponent(number)}`).then((messages) => {
         if (!previewMessages || !previewMessages.isConnected || !Array.isArray(messages)) return;
-        const recent = messages.slice(-4);
-        if (!recent.length) return;
-        previewMessages.innerHTML = recent.map((message) => `<div class="chat-folder-preview-message ${message.type === "sent" || message.direction === "outgoing" ? "outgoing" : ""}">${this._esc(String(message.text || message.body || "").slice(0, 220))}</div>`).join("");
+        if (!messages.length) return;
+        previewMessages.innerHTML = messages.map((message) => `<div class="chat-folder-preview-message ${message.type === "sent" || message.direction === "outgoing" ? "outgoing" : ""}">${this._esc(String(message.text || message.body || message.Text || message.message || "").slice(0, 220))}</div>`).join("");
       }).catch(() => {});
     }
     menu.querySelector("#chat-folder-create")?.addEventListener("click", () => { close(); this._openFolderEditor(null, number); });
