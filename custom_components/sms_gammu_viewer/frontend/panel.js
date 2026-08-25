@@ -150,6 +150,7 @@ const CSS = `
 
   .swipe-wrap { position: relative; overflow: hidden; border-bottom: 0.5px solid var(--line); background: var(--card); }
   @media (max-width: 580px) {
+    .status-bar { padding-bottom: 2px; }
     .swipe-wrap { border-bottom: none; margin-bottom: 6px; }
     .swipe-wrap:last-child { margin-bottom: 0; }
     .swipe-inner { border: 1px solid var(--line); border-radius: 22px; }
@@ -1064,6 +1065,7 @@ const CSS = `
   @media (max-width: 580px) {
     .folder-tabs {
       position: sticky; top: 3px; left: auto; right: auto; z-index: 8; display: block;
+      padding-top: 3px;
     }
     .folder-tab-shell {
       width: auto; margin: 0 12px 7px; padding: 3px; gap: 3px; border: 1px solid var(--line);
