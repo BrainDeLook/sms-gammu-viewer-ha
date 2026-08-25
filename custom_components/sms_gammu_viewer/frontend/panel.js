@@ -1085,10 +1085,10 @@ const CSS = `
     .status-grid { grid-template-columns: 1fr; }
     .fab {
       width: 60px; height: 60px;
-      bottom: calc(28px + var(--safe-area-inset-bottom, 0px)); left: 24px;
+      bottom: calc(16px + var(--safe-area-inset-bottom, 0px)); left: 24px;
     }
     #fab-call-anchor {
-      bottom: calc(28px + var(--safe-area-inset-bottom, 0px)) !important;
+      bottom: calc(16px + var(--safe-area-inset-bottom, 0px)) !important;
       right: 24px !important;
     }
     .fab-call {
