@@ -413,19 +413,17 @@ const CSS = `
     border-bottom: 1px solid var(--line);
     min-height: 58px;
   }
-  .pinned-banner { display:none; padding:0; background:transparent !important; border:0 !important; box-shadow:none !important; }
+  .pinned-banner { display:none; position:absolute; top:58px; left:0; right:0; z-index:8; padding:0; pointer-events:none; background:transparent !important; border:0 !important; box-shadow:none !important; }
   .pinned-banner.visible { display:block; }
   .pinned-banner-shell { display:flex; align-items:center; gap:10px; min-height:40px; padding:6px 16px; background:var(--card); border-bottom:1px solid var(--line); }
-  .pinned-banner button { border:0; background:transparent; color:var(--text); cursor:pointer; min-width:0; }
+  .pinned-banner button { position:relative; z-index:1; border:0; background:transparent; color:var(--text); cursor:pointer; min-width:0; pointer-events:auto; }
   .pinned-banner .pinned-jump { flex:1; overflow:hidden; text-align:left; white-space:nowrap; text-overflow:ellipsis; font-size:13px; }
   .pinned-banner .pinned-jump::before { content:'📌 '; color:var(--accent); }
   .pinned-banner .pinned-list { color:var(--accent); white-space:nowrap; font-size:12px; }
   .chat-header > svg { display:none; }
   .pinned-highlight { outline:2px solid var(--accent); outline-offset:2px; }
   @media (max-width: 580px) {
-    .pinned-banner:not(.visible) { display:none !important; }
-    .pinned-banner.visible { display:contents !important; }
-    .pinned-banner-shell { margin:10px 12px; padding:3px; min-height:38px; border:1px solid var(--line) !important; border-bottom:1px solid var(--line) !important; border-radius:999px !important; overflow:hidden; background:var(--card); box-shadow:0 2px 8px rgba(0,0,0,.18); clip-path:inset(0 round 999px); }
+    .pinned-banner-shell { margin:8px 12px 0; padding:3px; min-height:38px; border:1px solid var(--line) !important; border-radius:999px !important; overflow:hidden; background:var(--card); box-shadow:0 2px 8px rgba(0,0,0,.18); }
     .pinned-banner-shell .pinned-jump { padding:7px 10px; }
     .pinned-banner-shell .pinned-list { padding:7px 10px; }
   }
@@ -3374,7 +3372,7 @@ class SmsGammuPanel extends HTMLElement {
               </svg>
             </button>
           </div>
-          <div class="pinned-banner" id="pinned-banner"><div class="pinned-banner-shell"><button class="pinned-jump" id="pinned-jump"></button><button class="pinned-list" id="pinned-list"></button></div></div>
+          <div class="pinned-banner" id="pinned-banner"><div class="pinned-banner-shell"><button class="pinned-jump" id="pinned-jump"></button><button class="pinned-list" id="pinned-list" aria-label="Все закреплённые"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 4.5v5l-2 2h6l-2-2v-5"/><path d="M9.5 11.5v5"/><path d="M15 7h6M15 11h6M15 15h6"/></svg></button></div></div>
           <div class="messages-area" id="messages-area">
             <div class="empty">
               <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
@@ -3383,6 +3381,7 @@ class SmsGammuPanel extends HTMLElement {
               <p>${this._t("select_dialog_left")}</p>
             </div>
           </div>
+          <button class="scroll-bottom-btn" id="scroll-bottom-btn" title="Вниз"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
           <div class="status-main" id="status-main" style="display:none"></div>
           <div class="send-bar-wrap">
           <div class="send-bar" id="send-bar" style="display:none; flex-wrap:wrap">
@@ -3594,6 +3593,10 @@ class SmsGammuPanel extends HTMLElement {
       this._pinnedCycle = (this._pinnedCycle + 1) % pins.length;
     });
     this.shadowRoot.getElementById("pinned-list")?.addEventListener("click", () => this._showPinnedMessages());
+    this.shadowRoot.getElementById("scroll-bottom-btn")?.addEventListener("click", () => {
+      const area = this.shadowRoot.getElementById("messages-area");
+      area?.scrollTo({ top: area.scrollHeight, behavior: "smooth" });
+    });
 
     this.shadowRoot.getElementById("back-btn").addEventListener("click", () => {
       if (this._activeTab === "status" || this._activeTab === "phonebook") {
@@ -3920,12 +3923,30 @@ class SmsGammuPanel extends HTMLElement {
     }
     host.style.removeProperty("top");
     host.querySelectorAll("[data-folder-id]").forEach((button) => button.addEventListener("click", () => {
+      if (button.dataset.longpress === "1") { button.dataset.longpress = "0"; return; }
       const previous = host.querySelector(".folder-tab.active");
       previous?.classList.remove("active");
       button.classList.add("active");
       this._activeFolderId = button.dataset.folderId;
       this._renderContacts(true);
     }));
+    host.querySelectorAll("[data-folder-id]").forEach((button) => {
+      let timer = null;
+      button.addEventListener("pointerdown", () => {
+        timer = setTimeout(() => {
+          button.dataset.longpress = "1";
+          const id = button.dataset.folderId;
+          const folder = this._chatFolders.find((item) => item.id === id);
+          if (folder) this._openFolderEditor(folder);
+          else if (id === "brands") this._openBrandsEditor();
+          else this._openFolderSettings();
+        }, 550);
+      });
+      const cancel = () => { if (timer) clearTimeout(timer); timer = null; };
+      button.addEventListener("pointerup", cancel);
+      button.addEventListener("pointercancel", cancel);
+      button.addEventListener("pointerleave", cancel);
+    });
     const folderScroller = host.querySelector(".folder-tab-scroll");
     folderScroller?.addEventListener("wheel", (event) => {
       if (!folderScroller || folderScroller.scrollWidth <= folderScroller.clientWidth) return;
@@ -4312,10 +4333,13 @@ class SmsGammuPanel extends HTMLElement {
     const current = folder || { id: `folder-${Date.now()}`, name: "", icon: "", numbers: [] };
     const selected = new Set(current.numbers || []);
     if (preselectedNumber) selected.add(preselectedNumber);
+    const folderTabs = this._folderTabDefinitions();
+    const currentPosition = Math.max(0, folderTabs.findIndex(item => item.id === current.id));
     modal.innerHTML = `<div class="contact-form" style="padding:20px">
       <div class="contact-form-header"><h2>${this._esc(folder ? this._t("edit_folder") : this._t("new_folder"))}</h2></div>
       <label class="folder-edit-field">${this._esc(this._t("folder_name"))}<input id="folder-name" maxlength="80" value="${this._esc(current.name)}" /></label>
       <label class="folder-edit-field">${this._esc(this._t("folder_icon"))}<input id="folder-icon" maxlength="8" placeholder="📁" value="${this._esc(current.icon || "")}" /></label>
+      ${folder ? `<label class="folder-edit-field">Позиция в списке папок<select id="folder-position">${folderTabs.map((item, index) => `<option value="${index}" ${index === currentPosition ? "selected" : ""}>${index + 1}. ${this._esc(item.name)}</option>`).join("")}</select></label>` : ""}
       <div class="folder-editor-list">${this._contacts.map((chat) => `<label class="folder-editor-chat"><input type="checkbox" data-folder-number="${this._esc(chat.number)}" ${selected.has(chat.number) ? "checked" : ""}/><span>${this._esc(chat.contact_name || chat.number)}</span></label>`).join("")}</div>
       <div class="contact-form-actions"><button id="folder-cancel">${this._esc(this._t("cancel"))}</button><button class="primary" id="folder-save">${this._esc(this._t("save"))}</button></div>
     </div>`;
@@ -4331,6 +4355,13 @@ class SmsGammuPanel extends HTMLElement {
       const folders = folder ? this._chatFolders.map((item) => item.id === folder.id ? next : item) : [...this._chatFolders, next];
       await this._api("save_chat_folders", "POST", { folders });
       this._chatFolders = folders;
+      if (folder) {
+        const order = this._folderTabDefinitions().map(item => item.id).filter(id => id !== folder.id);
+        const position = Math.max(0, Math.min(order.length, Number(modal.querySelector("#folder-position")?.value || 0)));
+        order.splice(position, 0, folder.id);
+        this._folderOptions = { ...this._folderOptions, folder_order: order };
+        await this._api("save_chat_folder_options", "POST", this._folderOptions).catch(() => {});
+      }
       this._activeFolderId = next.id;
       close(); this._renderContacts();
     });
@@ -4537,6 +4568,9 @@ class SmsGammuPanel extends HTMLElement {
     overlay.addEventListener("click", e => { if (e.target === overlay) overlay.remove(); });
     sheet.append(head, list); overlay.appendChild(sheet); document.body.appendChild(overlay);
   }
+  .messages-area.has-pinned-banner { padding-top:72px; }
+  .scroll-bottom-btn { display:none; position:absolute; right:20px; bottom:86px; z-index:9; width:44px; height:44px; align-items:center; justify-content:center; border:1px solid var(--line); border-radius:50%; background:color-mix(in srgb, var(--card) 92%, var(--sub)); color:var(--text); box-shadow:0 4px 14px rgba(0,0,0,.28); cursor:pointer; }
+  .scroll-bottom-btn.visible { display:flex; }
 
   _updatePinnedBanner() {
     const area = this.shadowRoot?.getElementById("messages-area");
@@ -4555,7 +4589,15 @@ class SmsGammuPanel extends HTMLElement {
     const jump = this.shadowRoot.getElementById("pinned-jump");
     if (jump) jump.textContent = current?.text || "Закреплённое сообщение";
     const list = this.shadowRoot.getElementById("pinned-list");
-    if (list) list.textContent = `Все закреплённые (${pins.length})`;
+    if (list) { list.title = `Все закреплённые (${pins.length})`; list.setAttribute("aria-label", list.title); }
+  }
+
+  _updateScrollBottomButton() {
+    const area = this.shadowRoot?.getElementById("messages-area");
+    const button = this.shadowRoot?.getElementById("scroll-bottom-btn");
+    if (!area || !button) return;
+    const away = area.scrollHeight - area.scrollTop - area.clientHeight;
+    button.classList.toggle("visible", away > 180);
   }
 
   _renderMessages() {
@@ -4578,6 +4620,9 @@ class SmsGammuPanel extends HTMLElement {
     const sendBar = this.shadowRoot.getElementById("send-bar");
 
     if (!this._activeNumber) {
+      this.shadowRoot.getElementById("pinned-banner")?.classList.remove("visible");
+      this.shadowRoot.getElementById("scroll-bottom-btn")?.classList.remove("visible");
+      area.classList.remove("has-pinned-banner");
       titleEl && (titleEl.textContent = this._t("select_dialog"));
       subEl && (subEl.textContent = "");
       delBtn && (delBtn.style.display = "none");
@@ -4629,8 +4674,9 @@ class SmsGammuPanel extends HTMLElement {
       const list = this.shadowRoot.getElementById("pinned-list");
       const item = pinned[this._pinnedCycle % Math.max(1, pinned.length)];
       if (jump) jump.textContent = item?.text || "Закреплённое сообщение";
-      if (list) list.textContent = `Все закреплённые (${pinned.length})`;
+      if (list) { list.title = `Все закреплённые (${pinned.length})`; list.setAttribute("aria-label", list.title); }
     }
+    area.classList.toggle("has-pinned-banner", pinned.length > 0);
 
     if (this._messages.length === 0) {
       area.innerHTML = `<div class="empty"><p>Нет сообщений</p></div>`;
@@ -4659,10 +4705,10 @@ class SmsGammuPanel extends HTMLElement {
     }
     area.innerHTML = html;
     if (!this._pinnedScrollBound) {
-      area.addEventListener("scroll", () => this._updatePinnedBanner(), { passive: true });
+      area.addEventListener("scroll", () => { this._updatePinnedBanner(); this._updateScrollBottomButton(); }, { passive: true });
       this._pinnedScrollBound = true;
     }
-    requestAnimationFrame(() => this._updatePinnedBanner());
+    requestAnimationFrame(() => { this._updatePinnedBanner(); this._updateScrollBottomButton(); });
 
 
 
