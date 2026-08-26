@@ -4009,6 +4009,7 @@ class SmsGammuPanel extends HTMLElement {
     const reset = () => { tracking = false; switched = false; };
     list.addEventListener("pointerdown", (event) => {
       if (event.pointerType === "mouse" || event.button !== 0) return;
+      if (this._swipeState && [...this._swipeState.values()].some((value) => value !== 0)) return;
       if (event.target.closest?.(".swipe-wrap, .folder-tabs")) return;
       const rect = list.getBoundingClientRect();
       const ratio = (event.clientX - rect.left) / Math.max(1, rect.width);
