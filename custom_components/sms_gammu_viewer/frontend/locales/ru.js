@@ -13,7 +13,7 @@ export default {
   manage_brands_folder: "Настроить папку «Бренды»",
   manage_people_folder: "Настроить папку «Люди»",
   add_to_folder: "Добавить в папку",
-  mark_unread: "Пометить как новое",
+  mark_unread: "Пометить как непрочитанное",
   notifications_on: "Включить уведомления",
   notifications_off: "Выключить уведомления",
   back: "Назад",

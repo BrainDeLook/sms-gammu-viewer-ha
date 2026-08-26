@@ -297,7 +297,7 @@ const CSS = `
     position: fixed; z-index: 1000; min-width: 220px; max-width: min(300px, calc(100vw - 16px));
     max-height: min(420px, calc(100vh - 16px)); overflow: hidden; padding: 8px;
     border: 1px solid var(--line); border-radius: 16px; background: var(--card); color: var(--text);
-    box-shadow: 0 8px 28px rgba(0,0,0,.35);
+    box-shadow: 0 8px 28px rgba(0,0,0,.35); contain: paint; isolation: isolate;
   }
   .chat-folder-menu-title { padding: 6px 8px 8px; font-size: 13px; font-weight: 600; border-bottom: 1px solid var(--line); }
   .chat-folder-menu-row { display: flex; align-items: center; gap: 8px; width: 100%; padding: 9px 8px; border: 0; border-radius: 10px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
@@ -311,6 +311,7 @@ const CSS = `
   .chat-folder-menu-track { display: flex; width: 200%; align-items: flex-start; transform: translateX(0); transition: transform .24s cubic-bezier(.2,.7,.2,1); }
   .chat-folder-menu.folders-open .chat-folder-menu-track { transform: translateX(-50%); }
   .chat-folder-menu.folders-open .chat-folder-menu-main { pointer-events: none; visibility: hidden; }
+  .chat-folder-menu:not(.folders-open) .chat-folder-menu-folders { pointer-events: none; visibility: hidden; }
   .chat-folder-menu-page { flex: 0 0 50%; width: 50%; min-width: 0; box-sizing: border-box; max-height: min(46vh, 420px); overflow-y: auto; overflow-x: hidden; }
   .chat-folder-menu-back { border-bottom: 1px solid var(--line); margin-bottom: 4px; font-weight: 600; }
   .chat-folder-preview-overlay {
