@@ -273,8 +273,9 @@ const CSS = `
     background: transparent; color: var(--sub); padding: 5px 10px;
     font: inherit; font-size: 12px; cursor: pointer; white-space: nowrap;
     user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
-    transition: color .22s ease, background-color .22s ease, border-color .22s ease, box-shadow .22s ease;
+    transition: color .22s ease, background-color .22s ease, border-color .22s ease, box-shadow .22s ease, transform .12s ease;
   }
+  .folder-tab:active, .folder-tab.pressing { transform: scale(.95); background: color-mix(in srgb, var(--accent) 18%, var(--card)); box-shadow: 0 1px 2px rgba(0,0,0,.25) inset; }
   .folder-tab.active { color: var(--accent); border-color: var(--accent); background: rgba(3,169,244,.1); }
   .folder-tab.add { font-size: 17px; line-height: 15px; padding: 4px 9px; }
   .folder-editor-list { max-height: 260px; overflow: auto; margin-top: 12px; border-top: 1px solid var(--border); }
@@ -3956,13 +3957,14 @@ class SmsGammuPanel extends HTMLElement {
         if (event.pointerType === "mouse" && event.button !== 0) return;
         if (button.dataset.folderId === "all") return;
         if (event.pointerType !== "mouse") event.preventDefault();
+        button.classList.add("pressing");
         timer = setTimeout(() => {
           button.dataset.longpress = "1";
           window.getSelection?.()?.removeAllRanges?.();
           openPressedFolder();
         }, 550);
       });
-      const cancel = () => { if (timer) clearTimeout(timer); timer = null; };
+      const cancel = () => { if (timer) clearTimeout(timer); timer = null; button.classList.remove("pressing"); };
       button.addEventListener("pointerup", cancel);
       button.addEventListener("pointercancel", cancel);
       button.addEventListener("pointerleave", cancel);
