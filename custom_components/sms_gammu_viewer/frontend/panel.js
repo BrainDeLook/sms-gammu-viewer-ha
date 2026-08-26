@@ -4182,6 +4182,7 @@ class SmsGammuPanel extends HTMLElement {
     const excluded = new Set(this._folderOptions.brands_excluded || []);
     modal.innerHTML = `<div class="contact-form" style="padding:20px">
       <div class="contact-form-header"><h2>🏷️ ${this._esc(this._t("brands_folder"))}</h2></div>
+      <label class="folder-editor-chat folder-editor-enabled"><input type="checkbox" id="brands-enabled-toggle" ${this._folderOptions.brands_enabled ? "checked" : ""}/> <span>${this._esc(this._t("enable_brands_folder"))}</span></label>
       <p class="form-help">${this._esc(this._t("brands_folder_help"))}</p>
       <div class="folder-editor-list">${this._contacts.map((chat) => { const checked = !excluded.has(chat.number) && (manual.has(chat.number) || this._isBrandChat(chat)); return `<label class="folder-editor-chat"><input type="checkbox" data-brand-number="${this._esc(chat.number)}" ${checked ? "checked" : ""}/><span>${this._esc(chat.contact_name || chat.number)}</span></label>`; }).join("")}</div>
       <div class="contact-form-actions"><button id="brands-cancel">${this._esc(this._t("cancel"))}</button><button class="primary" id="brands-save">${this._esc(this._t("save"))}</button></div>
@@ -4194,6 +4195,7 @@ class SmsGammuPanel extends HTMLElement {
       const selected = new Set([...modal.querySelectorAll("[data-brand-number]:checked")].map((el) => el.dataset.brandNumber));
       const auto = new Set(this._contacts.filter((chat) => this._isBrandChat(chat)).map((chat) => chat.number));
       const options = { ...this._folderOptions,
+        brands_enabled: modal.querySelector("#brands-enabled-toggle")?.checked === true,
         brands_manual: [...selected].filter((number) => !auto.has(number)),
         brands_excluded: [...auto].filter((number) => !selected.has(number)),
       };
@@ -4692,6 +4694,7 @@ class SmsGammuPanel extends HTMLElement {
     const excluded = new Set(this._folderOptions.people_excluded || []);
     modal.innerHTML = `<div class="contact-form" style="padding:20px">
       <div class="contact-form-header"><h2>👤 ${this._esc(this._t("people_folder"))}</h2></div>
+      <label class="folder-editor-chat folder-editor-enabled"><input type="checkbox" id="people-enabled-toggle" ${this._folderOptions.people_enabled ? "checked" : ""}/> <span>${this._esc(this._t("enable_people_folder"))}</span></label>
       <p class="form-help">${this._esc(this._t("people_folder_help"))}</p>
       <div class="folder-editor-list">${this._contacts.map((chat) => { const checked = !excluded.has(chat.number) && (manual.has(chat.number) || this._isInPeopleFolder(chat)); return `<label class="folder-editor-chat"><input type="checkbox" data-people-number="${this._esc(chat.number)}" ${checked ? "checked" : ""}/><span>${this._esc(chat.contact_name || chat.number)}</span></label>`; }).join("")}</div>
       <div class="contact-form-actions"><button id="people-cancel">${this._esc(this._t("cancel"))}</button><button class="primary" id="people-save">${this._esc(this._t("save"))}</button></div>
@@ -4703,6 +4706,7 @@ class SmsGammuPanel extends HTMLElement {
       const selected = new Set([...modal.querySelectorAll("[data-people-number]:checked")].map((el) => el.dataset.peopleNumber));
       const auto = new Set(this._contacts.filter((chat) => !this._isBrandChat(chat)).map((chat) => chat.number));
       const options = { ...this._folderOptions,
+        people_enabled: modal.querySelector("#people-enabled-toggle")?.checked === true,
         people_manual: [...selected].filter((number) => !auto.has(number)),
         people_excluded: [...auto].filter((number) => !selected.has(number)),
       };
