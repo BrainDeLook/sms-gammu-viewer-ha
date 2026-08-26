@@ -489,6 +489,9 @@ const CSS = `
   .messages-area.has-pinned-banner { padding-top:72px; }
   .scroll-bottom-btn { display:none; position:absolute; right:20px; bottom:86px; z-index:9; width:44px; height:44px; align-items:center; justify-content:center; border:1px solid var(--line); border-radius:50%; background:color-mix(in srgb, var(--card) 92%, var(--sub)); color:var(--text); box-shadow:0 4px 14px rgba(0,0,0,.28); cursor:pointer; }
   .scroll-bottom-btn.visible { display:flex; }
+  @media (max-width: 580px) {
+    .scroll-bottom-btn { right:16px; bottom:calc(112px + var(--safe-area-inset-bottom, 0px)); width:40px; height:40px; }
+  }
 
   .msg-ctx-menu {
     position: absolute; z-index: 999;
