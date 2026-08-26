@@ -419,7 +419,11 @@ const CSS = `
   .pinned-banner .pinned-jump { flex:1; overflow:hidden; text-align:left; white-space:nowrap; text-overflow:ellipsis; font-size:13px; }
   .pinned-banner .pinned-jump::before { content:'📌 '; color:var(--accent); }
   .pinned-banner .pinned-list { color:var(--accent); white-space:nowrap; font-size:12px; }
+  .chat-header > svg { display:none; }
   .pinned-highlight { outline:2px solid var(--accent); outline-offset:2px; }
+  @media (max-width: 580px) {
+    .pinned-banner { margin:6px 12px; border:1px solid var(--line); border-radius:24px; padding:8px 14px; min-height:38px; box-shadow:0 2px 8px rgba(0,0,0,.18); }
+  }
   .chat-profile-trigger {
     flex: 1; min-width: 0; cursor: pointer;
   }
@@ -1255,6 +1259,7 @@ class SmsGammuPanel extends HTMLElement {
     this._folderOptions = { show_all: true, people_enabled: false, brands_enabled: false, brands_manual: [], brands_excluded: [], people_manual: [], people_excluded: [], folder_order: [] };
     this._folderScrollLeft = 0;
     this._pinnedCycle = 0;
+    this._pinnedScrollBound = false;
   }
 
   _t(key, ...args) {
@@ -2460,8 +2465,6 @@ class SmsGammuPanel extends HTMLElement {
       if (profileAvatar) profileAvatar.style.display = "none";
       const profileTrigger = this.shadowRoot.getElementById("chat-profile-trigger");
       if (profileTrigger) profileTrigger.style.pointerEvents = "none";
-      const starBtn = this.shadowRoot.getElementById("star-filter-btn");
-      if (starBtn) starBtn.style.display = "none";
       // На мобилке показываем правую область
       root?.classList.add("chat-open");
       if (isStatus) {
@@ -3343,7 +3346,6 @@ class SmsGammuPanel extends HTMLElement {
               <div class="chat-title" id="chat-title">Выберите диалог</div>
               <div class="chat-subtitle" id="chat-subtitle"></div>
             </div>
-            <button class="icon-btn" id="star-filter-btn" title="${this._t('star')}" style="display:none">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
             </button>
             <button class="icon-btn" id="call-contact-btn" title="Позвонить" style="display:none">
@@ -4531,6 +4533,26 @@ class SmsGammuPanel extends HTMLElement {
     sheet.append(head, list); overlay.appendChild(sheet); document.body.appendChild(overlay);
   }
 
+  _updatePinnedBanner() {
+    const area = this.shadowRoot?.getElementById("messages-area");
+    const banner = this.shadowRoot?.getElementById("pinned-banner");
+    if (!area || !banner) return;
+    const pins = this._messages.filter(m => m.is_message_pinned).sort((a, b) => new Date(a.date) - new Date(b.date) || Number(a.id) - Number(b.id));
+    if (!pins.length) { banner.classList.remove("visible"); return; }
+    let index = 0;
+    const top = area.getBoundingClientRect().top + 12;
+    pins.forEach((message, i) => {
+      const bubble = [...area.querySelectorAll(".msg-bubble")].find(el => el.dataset.id === String(message.id));
+      if (bubble && bubble.getBoundingClientRect().top <= top) index = i;
+    });
+    this._pinnedCycle = index;
+    const current = pins[index];
+    const jump = this.shadowRoot.getElementById("pinned-jump");
+    if (jump) jump.textContent = current?.text || "Закреплённое сообщение";
+    const list = this.shadowRoot.getElementById("pinned-list");
+    if (list) list.textContent = `Все закреплённые (${pins.length})`;
+  }
+
   _renderMessages() {
     // Защита от гонки: пока показан оверлей (статус модема/телефонная
     // книга), эта функция не должна трогать шапку/send-bar вообще —
@@ -4631,6 +4653,11 @@ class SmsGammuPanel extends HTMLElement {
         </div>`;
     }
     area.innerHTML = html;
+    if (!this._pinnedScrollBound) {
+      area.addEventListener("scroll", () => this._updatePinnedBanner(), { passive: true });
+      this._pinnedScrollBound = true;
+    }
+    requestAnimationFrame(() => this._updatePinnedBanner());
 
 
 
