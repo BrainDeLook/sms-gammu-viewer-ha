@@ -1678,6 +1678,20 @@ class SmsApiView(HomeAssistantView):
             await self.hass.async_add_executor_job(store.unstar_message, msg_id)
             return self._json({"ok": True})
 
+        if action.startswith("pin_message/"):
+            msg_id = self._parse_int(action[len("pin_message/"):])
+            if msg_id is None:
+                return self._error("Invalid message id", 400)
+            await self.hass.async_add_executor_job(store.pin_message, msg_id)
+            return self._json({"ok": True})
+
+        if action.startswith("unpin_message/"):
+            msg_id = self._parse_int(action[len("unpin_message/"):])
+            if msg_id is None:
+                return self._error("Invalid message id", 400)
+            await self.hass.async_add_executor_job(store.unpin_message, msg_id)
+            return self._json({"ok": True})
+
         if action.startswith("pin/"):
             from urllib.parse import unquote as _uq
             number = _uq(action[len("pin/"):])

@@ -1247,6 +1247,9 @@ class SmsGammuPanel extends HTMLElement {
     this._activeFolderId = "all";
     this._folderOptions = { show_all: true, people_enabled: false, brands_enabled: false, brands_manual: [], brands_excluded: [], people_manual: [], people_excluded: [], folder_order: [] };
     this._folderScrollLeft = 0;
+    this._pinnedViewActive = false;
+    this._pinnedCycle = 0;
+    this._savedChatScrollTop = 0;
   }
 
   _t(key, ...args) {
@@ -1620,6 +1623,9 @@ class SmsGammuPanel extends HTMLElement {
     }
 
     this._activeNumber = number;
+    this._pinnedViewActive = false;
+    this._pinnedCycle = 0;
+    this._savedChatScrollTop = 0;
     this._firstRender = true;
     try { localStorage.setItem("sms_gammu_active_number", number); } catch {}
     this.shadowRoot.querySelector(".root")?.classList.add("chat-open");
@@ -2018,6 +2024,13 @@ class SmsGammuPanel extends HTMLElement {
         (c.last_text || "").toLowerCase().includes(q)
     );
   }
+  .pinned-bar { display:none; align-items:center; gap:8px; padding:6px 12px; border-bottom:1px solid var(--border); background:var(--card); min-height:38px; }
+  .pinned-bar.visible { display:flex; }
+  .pinned-bar button { border:0; background:transparent; color:var(--text); cursor:pointer; text-align:left; min-width:0; }
+  .pinned-bar .pinned-current { flex:1; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:12px; }
+  .pinned-bar .pinned-current::before { content:'📌 '; color:var(--accent); }
+  .pinned-bar .pinned-all { color:var(--accent); white-space:nowrap; font-size:12px; }
+  .pinned-highlight { outline:2px solid var(--accent); outline-offset:2px; }
 
   _isBrandChat(contact) {
     return Boolean(contact?.brand_logo_url || this._brandLogoFor(contact));
@@ -3335,7 +3348,7 @@ class SmsGammuPanel extends HTMLElement {
               <div class="chat-title" id="chat-title">Выберите диалог</div>
               <div class="chat-subtitle" id="chat-subtitle"></div>
             </div>
-            <button class="icon-btn" id="star-filter-btn" title="${this._t('star')}" style="display:none">
+            <button class="icon-btn" id="star-filter-btn" title="Закреплённые сообщения" style="display:none">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
             </button>
             <button class="icon-btn" id="call-contact-btn" title="Позвонить" style="display:none">
@@ -3359,6 +3372,7 @@ class SmsGammuPanel extends HTMLElement {
               </svg>
             </button>
           </div>
+          <div class="pinned-bar" id="pinned-bar"><button class="pinned-current" id="pinned-current"></button><button class="pinned-all" id="pinned-all"></button></div>
           <div class="messages-area" id="messages-area">
             <div class="empty">
               <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
@@ -3559,16 +3573,32 @@ class SmsGammuPanel extends HTMLElement {
 
     this._starFilterActive = false;
     this.shadowRoot.getElementById("star-filter-btn")?.addEventListener("click", () => {
-      this._starFilterActive = !this._starFilterActive;
-      const btn = this.shadowRoot.getElementById("star-filter-btn");
-      if (btn) {
-        btn.style.color = this._starFilterActive ? "var(--accent)" : "";
-        btn.querySelector("svg").setAttribute("fill", this._starFilterActive ? "currentColor" : "none");
-      }
+      const area = this.shadowRoot.getElementById("messages-area");
+      if (!this._pinnedViewActive && area) this._savedChatScrollTop = area.scrollTop;
+      this._pinnedViewActive = !this._pinnedViewActive;
       this._renderMessages();
+    });
+    this.shadowRoot.getElementById("pinned-all")?.addEventListener("click", () => {
+      if (!this._pinnedViewActive) {
+        const area = this.shadowRoot.getElementById("messages-area");
+        if (area) this._savedChatScrollTop = area.scrollTop;
+        this._pinnedViewActive = true;
+        this._renderMessages();
+      }
+    });
+    this.shadowRoot.getElementById("pinned-current")?.addEventListener("click", () => {
+      const pins = this._messages.filter(m => m.is_message_pinned);
+      if (!pins.length) return;
+      this._scrollToMessage(pins[this._pinnedCycle % pins.length].id);
+      this._pinnedCycle = (this._pinnedCycle + 1) % pins.length;
     });
 
     this.shadowRoot.getElementById("back-btn").addEventListener("click", () => {
+      if (this._pinnedViewActive) {
+        this._pinnedViewActive = false;
+        this._renderMessages();
+        return;
+      }
       if (this._activeTab === "status" || this._activeTab === "phonebook") {
         // Закрываем оверлей (модем/телефонная книга) — возврат к списку
         this._activeTab = "chats";
@@ -4386,6 +4416,7 @@ class SmsGammuPanel extends HTMLElement {
       if (!bubble) { console.error("no bubble"); return; }
       const msgId = parseInt(bubble.dataset.id);
       const isStarred = bubble.dataset.starred === "1";
+      const isMessagePinned = bubble.dataset.messagePinned === "1";
       const isOut = bubble.classList.contains("outgoing");
       const text = bubble.querySelector(".msg-text")?.textContent || "";
 
@@ -4399,7 +4430,7 @@ class SmsGammuPanel extends HTMLElement {
       `;
       menu.innerHTML = `
         <div class="msg-ctx-item" data-action="copy" style="display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:14px;color:#fff;cursor:pointer">📋 ${this._t("copy")}</div>
-        <div class="msg-ctx-item" data-action="star" style="display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:14px;color:#fff;cursor:pointer">${isStarred ? "★" : "☆"} ${isStarred ? this._t("unstar") : this._t("star")}</div>
+        <div class="msg-ctx-item" data-action="pin-message" style="display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:14px;color:#fff;cursor:pointer">${isMessagePinned ? "📌" : "📍"} ${isMessagePinned ? "Открепить сообщение" : "Закрепить сообщение"}</div>
         <div class="msg-ctx-item" data-action="delete" style="display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:14px;color:#e53935;cursor:pointer">🗑 ${this._t("delete_msg")}</div>
       `;
 
@@ -4439,6 +4470,12 @@ class SmsGammuPanel extends HTMLElement {
             } catch(err) {
               this._showToast(this._t("copy_failed"));
             }
+          } else if (action === "pin-message") {
+            const ep = isMessagePinned ? `unpin_message/${msgId}` : `pin_message/${msgId}`;
+            await this._api(ep, "POST").catch(() => {});
+            const msg = this._messages.find(m => m.id === msgId);
+            if (msg) msg.is_message_pinned = isMessagePinned ? 0 : 1;
+            this._renderMessages();
           } else if (action === "star") {
             const ep = isStarred ? `unstar/${msgId}` : `star/${msgId}`;
             await this._api(ep, "POST").catch(() => {});
@@ -4476,6 +4513,13 @@ class SmsGammuPanel extends HTMLElement {
   }
 
 
+  _scrollToMessage(id) {
+    const bubble = this.shadowRoot?.querySelector(`.msg-bubble[data-id="${CSS.escape(String(id))}"]`);
+    bubble?.scrollIntoView({ behavior: "smooth", block: "center" });
+    bubble?.classList.add("pinned-highlight");
+    setTimeout(() => bubble?.classList.remove("pinned-highlight"), 1200);
+  }
+
   _renderMessages() {
     // Защита от гонки: пока показан оверлей (статус модема/телефонная
     // книга), эта функция не должна трогать шапку/send-bar вообще —
@@ -4491,6 +4535,7 @@ class SmsGammuPanel extends HTMLElement {
     const muteBtn = this.shadowRoot.getElementById("mute-contact-btn");
     const callBtn = this.shadowRoot.getElementById("call-contact-btn");
     const profileAvatar = this.shadowRoot.getElementById("chat-profile-avatar");
+    const pinnedBar = this.shadowRoot.getElementById("pinned-bar");
     if (!area) return;
 
     const sendBar = this.shadowRoot.getElementById("send-bar");
@@ -4540,6 +4585,21 @@ class SmsGammuPanel extends HTMLElement {
     const starFilterBtn = this.shadowRoot.getElementById("star-filter-btn");
     if (starFilterBtn) starFilterBtn.style.display = "";
 
+    const pinned = this._messages.filter(m => m.is_message_pinned);
+    if (pinnedBar) {
+      pinnedBar.classList.toggle("visible", pinned.length > 0 && !this._pinnedViewActive);
+      const current = this.shadowRoot.getElementById("pinned-current");
+      const all = this.shadowRoot.getElementById("pinned-all");
+      const item = pinned[this._pinnedCycle % Math.max(1, pinned.length)];
+      if (current) current.textContent = item ? (item.text || "Закреплённое сообщение") : "";
+      if (all) all.textContent = pinned.length > 1 ? `Все закреплённые (${pinned.length})` : "Закреплённые";
+    }
+    if (this._pinnedViewActive) {
+      titleEl && (titleEl.textContent = `Закреплённые сообщения (${pinned.length})`);
+      subEl && (subEl.textContent = "");
+      if (pinnedBar) pinnedBar.classList.remove("visible");
+    }
+
     if (this._messages.length === 0) {
       area.innerHTML = `<div class="empty"><p>Нет сообщений</p></div>`;
       return;
@@ -4547,7 +4607,7 @@ class SmsGammuPanel extends HTMLElement {
 
     let html = "";
     let lastLabel = "";
-    const _msgs = this._starFilterActive ? this._messages.filter(m => m.is_starred) : this._messages;
+    const _msgs = this._pinnedViewActive ? pinned : this._messages;
     for (const m of _msgs) {
       const label = this._fmtDateLabel(m.date);
       if (label !== lastLabel) {
@@ -4556,11 +4616,11 @@ class SmsGammuPanel extends HTMLElement {
       }
       const isOut = m.direction === "out";
       html += `
-        <div class="msg-bubble ${isOut ? "outgoing" : (!m.is_read ? "unread" : "")}" data-id="${m.id}" data-starred="${m.is_starred ? '1' : '0'}">
+        <div class="msg-bubble ${isOut ? "outgoing" : (!m.is_read ? "unread" : "")}" data-id="${m.id}" data-starred="${m.is_starred ? '1' : '0'}" data-message-pinned="${m.is_message_pinned ? '1' : '0'}">
           <div class="msg-text">${this._esc(m.text)}</div>
           <div class="msg-meta">
             ${!isOut && !m.is_read ? '<span class="msg-unread-dot"></span>' : ""}
-            ${m.is_starred ? '<span style="font-size:11px;margin-right:2px">⭐</span>' : ''}<span class="msg-date">${this._formatFull(m.date)}</span>
+            ${m.is_message_pinned ? '<span style="font-size:11px;margin-right:2px">📌</span>' : ''}<span class="msg-date">${this._formatFull(m.date)}</span>
             ${isOut ? '<span style="font-size:11px;color:rgba(255,255,255,.7)">✓</span>' : ""}
           </div>
         </div>`;
@@ -4609,7 +4669,13 @@ class SmsGammuPanel extends HTMLElement {
 
     // Скроллим вниз при первом открытии чата или если пользователь уже внизу
     const isAtBottom = area.scrollHeight - area.scrollTop - area.clientHeight < 80;
-    if (this._firstRender || isAtBottom) {
+    if (this._pinnedViewActive) {
+      area.scrollTop = area.scrollHeight;
+    } else if (this._savedChatScrollTop > 0) {
+      const restore = this._savedChatScrollTop;
+      this._savedChatScrollTop = 0;
+      requestAnimationFrame(() => { area.scrollTop = Math.min(restore, area.scrollHeight); });
+    } else if (this._firstRender || isAtBottom) {
       area.scrollTop = area.scrollHeight;
       this._firstRender = false;
     }

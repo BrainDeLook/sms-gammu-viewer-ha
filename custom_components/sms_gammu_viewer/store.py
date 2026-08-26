@@ -104,6 +104,10 @@ class SmsStore:
             # падали с "no such table", если вызывались раньше первого чтения
             conn.execute("CREATE TABLE IF NOT EXISTS pinned_numbers (number TEXT PRIMARY KEY)")
             conn.execute("CREATE TABLE IF NOT EXISTS starred_messages (msg_id INTEGER PRIMARY KEY)")
+            conn.execute("CREATE TABLE IF NOT EXISTS pinned_messages (msg_id INTEGER PRIMARY KEY)")
+            # Старые «избранные» сообщения сохраняем как закреплённые при переходе
+            # на новую модель, чтобы пользователь не потерял отметки.
+            conn.execute("INSERT OR IGNORE INTO pinned_messages (msg_id) SELECT msg_id FROM starred_messages")
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS brand_logo_overrides (
                     number     TEXT PRIMARY KEY,
@@ -361,10 +365,19 @@ class SmsStore:
     def get_messages_with_starred(self, number: str):
         with self._conn() as conn:
             rows = conn.execute("""
-                SELECT m.*, EXISTS(SELECT 1 FROM starred_messages s WHERE s.msg_id = m.id) as is_starred
+                SELECT m.*, EXISTS(SELECT 1 FROM starred_messages s WHERE s.msg_id = m.id) as is_starred,
+                    EXISTS(SELECT 1 FROM pinned_messages p WHERE p.msg_id = m.id) as is_message_pinned
                 FROM messages m WHERE m.number=? ORDER BY date ASC, id ASC
             """, (number,)).fetchall()
         return [dict(r) for r in rows]
+
+    def pin_message(self, msg_id: int) -> None:
+        with self._conn() as conn:
+            conn.execute("INSERT OR IGNORE INTO pinned_messages (msg_id) VALUES (?)", (msg_id,))
+
+    def unpin_message(self, msg_id: int) -> None:
+        with self._conn() as conn:
+            conn.execute("DELETE FROM pinned_messages WHERE msg_id=?", (msg_id,))
 
     def get_message_count(self) -> int:
         with self._conn() as conn:

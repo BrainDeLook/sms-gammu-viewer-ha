@@ -60,6 +60,17 @@ class StoreContainsTests(unittest.TestCase):
             self.assertEqual([latest], unread)
             self.assertNotEqual(first, latest)
 
+    def test_message_pins_are_persisted_and_exposed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = SmsStore(Path(directory) / "sms.db")
+            store.init()
+            message_id = store.add("Sender", "keep this", "2026-08-16T12:00:00")
+            store.pin_message(message_id)
+            messages = store.get_messages_with_starred("Sender")
+            self.assertTrue(messages[0]["is_message_pinned"])
+            store.unpin_message(message_id)
+            self.assertFalse(store.get_messages_with_starred("Sender")[0]["is_message_pinned"])
+
 
 class ContactProfileTests(unittest.TestCase):
     def test_brand_logo_override_is_persistent_and_clearable(self) -> None:
