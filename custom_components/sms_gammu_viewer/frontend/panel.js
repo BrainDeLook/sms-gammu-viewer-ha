@@ -167,7 +167,8 @@ const CSS = `
   .swipe-wrap:last-child { border-bottom: none; }
   .swipe-actions-left { position: absolute; left: 0; top: 0; bottom: 0; width: 160px; display: flex; align-items: center; gap: 8px; padding: 0 10px; box-sizing: border-box; background: var(--card); z-index: 1; opacity: 0; }
   .swipe-actions-right { position: absolute; right: 0; top: 0; bottom: 0; width: 160px; display: flex; align-items: center; gap: 8px; padding: 0 10px; box-sizing: border-box; background: var(--card); z-index: 1;  opacity: 0; }
-  .swipe-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 8px 4px; font-size: 11px; font-weight: 500; color: #fff; border: none; border-radius: 12px; cursor: pointer; }
+  .swipe-btn { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 8px 4px; font-size: 11px; font-weight: 500; color: #fff; border: none; border-radius: 12px; cursor: pointer; }
+  .swipe-btn span { min-width: 0; max-width: 100%; text-align: center; overflow-wrap: anywhere; }
   .swipe-btn.read { background: #378ADD; }
   .swipe-btn.pin { background: #1D9E75; }
   .swipe-btn.mute { background: #888780; }
@@ -3729,7 +3730,7 @@ class SmsGammuPanel extends HTMLElement {
     list.innerHTML = items.map((c) => `
       <div class="swipe-wrap" data-number="${this._esc(c.number)}">
         <div class="swipe-actions-left">
-          <button class="swipe-btn read" data-action="read" data-number="${this._esc(c.number)}">${svgCheck}<span>${this._t(c.unread > 0 ? "mark_read" : "mark_unread")}</span></button>
+          <button class="swipe-btn read" data-action="read" data-number="${this._esc(c.number)}">${svgCheck}<span>${this._t(c.unread > 0 ? "mark_read_short" : "mark_unread_short")}</span></button>
           <button class="swipe-btn pin" data-action="pin" data-number="${this._esc(c.number)}" data-pinned="${c.is_pinned ? '1' : '0'}">${svgPin}<span>${c.is_pinned ? this._t("unpin") : this._t("pin")}</span></button>
         </div>
         <div class="swipe-actions-right">

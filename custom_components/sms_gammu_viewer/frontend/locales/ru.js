@@ -14,6 +14,8 @@ export default {
   manage_people_folder: "Настроить папку «Люди»",
   add_to_folder: "Добавить в папку",
   mark_unread: "Пометить как непрочитанное",
+  mark_read_short: "Прочитано",
+  mark_unread_short: "Непрочитано",
   notifications_on: "Включить уведомления",
   notifications_off: "Выключить уведомления",
   back: "Назад",
