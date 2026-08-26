@@ -423,8 +423,9 @@ const CSS = `
   .chat-header > svg { display:none; }
   .pinned-highlight { outline:2px solid var(--accent); outline-offset:2px; }
   @media (max-width: 580px) {
-    .pinned-banner { margin:0; padding:3px 0 7px; background:transparent !important; }
-    .pinned-banner-shell { margin:0 12px; padding:3px; min-height:38px; border:1px solid var(--line); border-radius:999px; overflow:hidden; background:var(--card); box-shadow:0 2px 8px rgba(0,0,0,.18); }
+    .pinned-banner:not(.visible) { display:none !important; }
+    .pinned-banner.visible { display:contents !important; }
+    .pinned-banner-shell { margin:10px 12px; padding:3px; min-height:38px; border:1px solid var(--line) !important; border-bottom:1px solid var(--line) !important; border-radius:999px !important; overflow:hidden; background:var(--card); box-shadow:0 2px 8px rgba(0,0,0,.18); clip-path:inset(0 round 999px); }
     .pinned-banner-shell .pinned-jump { padding:7px 10px; }
     .pinned-banner-shell .pinned-list { padding:7px 10px; }
   }
