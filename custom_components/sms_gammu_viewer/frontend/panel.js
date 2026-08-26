@@ -4010,7 +4010,7 @@ class SmsGammuPanel extends HTMLElement {
     list.addEventListener("pointerdown", (event) => {
       if (event.pointerType === "mouse" || event.button !== 0) return;
       if (this._swipeState && [...this._swipeState.values()].some((value) => value !== 0)) return;
-      if (event.target.closest?.(".swipe-wrap, .folder-tabs")) return;
+      if (event.target.closest?.(".folder-tabs")) return;
       const rect = list.getBoundingClientRect();
       const ratio = (event.clientX - rect.left) / Math.max(1, rect.width);
       // Reserve the outer quarters for native chat swipe actions.
