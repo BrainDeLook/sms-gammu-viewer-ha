@@ -272,6 +272,7 @@ const CSS = `
     flex: 0 0 auto; border: 1px solid var(--border); border-radius: 16px;
     background: transparent; color: var(--sub); padding: 5px 10px;
     font: inherit; font-size: 12px; cursor: pointer; white-space: nowrap;
+    user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
     transition: color .22s ease, background-color .22s ease, border-color .22s ease, box-shadow .22s ease;
   }
   .folder-tab.active { color: var(--accent); border-color: var(--accent); background: rgba(3,169,244,.1); }
@@ -294,7 +295,7 @@ const CSS = `
   .contact-form > button:hover, .contact-form-actions button:hover, .folder-settings-row button:hover { background: color-mix(in srgb, var(--accent) 22%, transparent); }
   .chat-folder-menu {
     position: fixed; z-index: 1000; min-width: 220px; max-width: min(300px, calc(100vw - 16px));
-    max-height: min(420px, calc(100vh - 16px)); overflow: auto; padding: 8px;
+    max-height: min(420px, calc(100vh - 16px)); overflow: hidden; padding: 8px;
     border: 1px solid var(--line); border-radius: 16px; background: var(--card); color: var(--text);
     box-shadow: 0 8px 28px rgba(0,0,0,.35);
   }
@@ -310,7 +311,7 @@ const CSS = `
   .chat-folder-menu-track { display: flex; width: 200%; align-items: flex-start; transform: translateX(0); transition: transform .24s cubic-bezier(.2,.7,.2,1); }
   .chat-folder-menu.folders-open .chat-folder-menu-track { transform: translateX(-50%); }
   .chat-folder-menu.folders-open .chat-folder-menu-main { pointer-events: none; visibility: hidden; }
-  .chat-folder-menu-page { flex: 0 0 50%; width: 50%; min-width: 0; box-sizing: border-box; max-height: min(46vh, 420px); overflow-y: auto; }
+  .chat-folder-menu-page { flex: 0 0 50%; width: 50%; min-width: 0; box-sizing: border-box; max-height: min(46vh, 420px); overflow-y: auto; overflow-x: hidden; }
   .chat-folder-menu-back { border-bottom: 1px solid var(--line); margin-bottom: 4px; font-weight: 600; }
   .chat-folder-preview-overlay {
     position: fixed; inset: 0; z-index: 1000; display: flex; flex-direction: column;
@@ -490,7 +491,7 @@ const CSS = `
   .scroll-bottom-btn { display:none; position:absolute; right:20px; bottom:86px; z-index:9; width:44px; height:44px; align-items:center; justify-content:center; border:1px solid var(--line); border-radius:50%; background:color-mix(in srgb, var(--card) 92%, var(--sub)); color:var(--text); box-shadow:0 4px 14px rgba(0,0,0,.28); cursor:pointer; }
   .scroll-bottom-btn.visible { display:flex; }
   @media (max-width: 580px) {
-    .scroll-bottom-btn { right:16px; bottom:calc(112px + var(--safe-area-inset-bottom, 0px)); width:40px; height:40px; }
+    .scroll-bottom-btn { right:16px; bottom:calc(136px + var(--safe-area-inset-bottom, 0px)); width:40px; height:40px; }
   }
 
   .msg-ctx-menu {
@@ -3725,7 +3726,7 @@ class SmsGammuPanel extends HTMLElement {
     list.innerHTML = items.map((c) => `
       <div class="swipe-wrap" data-number="${this._esc(c.number)}">
         <div class="swipe-actions-left">
-          <button class="swipe-btn read" data-action="read" data-number="${this._esc(c.number)}">${svgCheck}<span>${this._t("mark_read")}</span></button>
+          <button class="swipe-btn read" data-action="read" data-number="${this._esc(c.number)}">${svgCheck}<span>${this._t(c.unread > 0 ? "mark_read" : "mark_unread")}</span></button>
           <button class="swipe-btn pin" data-action="pin" data-number="${this._esc(c.number)}" data-pinned="${c.is_pinned ? '1' : '0'}">${svgPin}<span>${c.is_pinned ? this._t("unpin") : this._t("pin")}</span></button>
         </div>
         <div class="swipe-actions-right">
@@ -3874,10 +3875,12 @@ class SmsGammuPanel extends HTMLElement {
         const wrap = btn.closest(".swipe-wrap");
         if (wrap) this._swipeClose(wrap);
         if (action === "read") {
-          await this._api(`mark_read/${encodeURIComponent(number)}`, "POST").catch(() => {});
+          const contact = this._contacts.find(x => x.number === number);
+          const shouldMarkRead = Number(contact?.unread || 0) > 0;
+          await this._api(`${shouldMarkRead ? "mark_read" : "mark_unread"}/${encodeURIComponent(number)}`, "POST").catch(() => {});
           // Обновляем локально
-          const c = this._contacts.find(x => x.number === number);
-          if (c) c.unread = 0;
+          const c = contact;
+          if (c) c.unread = shouldMarkRead ? 0 : Math.max(1, c.unread || 0);
           this._renderContacts();
         } else if (action === "mute") {
           const c = this._contacts.find(x => x.number === number);
@@ -3938,20 +3941,34 @@ class SmsGammuPanel extends HTMLElement {
     }));
     host.querySelectorAll("[data-folder-id]").forEach((button) => {
       let timer = null;
-      button.addEventListener("pointerdown", () => {
+      const openPressedFolder = () => {
+        const id = button.dataset.folderId;
+        // "Все чаты" is a view, not an editable folder.
+        if (id === "all") return;
+        const folder = this._chatFolders.find((item) => item.id === id);
+        if (folder) this._openFolderEditor(folder);
+        else if (id === "brands") this._openBrandsEditor();
+        else this._openFolderSettings();
+      };
+      button.addEventListener("pointerdown", (event) => {
+        if (event.pointerType === "mouse" && event.button !== 0) return;
+        if (button.dataset.folderId === "all") return;
+        if (event.pointerType !== "mouse") event.preventDefault();
         timer = setTimeout(() => {
           button.dataset.longpress = "1";
-          const id = button.dataset.folderId;
-          const folder = this._chatFolders.find((item) => item.id === id);
-          if (folder) this._openFolderEditor(folder);
-          else if (id === "brands") this._openBrandsEditor();
-          else this._openFolderSettings();
+          window.getSelection?.()?.removeAllRanges?.();
+          openPressedFolder();
         }, 550);
       });
       const cancel = () => { if (timer) clearTimeout(timer); timer = null; };
       button.addEventListener("pointerup", cancel);
       button.addEventListener("pointercancel", cancel);
       button.addEventListener("pointerleave", cancel);
+      button.addEventListener("contextmenu", (event) => {
+        event.preventDefault();
+        cancel();
+        openPressedFolder();
+      });
     });
     const folderScroller = host.querySelector(".folder-tab-scroll");
     folderScroller?.addEventListener("wheel", (event) => {
@@ -4126,7 +4143,7 @@ class SmsGammuPanel extends HTMLElement {
     menu.innerHTML = `<div class="chat-folder-menu-track">
       <div class="chat-folder-menu-page chat-folder-menu-main">
         <button class="chat-folder-menu-row" id="chat-action-folders"><span class="chat-folder-menu-icon">📁</span><span>${this._esc(this._t("add_to_folder"))}</span><span class="chat-folder-menu-chevron">›</span></button>
-        <button class="chat-folder-menu-row" id="chat-action-unread"><span class="chat-folder-menu-icon">☑</span><span>${this._esc(this._t("mark_unread"))}</span></button>
+        <button class="chat-folder-menu-row" id="chat-action-unread"><span class="chat-folder-menu-icon">${contact.unread > 0 ? "☑" : "☐"}</span><span>${this._esc(this._t(contact.unread > 0 ? "mark_read" : "mark_unread"))}</span></button>
         <button class="chat-folder-menu-row" id="chat-action-pin"><span class="chat-folder-menu-icon">📌</span><span>${this._esc(pinLabel)}</span></button>
         <button class="chat-folder-menu-row" id="chat-action-mute"><span class="chat-folder-menu-icon">${contact.is_muted ? "🔔" : "🔕"}</span><span>${this._esc(muteLabel)}</span></button>
         <button class="chat-folder-menu-row danger" id="chat-action-delete"><span class="chat-folder-menu-icon">🗑</span><span>${this._esc(this._t("delete_msg"))}</span></button>
@@ -4265,9 +4282,10 @@ class SmsGammuPanel extends HTMLElement {
     menu.querySelector("#chat-folder-back")?.addEventListener("click", () => menu.classList.remove("folders-open"));
     menu.querySelector("#chat-action-unread")?.addEventListener("click", async () => {
       close();
-      await this._api(`mark_unread/${encodeURIComponent(number)}`, "POST").catch(() => {});
+      const shouldMarkRead = Number(contact.unread || 0) > 0;
+      await this._api(`${shouldMarkRead ? "mark_read" : "mark_unread"}/${encodeURIComponent(number)}`, "POST").catch(() => {});
       const item = this._contacts.find((entry) => entry.number === number);
-      if (item) item.unread = Math.max(1, item.unread || 0);
+      if (item) item.unread = shouldMarkRead ? 0 : Math.max(1, item.unread || 0);
       this._updateBadge();
       this._renderContacts();
     });
