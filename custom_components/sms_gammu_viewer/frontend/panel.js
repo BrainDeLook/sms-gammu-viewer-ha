@@ -413,6 +413,13 @@ const CSS = `
     border-bottom: 1px solid var(--line);
     min-height: 58px;
   }
+  .pinned-banner { display:none; align-items:center; gap:10px; min-height:40px; padding:6px 16px; background:var(--card); border-bottom:1px solid var(--line); }
+  .pinned-banner.visible { display:flex; }
+  .pinned-banner button { border:0; background:transparent; color:var(--text); cursor:pointer; min-width:0; }
+  .pinned-banner .pinned-jump { flex:1; overflow:hidden; text-align:left; white-space:nowrap; text-overflow:ellipsis; font-size:13px; }
+  .pinned-banner .pinned-jump::before { content:'📌 '; color:var(--accent); }
+  .pinned-banner .pinned-list { color:var(--accent); white-space:nowrap; font-size:12px; }
+  .pinned-highlight { outline:2px solid var(--accent); outline-offset:2px; }
   .chat-profile-trigger {
     flex: 1; min-width: 0; cursor: pointer;
   }
@@ -1247,6 +1254,7 @@ class SmsGammuPanel extends HTMLElement {
     this._activeFolderId = "all";
     this._folderOptions = { show_all: true, people_enabled: false, brands_enabled: false, brands_manual: [], brands_excluded: [], people_manual: [], people_excluded: [], folder_order: [] };
     this._folderScrollLeft = 0;
+    this._pinnedCycle = 0;
   }
 
   _t(key, ...args) {
@@ -3359,6 +3367,7 @@ class SmsGammuPanel extends HTMLElement {
               </svg>
             </button>
           </div>
+          <div class="pinned-banner" id="pinned-banner"><button class="pinned-jump" id="pinned-jump"></button><button class="pinned-list" id="pinned-list"></button></div>
           <div class="messages-area" id="messages-area">
             <div class="empty">
               <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
@@ -3567,6 +3576,17 @@ class SmsGammuPanel extends HTMLElement {
       }
       this._renderMessages();
     });
+    this.shadowRoot.getElementById("pinned-jump")?.addEventListener("click", () => {
+      const pins = this._messages.filter(m => m.is_message_pinned);
+      if (!pins.length) return;
+      const target = pins[this._pinnedCycle % pins.length];
+      const bubble = [...this.shadowRoot.querySelectorAll(".msg-bubble")].find(el => el.dataset.id === String(target.id));
+      bubble?.scrollIntoView({ behavior: "smooth", block: "center" });
+      bubble?.classList.add("pinned-highlight");
+      setTimeout(() => bubble?.classList.remove("pinned-highlight"), 1000);
+      this._pinnedCycle = (this._pinnedCycle + 1) % pins.length;
+    });
+    this.shadowRoot.getElementById("pinned-list")?.addEventListener("click", () => this._showPinnedMessages());
 
     this.shadowRoot.getElementById("back-btn").addEventListener("click", () => {
       if (this._activeTab === "status" || this._activeTab === "phonebook") {
@@ -4386,6 +4406,7 @@ class SmsGammuPanel extends HTMLElement {
       if (!bubble) { console.error("no bubble"); return; }
       const msgId = parseInt(bubble.dataset.id);
       const isStarred = bubble.dataset.starred === "1";
+      const isMessagePinned = bubble.dataset.messagePinned === "1";
       const isOut = bubble.classList.contains("outgoing");
       const text = bubble.querySelector(".msg-text")?.textContent || "";
 
@@ -4399,7 +4420,7 @@ class SmsGammuPanel extends HTMLElement {
       `;
       menu.innerHTML = `
         <div class="msg-ctx-item" data-action="copy" style="display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:14px;color:#fff;cursor:pointer">📋 ${this._t("copy")}</div>
-        <div class="msg-ctx-item" data-action="star" style="display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:14px;color:#fff;cursor:pointer">${isStarred ? "★" : "☆"} ${isStarred ? this._t("unstar") : this._t("star")}</div>
+        <div class="msg-ctx-item" data-action="pin-message" style="display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:14px;color:#fff;cursor:pointer">${isMessagePinned ? "📌 Открепить сообщение" : "📍 Закрепить сообщение"}</div>
         <div class="msg-ctx-item" data-action="delete" style="display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:14px;color:#e53935;cursor:pointer">🗑 ${this._t("delete_msg")}</div>
       `;
 
@@ -4439,6 +4460,11 @@ class SmsGammuPanel extends HTMLElement {
             } catch(err) {
               this._showToast(this._t("copy_failed"));
             }
+          } else if (action === "pin-message") {
+            await this._api(`${isMessagePinned ? "unpin_message" : "pin_message"}/${msgId}`, "POST").catch(() => {});
+            const msg = this._messages.find(m => m.id === msgId);
+            if (msg) msg.is_message_pinned = isMessagePinned ? 0 : 1;
+            this._renderMessages();
           } else if (action === "star") {
             const ep = isStarred ? `unstar/${msgId}` : `star/${msgId}`;
             await this._api(ep, "POST").catch(() => {});
@@ -4475,6 +4501,35 @@ class SmsGammuPanel extends HTMLElement {
     }
   }
 
+
+  _showPinnedMessages() {
+    document.querySelector(".pinned-dialog")?.remove();
+    const pins = this._messages.filter(m => m.is_message_pinned);
+    if (!pins.length) return;
+    const overlay = document.createElement("div");
+    overlay.className = "pinned-dialog";
+    overlay.style.cssText = "position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.62);display:flex;align-items:center;justify-content:center;padding:18px";
+    const sheet = document.createElement("div");
+    sheet.style.cssText = "width:min(720px,100%);max-height:min(85vh,760px);display:flex;flex-direction:column;background:var(--card,#202020);color:var(--text,#fff);border:1px solid var(--line,#444);border-radius:16px;overflow:hidden;box-shadow:0 16px 50px rgba(0,0,0,.5)";
+    const head = document.createElement("div");
+    head.style.cssText = "display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--line,#444);font-weight:600";
+    head.innerHTML = `<span>📌 Закреплено ${pins.length}</span><button style="border:0;background:none;color:inherit;font-size:24px;cursor:pointer">×</button>`;
+    const list = document.createElement("div");
+    list.style.cssText = "overflow:auto;padding:12px;display:flex;flex-direction:column;gap:8px";
+    let last = "";
+    for (const m of pins) {
+      const day = this._fmtDateLabel(m.date);
+      if (day !== last) { const d = document.createElement("div"); d.textContent = day; d.style.cssText = "text-align:center;color:var(--sub);font-size:12px;margin:8px"; list.appendChild(d); last = day; }
+      const item = document.createElement("button");
+      item.textContent = m.text || "";
+      item.style.cssText = `text-align:left;border:0;border-radius:12px;padding:10px 12px;background:${m.direction === "out" ? "var(--accent)" : "var(--bg,#151515)"};color:var(--text,#fff);cursor:pointer;white-space:pre-wrap`;
+      item.addEventListener("click", () => { overlay.remove(); const bubble = [...this.shadowRoot.querySelectorAll(".msg-bubble")].find(el => el.dataset.id === String(m.id)); bubble?.scrollIntoView({behavior:"smooth",block:"center"}); });
+      list.appendChild(item);
+    }
+    head.querySelector("button").addEventListener("click", () => overlay.remove());
+    overlay.addEventListener("click", e => { if (e.target === overlay) overlay.remove(); });
+    sheet.append(head, list); overlay.appendChild(sheet); document.body.appendChild(overlay);
+  }
 
   _renderMessages() {
     // Защита от гонки: пока показан оверлей (статус модема/телефонная
@@ -4539,6 +4594,16 @@ class SmsGammuPanel extends HTMLElement {
     }
     const starFilterBtn = this.shadowRoot.getElementById("star-filter-btn");
     if (starFilterBtn) starFilterBtn.style.display = "";
+    const pinned = this._messages.filter(m => m.is_message_pinned);
+    const pinnedBanner = this.shadowRoot.getElementById("pinned-banner");
+    if (pinnedBanner) {
+      pinnedBanner.classList.toggle("visible", pinned.length > 0);
+      const jump = this.shadowRoot.getElementById("pinned-jump");
+      const list = this.shadowRoot.getElementById("pinned-list");
+      const item = pinned[this._pinnedCycle % Math.max(1, pinned.length)];
+      if (jump) jump.textContent = item?.text || "Закреплённое сообщение";
+      if (list) list.textContent = `Все закреплённые (${pinned.length})`;
+    }
 
     if (this._messages.length === 0) {
       area.innerHTML = `<div class="empty"><p>Нет сообщений</p></div>`;
@@ -4556,11 +4621,11 @@ class SmsGammuPanel extends HTMLElement {
       }
       const isOut = m.direction === "out";
       html += `
-        <div class="msg-bubble ${isOut ? "outgoing" : (!m.is_read ? "unread" : "")}" data-id="${m.id}" data-starred="${m.is_starred ? '1' : '0'}">
+        <div class="msg-bubble ${isOut ? "outgoing" : (!m.is_read ? "unread" : "")}" data-id="${m.id}" data-starred="${m.is_starred ? '1' : '0'}" data-message-pinned="${m.is_message_pinned ? '1' : '0'}">
           <div class="msg-text">${this._esc(m.text)}</div>
           <div class="msg-meta">
             ${!isOut && !m.is_read ? '<span class="msg-unread-dot"></span>' : ""}
-            ${m.is_starred ? '<span style="font-size:11px;margin-right:2px">⭐</span>' : ''}<span class="msg-date">${this._formatFull(m.date)}</span>
+            ${m.is_message_pinned ? '<span style="font-size:11px;margin-right:2px">📌</span>' : ''}${m.is_starred ? '<span style="font-size:11px;margin-right:2px">⭐</span>' : ''}<span class="msg-date">${this._formatFull(m.date)}</span>
             ${isOut ? '<span style="font-size:11px;color:rgba(255,255,255,.7)">✓</span>' : ""}
           </div>
         </div>`;
