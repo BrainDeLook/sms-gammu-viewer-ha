@@ -1324,6 +1324,51 @@ class SmsApiView(HomeAssistantView):
             data = await self.hass.async_add_executor_job(store.get_contacts)
             return self._json(data)
 
+        if action == "chat_folders":
+            data = await self.hass.async_add_executor_job(store.get_chat_folders)
+            return self._json(data)
+
+        if action == "chat_folder_options":
+            data = await self.hass.async_add_executor_job(store.get_chat_folder_options)
+            return self._json(data)
+
+        if action == "save_chat_folders":
+            try:
+                body = await request.json()
+            except Exception:
+                return self._error("Invalid JSON", 400)
+            folders = body.get("folders") if isinstance(body, dict) else None
+            if not isinstance(folders, list) or len(folders) > 100:
+                return self._error("Invalid folders", 400)
+            normalized = []
+            for folder in folders:
+                if not isinstance(folder, dict):
+                    return self._error("Invalid folder", 400)
+                folder_id = str(folder.get("id") or "").strip()
+                name = str(folder.get("name") or "").strip()
+                icon = str(folder.get("icon") or "").strip()
+                numbers = folder.get("numbers") or []
+                if (
+                    not folder_id or len(folder_id) > 64
+                    or not name or len(name) > 80
+                    or len(icon) > 8
+                    or not isinstance(numbers, list) or len(numbers) > 1000
+                ):
+                    return self._error("Invalid folder fields", 400)
+                clean_numbers = []
+                for number in numbers:
+                    number = str(number or "").strip()
+                    if number and len(number) <= 64 and number not in clean_numbers:
+                        clean_numbers.append(number)
+                normalized.append({
+                    "id": folder_id,
+                    "name": name,
+                    "icon": icon,
+                    "numbers": clean_numbers,
+                })
+            await self.hass.async_add_executor_job(store.set_chat_folders, normalized)
+            return self._json(normalized)
+
         if action.startswith("messages/"):
             from urllib.parse import unquote as _uq
             number = _uq(action[len("messages/"):])
@@ -1522,6 +1567,76 @@ class SmsApiView(HomeAssistantView):
             return self._error("Not configured", 503)
         store = coord.store
 
+        if action == "save_chat_folder_options":
+            try:
+                body = await request.json()
+            except Exception:
+                return self._error("Invalid JSON", 400)
+            if not isinstance(body, dict):
+                return self._error("Invalid options", 400)
+            # ``brands_enabled`` used to be the single switch for both
+            # system folders.  Keep that request shape working by applying
+            # its value to People when the new independent key is omitted.
+            # For a modern partial update, an omitted key keeps its current
+            # value instead of unexpectedly disabling the other folder.
+            current = await self.hass.async_add_executor_job(store.get_chat_folder_options)
+            has_legacy_brands = "brands_enabled" in body
+            has_people = "people_enabled" in body
+            brands_enabled = (
+                bool(body.get("brands_enabled"))
+                if has_legacy_brands
+                else bool(current.get("brands_enabled", False))
+            )
+            people_enabled = (
+                bool(body.get("people_enabled"))
+                if has_people
+                else (brands_enabled if has_legacy_brands else bool(current.get("people_enabled", False)))
+            )
+            clean = {
+                "show_all": bool(body.get("show_all", current.get("show_all", True))),
+                "people_enabled": people_enabled,
+                "brands_enabled": brands_enabled,
+            }
+            for key in ("brands_manual", "brands_excluded", "people_manual", "people_excluded"):
+                values = body.get(key) or []
+                if not isinstance(values, list) or len(values) > 1000:
+                    return self._error("Invalid folder numbers", 400)
+                clean[key] = list(dict.fromkeys(str(value).strip() for value in values if str(value).strip() and len(str(value).strip()) <= 64))
+            order = body.get("folder_order") or []
+            if not isinstance(order, list) or len(order) > 200:
+                return self._error("Invalid folder order", 400)
+            clean["folder_order"] = list(dict.fromkeys(str(value).strip() for value in order if str(value).strip() and len(str(value).strip()) <= 64))
+            await self.hass.async_add_executor_job(store.set_chat_folder_options, clean)
+            return self._json(clean)
+
+        if action == "save_chat_folders":
+            try:
+                body = await request.json()
+            except Exception:
+                return self._error("Invalid JSON", 400)
+            folders = body.get("folders") if isinstance(body, dict) else None
+            if not isinstance(folders, list) or len(folders) > 100:
+                return self._error("Invalid folders", 400)
+            normalized = []
+            for folder in folders:
+                if not isinstance(folder, dict):
+                    return self._error("Invalid folder", 400)
+                folder_id = str(folder.get("id") or "").strip()
+                name = str(folder.get("name") or "").strip()
+                icon = str(folder.get("icon") or "").strip()
+                numbers = folder.get("numbers") or []
+                if (not folder_id or len(folder_id) > 64 or not name or len(name) > 80
+                        or len(icon) > 8 or not isinstance(numbers, list) or len(numbers) > 1000):
+                    return self._error("Invalid folder fields", 400)
+                clean_numbers = []
+                for number in numbers:
+                    number = str(number or "").strip()
+                    if number and len(number) <= 64 and number not in clean_numbers:
+                        clean_numbers.append(number)
+                normalized.append({"id": folder_id, "name": name, "icon": icon, "numbers": clean_numbers})
+            await self.hass.async_add_executor_job(store.set_chat_folders, normalized)
+            return self._json(normalized)
+
         if action.startswith("read/"):
             msg_id = self._parse_int(action[len("read/"):])
             if msg_id is None:
@@ -1541,6 +1656,14 @@ class SmsApiView(HomeAssistantView):
             coord.push_event("contact_read", {"number": number})
             return self._json({"ok": True})
 
+        if action.startswith("mark_unread/"):
+            from urllib.parse import unquote as _uq
+            number = _uq(action[len("mark_unread/"):])
+            changed = await self.hass.async_add_executor_job(store.mark_unread_by_number, number)
+            if changed:
+                coord.push_event("contact_unread", {"number": number})
+            return self._json({"ok": True, "changed": changed})
+
         if action.startswith("star/"):
             msg_id = self._parse_int(action[len("star/"):])
             if msg_id is None:
@@ -1553,6 +1676,20 @@ class SmsApiView(HomeAssistantView):
             if msg_id is None:
                 return self._error("Invalid message id", 400)
             await self.hass.async_add_executor_job(store.unstar_message, msg_id)
+            return self._json({"ok": True})
+
+        if action.startswith("pin_message/"):
+            msg_id = self._parse_int(action[len("pin_message/"):])
+            if msg_id is None:
+                return self._error("Invalid message id", 400)
+            await self.hass.async_add_executor_job(store.pin_message, msg_id)
+            return self._json({"ok": True})
+
+        if action.startswith("unpin_message/"):
+            msg_id = self._parse_int(action[len("unpin_message/"):])
+            if msg_id is None:
+                return self._error("Invalid message id", 400)
+            await self.hass.async_add_executor_job(store.unpin_message, msg_id)
             return self._json({"ok": True})
 
         if action.startswith("pin/"):

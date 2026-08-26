@@ -104,6 +104,10 @@ class SmsStore:
             # падали с "no such table", если вызывались раньше первого чтения
             conn.execute("CREATE TABLE IF NOT EXISTS pinned_numbers (number TEXT PRIMARY KEY)")
             conn.execute("CREATE TABLE IF NOT EXISTS starred_messages (msg_id INTEGER PRIMARY KEY)")
+            conn.execute("CREATE TABLE IF NOT EXISTS pinned_messages (msg_id INTEGER PRIMARY KEY)")
+            # Старые «избранные» сообщения сохраняем как закреплённые при переходе
+            # на новую модель, чтобы пользователь не потерял отметки.
+            conn.execute("INSERT OR IGNORE INTO pinned_messages (msg_id) SELECT msg_id FROM starred_messages")
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS brand_logo_overrides (
                     number     TEXT PRIMARY KEY,
@@ -237,6 +241,18 @@ class SmsStore:
         with self._conn() as conn:
             conn.execute("UPDATE messages SET is_read=1 WHERE number=?", (number,))
 
+    def mark_unread_by_number(self, number: str) -> bool:
+        """Mark the newest incoming message unread to flag the conversation."""
+        number = self._sanitize_number(number)
+        with self._conn() as conn:
+            cur = conn.execute(
+                "UPDATE messages SET is_read=0 WHERE id=("
+                "SELECT id FROM messages WHERE number=? AND direction='in' "
+                "ORDER BY id DESC LIMIT 1)",
+                (number,),
+            )
+            return cur.rowcount > 0
+
     def pin_number(self, number: str) -> None:
         with self._conn() as conn:
             conn.execute("INSERT OR IGNORE INTO pinned_numbers (number) VALUES (?)", (number,))
@@ -349,10 +365,19 @@ class SmsStore:
     def get_messages_with_starred(self, number: str):
         with self._conn() as conn:
             rows = conn.execute("""
-                SELECT m.*, EXISTS(SELECT 1 FROM starred_messages s WHERE s.msg_id = m.id) as is_starred
+                SELECT m.*, EXISTS(SELECT 1 FROM starred_messages s WHERE s.msg_id = m.id) as is_starred,
+                    EXISTS(SELECT 1 FROM pinned_messages p WHERE p.msg_id = m.id) as is_message_pinned
                 FROM messages m WHERE m.number=? ORDER BY date ASC, id ASC
             """, (number,)).fetchall()
         return [dict(r) for r in rows]
+
+    def pin_message(self, msg_id: int) -> None:
+        with self._conn() as conn:
+            conn.execute("INSERT OR IGNORE INTO pinned_messages (msg_id) VALUES (?)", (msg_id,))
+
+    def unpin_message(self, msg_id: int) -> None:
+        with self._conn() as conn:
+            conn.execute("DELETE FROM pinned_messages WHERE msg_id=?", (msg_id,))
 
     def get_message_count(self) -> int:
         with self._conn() as conn:
@@ -437,6 +462,87 @@ class SmsStore:
                 "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
                 (key, value),
             )
+
+    def get_chat_folders(self) -> list[dict[str, Any]]:
+        """Return persisted chat folders, keeping malformed data safe."""
+        raw = self.get_setting("chat_folders")
+        if not raw:
+            return []
+        try:
+            value = json.loads(raw)
+        except (TypeError, ValueError):
+            return []
+        return value if isinstance(value, list) else []
+
+    def set_chat_folders(self, folders: list[dict[str, Any]]) -> None:
+        self.set_setting("chat_folders", json.dumps(folders, ensure_ascii=False))
+
+    @staticmethod
+    def _normalize_chat_folder_options(value: Any) -> dict[str, Any]:
+        """Return a safe, forward-compatible chat-folder options object.
+
+        Before independent system-folder switches were introduced,
+        ``brands_enabled`` controlled both the People and Brands tabs.  When
+        either of the new keys is absent we therefore fall back to that legacy
+        value.  This keeps existing installations visually unchanged while
+        allowing newer clients to persist the two switches independently.
+        """
+        if not isinstance(value, dict):
+            value = {}
+
+        legacy_present = "brands_enabled" in value
+        legacy_enabled = bool(value.get("brands_enabled", False))
+        people_enabled = (
+            bool(value.get("people_enabled"))
+            if "people_enabled" in value
+            else legacy_enabled
+        )
+        brands_enabled = (
+            bool(value.get("brands_enabled"))
+            if legacy_present
+            else False
+        )
+
+        brands_manual = value.get("brands_manual", [])
+        if not isinstance(brands_manual, list):
+            brands_manual = []
+        brands_excluded = value.get("brands_excluded", [])
+        if not isinstance(brands_excluded, list):
+            brands_excluded = []
+        people_manual = value.get("people_manual", [])
+        if not isinstance(people_manual, list):
+            people_manual = []
+        people_excluded = value.get("people_excluded", [])
+        if not isinstance(people_excluded, list):
+            people_excluded = []
+        folder_order = value.get("folder_order", [])
+        if not isinstance(folder_order, list):
+            folder_order = []
+
+        return {
+            "show_all": bool(value.get("show_all", True)),
+            "people_enabled": people_enabled,
+            "brands_enabled": brands_enabled,
+            "brands_manual": brands_manual,
+            "brands_excluded": brands_excluded,
+            "people_manual": people_manual,
+            "people_excluded": people_excluded,
+            "folder_order": folder_order,
+        }
+
+    def get_chat_folder_options(self) -> dict[str, Any]:
+        raw = self.get_setting("chat_folder_options")
+        if not raw:
+            return self._normalize_chat_folder_options({})
+        try:
+            value = json.loads(raw)
+        except (TypeError, ValueError):
+            value = {}
+        return self._normalize_chat_folder_options(value)
+
+    def set_chat_folder_options(self, options: dict[str, Any]) -> None:
+        normalized = self._normalize_chat_folder_options(options)
+        self.set_setting("chat_folder_options", json.dumps(normalized, ensure_ascii=False))
 
     def set_brand_logo_override(self, number: str, source_url: str) -> None:
         """Persist or clear the manually selected logo for an SMS sender."""

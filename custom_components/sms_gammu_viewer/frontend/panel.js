@@ -122,6 +122,12 @@ const CSS = `
     align-items: center;
     gap: 6px;
   }
+  .contact-scroll-chrome {
+    position: sticky;
+    top: 0;
+    z-index: 8;
+    background: var(--card);
+  }
 
   .signal-dot {
     width: 7px; height: 7px;
@@ -135,19 +141,24 @@ const CSS = `
   .contact-list {
     flex: 1;
     overflow-y: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
     padding-bottom: calc(80px + var(--safe-area-inset-bottom, 0px));
     position: relative;
     -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 60px), transparent 100%);
     mask-image: linear-gradient(to bottom, black calc(100% - 60px), transparent 100%);
   }
+  .contact-list::-webkit-scrollbar { display: none; width: 0; height: 0; }
 
 
   .swipe-wrap { position: relative; overflow: hidden; border-bottom: 0.5px solid var(--line); background: var(--card); }
   @media (max-width: 580px) {
+    .status-bar { padding-bottom: 2px; }
     .swipe-wrap { border-bottom: none; margin-bottom: 6px; }
     .swipe-wrap:last-child { margin-bottom: 0; }
     .swipe-inner { border: 1px solid var(--line); border-radius: 22px; }
     .contact-list { padding-bottom: calc(90px + var(--safe-area-inset-bottom, 0px)); }
+    .contact-scroll-chrome { display: contents; }
   }
   @media (min-width: 581px) {
     .swipe-actions-left, .swipe-actions-right { display: none !important; }
@@ -162,6 +173,21 @@ const CSS = `
   .swipe-btn.mute { background: #888780; }
   .swipe-btn.swipe-del { background: #E24B4A; }
   .swipe-inner { position: relative; z-index: 2; background-color: var(--card) !important; will-change: transform; }
+  /* A long press opens the chat-folder menu.  Keep the browser from starting
+     its native text-selection gesture while the press is pending. */
+  .swipe-inner.long-press-pending,
+  .swipe-inner.long-press-pending * {
+    user-select: none !important;
+    -webkit-user-select: none !important;
+    -webkit-touch-callout: none !important;
+  }
+  .swipe-inner.long-press-pending::after {
+    content: ''; position: absolute; inset: 0; border-radius: inherit;
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 28%, transparent);
+    pointer-events: none; animation: chat-press-in .14s ease-out;
+  }
+  @keyframes chat-press-in { from { opacity: 0; } to { opacity: 1; } }
   .swipe-inner.active { background-color: rgba(3,169,244,.1) !important; }
   .swipe-inner.snapping { transition: transform 0.25s ease; }
   .contact-item {
@@ -235,6 +261,88 @@ const CSS = `
     letter-spacing: -.5px;
   }
   .contact-list.brand-loading { visibility: hidden; }
+  .folder-tabs { display: flex; align-items: center; gap: 6px; padding: 7px 12px 5px; overflow: visible; }
+  .folder-tab-shell { display: flex; align-items: center; gap: 6px; min-width: 0; width: auto; box-sizing: border-box; }
+  .folder-tab-scroll { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1 1 auto; overflow-x: auto; scrollbar-width: none; touch-action: pan-x; background: transparent; }
+  .folder-tab-scroll::-webkit-scrollbar { display: none; }
+  .folder-tab-scroll { cursor: grab; }
+  .folder-tab-scroll:active { cursor: grabbing; }
+  .folder-tab-actions { display: flex; flex: 0 0 30px; width: 30px; justify-content: center; align-items: center; padding-left: 0; background: transparent; }
+  .folder-tab {
+    flex: 0 0 auto; border: 1px solid var(--border); border-radius: 16px;
+    background: transparent; color: var(--sub); padding: 5px 10px;
+    font: inherit; font-size: 12px; cursor: pointer; white-space: nowrap;
+    user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+    transition: color .22s ease, background-color .22s ease, border-color .22s ease, box-shadow .22s ease;
+  }
+  .folder-tab.active { color: var(--accent); border-color: var(--accent); background: rgba(3,169,244,.1); }
+  .folder-tab.add { font-size: 17px; line-height: 15px; padding: 4px 9px; }
+  .folder-editor-list { max-height: 260px; overflow: auto; margin-top: 12px; border-top: 1px solid var(--border); }
+  .folder-editor-chat { display: flex; align-items: center; gap: 8px; padding: 8px 2px; border-bottom: 1px solid var(--border); }
+  .folder-editor-chat input { width: 18px; height: 18px; }
+  .folder-edit-field { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; color: var(--sub); font-size: 12px; }
+  .folder-edit-field input { width: 100%; box-sizing: border-box; border: 1px solid var(--line); border-radius: 12px; padding: 11px 12px; background: var(--bg); color: var(--text); font: inherit; }
+  .folder-edit-field input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 15%, transparent); }
+  .folder-settings-list { max-height: 220px; overflow: auto; margin: 8px 0 10px; border-top: 1px solid var(--border); }
+  .folder-settings-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--border); }
+  .folder-settings-row > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .folder-settings-row > span:last-child { display: flex; gap: 4px; flex: 0 0 auto; }
+  .folder-settings-row button { padding: 4px 7px; }
+  .contact-form > button, .contact-form-actions button, .folder-settings-row button {
+    border: 0; border-radius: 12px; padding: 9px 13px; background: color-mix(in srgb, var(--accent) 13%, transparent);
+    color: var(--accent); font: inherit; cursor: pointer;
+  }
+  .contact-form > button:hover, .contact-form-actions button:hover, .folder-settings-row button:hover { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+  .chat-folder-menu {
+    position: fixed; z-index: 1000; min-width: 220px; max-width: min(300px, calc(100vw - 16px));
+    max-height: min(420px, calc(100vh - 16px)); overflow: hidden; padding: 8px;
+    border: 1px solid var(--line); border-radius: 16px; background: var(--card); color: var(--text);
+    box-shadow: 0 8px 28px rgba(0,0,0,.35);
+  }
+  .chat-folder-menu-title { padding: 6px 8px 8px; font-size: 13px; font-weight: 600; border-bottom: 1px solid var(--line); }
+  .chat-folder-menu-row { display: flex; align-items: center; gap: 8px; width: 100%; padding: 9px 8px; border: 0; border-radius: 10px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+  .chat-folder-menu-row:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+  .chat-folder-menu-row:disabled { opacity: .55; cursor: default; }
+  .chat-folder-menu-row input { width: 16px; height: 16px; accent-color: var(--accent); }
+  .chat-folder-menu-icon { width: 26px; flex: 0 0 26px; text-align: center; font-size: 18px; }
+  .chat-folder-menu-chevron { margin-left: auto; color: var(--sub); font-size: 22px; }
+  .chat-folder-menu-row.danger { color: var(--danger); }
+  .chat-folder-menu-new { margin-top: 6px; border-top: 1px solid var(--line); padding-top: 8px; color: var(--accent); }
+  .chat-folder-menu-track { display: flex; width: 200%; align-items: flex-start; transform: translateX(0); transition: transform .24s cubic-bezier(.2,.7,.2,1); }
+  .chat-folder-menu.folders-open .chat-folder-menu-track { transform: translateX(-50%); }
+  .chat-folder-menu.folders-open .chat-folder-menu-main { pointer-events: none; visibility: hidden; }
+  .chat-folder-menu-page { flex: 0 0 50%; width: 50%; min-width: 0; box-sizing: border-box; max-height: min(46vh, 420px); overflow-y: auto; overflow-x: hidden; }
+  .chat-folder-menu-back { border-bottom: 1px solid var(--line); margin-bottom: 4px; font-weight: 600; }
+  .chat-folder-preview-overlay {
+    position: fixed; inset: 0; z-index: 1000; display: flex; flex-direction: column;
+    justify-content: center; align-items: center; gap: 10px;
+    padding: 18px 12px calc(12px + var(--safe-area-inset-bottom, 0px));
+    box-sizing: border-box; background: rgba(0,0,0,.42); backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px); animation: ctx-in .16s ease;
+    user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+  }
+  .chat-folder-preview-overlay * { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+  .chat-folder-preview-card {
+    width: min(520px, 100%); height: min(42vh, 380px); max-height: min(42vh, 380px); margin: 0; overflow: hidden;
+    border: 1px solid var(--line); border-radius: 24px; background: var(--card);
+    box-shadow: 0 12px 38px rgba(0,0,0,.38); display: flex; flex-direction: column;
+    user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+  }
+  .chat-folder-preview-head { display: flex; align-items: center; gap: 12px; padding: 14px 16px 10px; }
+  .chat-folder-preview-avatar { width: 52px; height: 52px; flex: 0 0 52px; }
+  .chat-folder-preview-avatar .avatar { width: 52px; height: 52px; padding: 0; }
+  .chat-folder-preview-name { min-width: 0; font-size: 16px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .chat-folder-preview-number { margin-top: 2px; color: var(--sub); font-size: 12px; }
+  .chat-folder-preview-messages { min-height: 0; flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding: 4px 16px 16px; display: flex; flex-direction: column; gap: 6px; }
+  .chat-folder-preview-message { align-self: flex-start; max-width: 88%; padding: 8px 11px; border-radius: 5px 13px 13px 13px; background: color-mix(in srgb, var(--bg) 78%, var(--card)); color: var(--text); font-size: 13px; line-height: 1.35; white-space: pre-wrap; word-break: break-word; }
+  .chat-folder-preview-message.unread-preview { box-shadow: inset 2px 0 var(--accent); }
+  .chat-folder-preview-message.outgoing { align-self: flex-end; border-radius: 13px 5px 13px 13px; background: color-mix(in srgb, var(--accent) 18%, var(--card)); }
+  .chat-folder-menu-sheet { position: static; width: min(520px, 100%); max-width: none; max-height: min(48vh, 440px); margin: 0 auto; box-sizing: border-box; border-radius: 24px; padding: 8px; overflow: hidden; }
+  .chat-folder-menu-sheet .chat-folder-menu-title { padding: 8px 12px 10px; }
+  @media (min-width: 581px) { .chat-folder-preview-overlay { display: none; } }
+  .contact-form-actions button.primary { background: var(--accent); color: #fff; }
+  .contact-form-actions button.secondary { background: transparent; color: var(--sub); }
+  .folder-settings-row button:disabled { opacity: .35; cursor: default; }
   /* Brand marks in the chat list use the same full circular treatment as the
      chat header; don't add the old white inset ring around the logo. */
   .avatar.brand-avatar { background: transparent; padding: 0; }
@@ -306,6 +414,20 @@ const CSS = `
     border-bottom: 1px solid var(--line);
     min-height: 58px;
   }
+  .pinned-banner { display:none; position:absolute; top:58px; left:0; right:0; z-index:8; padding:0; pointer-events:none; background:transparent !important; border:0 !important; box-shadow:none !important; }
+  .pinned-banner.visible { display:block; }
+  .pinned-banner-shell { display:flex; align-items:center; gap:10px; min-height:40px; padding:6px 16px; background:var(--card); border-bottom:1px solid var(--line); }
+  .pinned-banner button { position:relative; z-index:1; border:0; background:transparent; color:var(--text); cursor:pointer; min-width:0; pointer-events:auto; }
+  .pinned-banner .pinned-jump { flex:1; overflow:hidden; text-align:left; white-space:nowrap; text-overflow:ellipsis; font-size:13px; }
+  .pinned-banner .pinned-jump::before { content:'📌 '; color:var(--accent); }
+  .pinned-banner .pinned-list { color:var(--accent); white-space:nowrap; font-size:12px; }
+  .chat-header > svg { display:none; }
+  .pinned-highlight { outline:2px solid var(--accent); outline-offset:2px; }
+  @media (max-width: 580px) {
+    .pinned-banner-shell { margin:8px 12px 0; padding:3px; min-height:38px; border:1px solid var(--line) !important; border-radius:999px !important; overflow:hidden; background:var(--card); box-shadow:0 2px 8px rgba(0,0,0,.18); }
+    .pinned-banner-shell .pinned-jump { padding:7px 10px; }
+    .pinned-banner-shell .pinned-list { padding:7px 10px; }
+  }
   .chat-profile-trigger {
     flex: 1; min-width: 0; cursor: pointer;
   }
@@ -364,6 +486,12 @@ const CSS = `
     gap: 10px;
     -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 60px), transparent 100%);
     mask-image: linear-gradient(to bottom, black calc(100% - 60px), transparent 100%);
+  }
+  .messages-area.has-pinned-banner { padding-top:72px; }
+  .scroll-bottom-btn { display:none; position:absolute; right:20px; bottom:86px; z-index:9; width:44px; height:44px; align-items:center; justify-content:center; border:1px solid var(--line); border-radius:50%; background:color-mix(in srgb, var(--card) 92%, var(--sub)); color:var(--text); box-shadow:0 4px 14px rgba(0,0,0,.28); cursor:pointer; }
+  .scroll-bottom-btn.visible { display:flex; }
+  @media (max-width: 580px) {
+    .scroll-bottom-btn { right:16px; bottom:calc(104px + var(--safe-area-inset-bottom, 0px)); width:40px; height:40px; }
   }
 
   .msg-ctx-menu {
@@ -942,6 +1070,10 @@ const CSS = `
   .profile-detail-label { color: var(--sub); font-size: 11px; margin-bottom: 3px; }
   .profile-detail-value { font-size: 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
   .contact-form { padding: 18px 20px 20px; }
+  .contact-form-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: -4px -4px 12px; }
+  .contact-form-header h2 { margin: 0; min-width: 0; font-size: 19px; font-weight: 650; }
+  .contact-form-header .icon-btn { width: 34px; height: 34px; flex: 0 0 auto; justify-content: center; padding: 0; font-size: 22px; line-height: 1; background: color-mix(in srgb, var(--text) 8%, transparent); }
+  .contact-form-header .icon-btn:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
   .contact-form-title { font-size: 19px; font-weight: 600; margin-bottom: 16px; }
   .contact-form-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; min-width: 0; }
   .contact-field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
@@ -1018,6 +1150,20 @@ const CSS = `
   .brand-picker-empty { padding: 24px 8px; color: var(--sub); text-align: center; }
 
   @media (max-width: 580px) {
+    .folder-tabs {
+      position: sticky; top: 3px; left: auto; right: auto; z-index: 8; display: block;
+      padding-top: 3px;
+    }
+    .folder-tab-shell {
+      width: auto; margin: 0 12px 7px; padding: 3px; gap: 3px; border: 1px solid var(--line);
+      border-radius: 999px; overflow: hidden; background: var(--card);
+    }
+    .folder-tab-scroll { gap: 3px; padding: 0 1px; }
+    .folder-tab { border-color: transparent; border-radius: 999px; padding: 7px 12px; }
+    .folder-tab.active { color: var(--accent); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent) inset; }
+    .folder-tab.add { font-size: 16px; padding: 6px 10px; }
+    .folder-tab-actions { flex-basis: 32px; width: 32px; padding-left: 0; }
+    .folder-tab-actions .folder-tab { width: 32px; height: 32px; padding: 0; }
     .profile-actions { gap: 6px; padding: 13px 8px; flex-wrap: wrap; }
     .profile-action { min-width: 62px; flex: 1 1 62px; }
     .contacts { width: 100%; border-right: none; }
@@ -1028,10 +1174,10 @@ const CSS = `
     .status-grid { grid-template-columns: 1fr; }
     .fab {
       width: 60px; height: 60px;
-      bottom: calc(28px + var(--safe-area-inset-bottom, 0px)); left: 24px;
+      bottom: calc(16px + var(--safe-area-inset-bottom, 0px)); left: 24px;
     }
     #fab-call-anchor {
-      bottom: calc(28px + var(--safe-area-inset-bottom, 0px)) !important;
+      bottom: calc(16px + var(--safe-area-inset-bottom, 0px)) !important;
       right: 24px !important;
     }
     .fab-call {
@@ -1118,6 +1264,12 @@ class SmsGammuPanel extends HTMLElement {
     this._contactsLoaded = false;
     this._brandReady = false;
     this._brandPickerContact = null;
+    this._chatFolders = [];
+    this._activeFolderId = "all";
+    this._folderOptions = { show_all: true, people_enabled: false, brands_enabled: false, brands_manual: [], brands_excluded: [], people_manual: [], people_excluded: [], folder_order: [] };
+    this._folderScrollLeft = 0;
+    this._pinnedCycle = 0;
+    this._pinnedScrollBound = false;
   }
 
   _t(key, ...args) {
@@ -1285,7 +1437,22 @@ class SmsGammuPanel extends HTMLElement {
     this._updateRefreshBtn();
     let contactsChanged = true;
     try {
-      const contacts = await this._api("contacts");
+      const [contacts, folders, folderOptions] = await Promise.all([
+        this._api("contacts"), this._api("chat_folders"), this._api("chat_folder_options"),
+      ]);
+      this._chatFolders = Array.isArray(folders) ? folders : [];
+      if (folderOptions && typeof folderOptions === "object") {
+        // Keep older gateways compatible: before independent switches,
+        // brands_enabled controlled both system folders.
+        this._folderOptions = {
+          ...this._folderOptions,
+          ...folderOptions,
+          people_enabled: "people_enabled" in folderOptions
+            ? Boolean(folderOptions.people_enabled)
+            : Boolean(folderOptions.brands_enabled),
+          brands_enabled: Boolean(folderOptions.brands_enabled),
+        };
+      }
       const signature = JSON.stringify((contacts || []).map((c) => [
         c.number, c.contact_name, c.last_text, c.last_date, c.unread,
         c.is_muted, c.is_pinned, c.total, c.brand_logo_url,
@@ -1428,7 +1595,7 @@ class SmsGammuPanel extends HTMLElement {
           if (ev.data.number === this._activeNumber) {
             needMessages = true;
           }
-        } else if (ev.type === "message_deleted" || ev.type === "contact_deleted") {
+        } else if (ev.type === "message_deleted" || ev.type === "contact_deleted" || ev.type === "contact_read" || ev.type === "contact_unread" || ev.type === "contact_muted") {
           needContacts = true;
           needMessages = true;
         } else if (ev.type === "contact_saved" || ev.type === "contact_deleted_pb") {
@@ -1855,14 +2022,40 @@ class SmsGammuPanel extends HTMLElement {
   }
 
   _filteredContacts() {
-    if (!this._search.trim()) return this._contacts;
+    let contacts = this._contacts;
+    if (this._activeFolderId === "brands") {
+      contacts = contacts.filter((contact) => this._isInBrandsFolder(contact));
+    } else if (this._activeFolderId === "people") {
+      contacts = contacts.filter((contact) => this._isInPeopleFolder(contact));
+    } else if (this._activeFolderId !== "all") {
+      const folder = this._chatFolders.find((item) => item.id === this._activeFolderId);
+      const numbers = new Set(folder?.numbers || []);
+      contacts = contacts.filter((c) => numbers.has(c.number));
+    }
+    if (!this._search.trim()) return contacts;
     const q = this._search.toLowerCase();
-    return this._contacts.filter(
+    return contacts.filter(
       (c) =>
         c.number.toLowerCase().includes(q) ||
         (c.contact_name || "").toLowerCase().includes(q) ||
         (c.last_text || "").toLowerCase().includes(q)
     );
+  }
+
+  _isBrandChat(contact) {
+    return Boolean(contact?.brand_logo_url || this._brandLogoFor(contact));
+  }
+
+  _isInBrandsFolder(contact) {
+    const manual = new Set(this._folderOptions.brands_manual || []);
+    const excluded = new Set(this._folderOptions.brands_excluded || []);
+    return !excluded.has(contact?.number) && (manual.has(contact?.number) || this._isBrandChat(contact));
+  }
+
+  _isInPeopleFolder(contact) {
+    const manual = new Set(this._folderOptions.people_manual || []);
+    const excluded = new Set(this._folderOptions.people_excluded || []);
+    return !excluded.has(contact?.number) && (manual.has(contact?.number) || !this._isInBrandsFolder(contact));
   }
 
   _updateMenuBtn() {
@@ -2282,8 +2475,6 @@ class SmsGammuPanel extends HTMLElement {
       if (profileAvatar) profileAvatar.style.display = "none";
       const profileTrigger = this.shadowRoot.getElementById("chat-profile-trigger");
       if (profileTrigger) profileTrigger.style.pointerEvents = "none";
-      const starBtn = this.shadowRoot.getElementById("star-filter-btn");
-      if (starBtn) starBtn.style.display = "none";
       // На мобилке показываем правую область
       root?.classList.add("chat-open");
       if (isStatus) {
@@ -3095,8 +3286,13 @@ class SmsGammuPanel extends HTMLElement {
             </div>
             <input class="search" id="search" type="text" />
           </div>
-          <div class="status-bar" id="status-bar">${this._t("loading_status")}</div>
-          <div class="contact-list" id="contact-list"></div>
+          <div class="contact-list" id="contact-list">
+            <div class="contact-scroll-chrome">
+              <div class="status-bar" id="status-bar">${this._t("loading_status")}</div>
+              <div class="folder-tabs" id="folder-tabs"></div>
+            </div>
+            <div class="contact-items" id="contact-items"></div>
+          </div>
 
           <button class="fab" id="fab-new-chat" title="New message">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
@@ -3160,7 +3356,6 @@ class SmsGammuPanel extends HTMLElement {
               <div class="chat-title" id="chat-title">Выберите диалог</div>
               <div class="chat-subtitle" id="chat-subtitle"></div>
             </div>
-            <button class="icon-btn" id="star-filter-btn" title="${this._t('star')}" style="display:none">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
             </button>
             <button class="icon-btn" id="call-contact-btn" title="Позвонить" style="display:none">
@@ -3184,6 +3379,7 @@ class SmsGammuPanel extends HTMLElement {
               </svg>
             </button>
           </div>
+          <div class="pinned-banner" id="pinned-banner"><div class="pinned-banner-shell"><button class="pinned-jump" id="pinned-jump"></button><button class="pinned-list" id="pinned-list" aria-label="Все закреплённые"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 4.5v5l-2 2h6l-2-2v-5"/><path d="M9.5 11.5v5"/><path d="M15 7h6M15 11h6M15 15h6"/></svg></button></div></div>
           <div class="messages-area" id="messages-area">
             <div class="empty">
               <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
@@ -3192,6 +3388,7 @@ class SmsGammuPanel extends HTMLElement {
               <p>${this._t("select_dialog_left")}</p>
             </div>
           </div>
+          <button class="scroll-bottom-btn" id="scroll-bottom-btn" title="Вниз"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
           <div class="status-main" id="status-main" style="display:none"></div>
           <div class="send-bar-wrap">
           <div class="send-bar" id="send-bar" style="display:none; flex-wrap:wrap">
@@ -3392,6 +3589,21 @@ class SmsGammuPanel extends HTMLElement {
       }
       this._renderMessages();
     });
+    this.shadowRoot.getElementById("pinned-jump")?.addEventListener("click", () => {
+      const pins = this._messages.filter(m => m.is_message_pinned);
+      if (!pins.length) return;
+      const target = pins[this._pinnedCycle % pins.length];
+      const bubble = [...this.shadowRoot.querySelectorAll(".msg-bubble")].find(el => el.dataset.id === String(target.id));
+      bubble?.scrollIntoView({ behavior: "smooth", block: "center" });
+      bubble?.classList.add("pinned-highlight");
+      setTimeout(() => bubble?.classList.remove("pinned-highlight"), 1000);
+      this._pinnedCycle = (this._pinnedCycle + 1) % pins.length;
+    });
+    this.shadowRoot.getElementById("pinned-list")?.addEventListener("click", () => this._showPinnedMessages());
+    this.shadowRoot.getElementById("scroll-bottom-btn")?.addEventListener("click", () => {
+      const area = this.shadowRoot.getElementById("messages-area");
+      area?.scrollTo({ top: area.scrollHeight, behavior: "smooth" });
+    });
 
     this.shadowRoot.getElementById("back-btn").addEventListener("click", () => {
       if (this._activeTab === "status" || this._activeTab === "phonebook") {
@@ -3481,12 +3693,14 @@ class SmsGammuPanel extends HTMLElement {
     `;
   }
 
-  _renderContacts() {
-    const list = this.shadowRoot.getElementById("contact-list");
-    if (!list) return;
+  _renderContacts(skipFolders = false) {
+    const scrollList = this.shadowRoot.getElementById("contact-list");
+    const list = this.shadowRoot.getElementById("contact-items");
+    if (!scrollList || !list) return;
     const brandLoading = !this._status || (this._status.use_brand_logos && !this._brandReady);
-    list.classList.toggle("brand-loading", brandLoading);
+    scrollList.classList.toggle("brand-loading", brandLoading);
     if (brandLoading) return;
+    if (!skipFolders) this._renderFolders();
 
     // Локальная сортировка: закреплённые вверху
     this._contacts.sort((a, b) => (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0) || new Date(b.last_activity) - new Date(a.last_activity));
@@ -3512,7 +3726,7 @@ class SmsGammuPanel extends HTMLElement {
     list.innerHTML = items.map((c) => `
       <div class="swipe-wrap" data-number="${this._esc(c.number)}">
         <div class="swipe-actions-left">
-          <button class="swipe-btn read" data-action="read" data-number="${this._esc(c.number)}">${svgCheck}<span>${this._t("mark_read")}</span></button>
+          <button class="swipe-btn read" data-action="read" data-number="${this._esc(c.number)}">${svgCheck}<span>${this._t(c.unread > 0 ? "mark_read" : "mark_unread")}</span></button>
           <button class="swipe-btn pin" data-action="pin" data-number="${this._esc(c.number)}" data-pinned="${c.is_pinned ? '1' : '0'}">${svgPin}<span>${c.is_pinned ? this._t("unpin") : this._t("pin")}</span></button>
         </div>
         <div class="swipe-actions-right">
@@ -3585,8 +3799,47 @@ class SmsGammuPanel extends HTMLElement {
     });
 
     list.querySelectorAll(".swipe-inner").forEach((el) => {
+      let longPressTimer = null;
+      let pressX = 0;
+      let pressY = 0;
+      const cancelLongPress = () => {
+        if (longPressTimer) clearTimeout(longPressTimer);
+        longPressTimer = null;
+        el.classList.remove("long-press-pending");
+      };
+      el.addEventListener("pointerdown", (event) => {
+        if (event.pointerType === "mouse" || event.button !== 0) return;
+        pressX = event.clientX; pressY = event.clientY;
+        el.classList.add("long-press-pending");
+        longPressTimer = setTimeout(() => {
+          longPressTimer = null;
+          el.classList.remove("long-press-pending");
+          // Remove a range that a mobile browser may have created just before
+          // the timer fired.  The menu itself remains fully interactive.
+          window.getSelection?.()?.removeAllRanges?.();
+          this._suppressNextChatClick = true;
+          clearTimeout(this._suppressNextChatClickTimer);
+          this._suppressNextChatClickTimer = setTimeout(() => { this._suppressNextChatClick = false; }, 1000);
+          navigator.vibrate?.(18);
+          this._showChatFolderMenu(event, el.closest(".swipe-wrap")?.dataset.number);
+        }, 550);
+      }, { passive: true });
+      el.addEventListener("pointermove", (event) => {
+        if (Math.hypot(event.clientX - pressX, event.clientY - pressY) > 10) cancelLongPress();
+      }, { passive: true });
+      ["pointerup", "pointercancel", "pointerleave"].forEach((name) => el.addEventListener(name, cancelLongPress, { passive: true }));
+      el.addEventListener("contextmenu", (event) => {
+        event.preventDefault();
+        window.getSelection?.()?.removeAllRanges?.();
+        el.classList.remove("long-press-pending");
+        this._suppressNextChatClick = true;
+        clearTimeout(this._suppressNextChatClickTimer);
+        this._suppressNextChatClickTimer = setTimeout(() => { this._suppressNextChatClick = false; }, 1000);
+        this._showChatFolderMenu(event, el.closest(".swipe-wrap")?.dataset.number);
+      });
       el.addEventListener("click", (e) => {
         if (e.target.closest(".swipe-btn")) return;
+        if (this._suppressNextChatClick) { this._suppressNextChatClick = false; return; }
         const wrap = el.closest(".swipe-wrap");
         const snapVal = this._swipeState?.get(wrap) || 0;
         if (snapVal !== 0) {
@@ -3622,10 +3875,12 @@ class SmsGammuPanel extends HTMLElement {
         const wrap = btn.closest(".swipe-wrap");
         if (wrap) this._swipeClose(wrap);
         if (action === "read") {
-          await this._api(`mark_read/${encodeURIComponent(number)}`, "POST").catch(() => {});
+          const contact = this._contacts.find(x => x.number === number);
+          const shouldMarkRead = Number(contact?.unread || 0) > 0;
+          await this._api(`${shouldMarkRead ? "mark_read" : "mark_unread"}/${encodeURIComponent(number)}`, "POST").catch(() => {});
           // Обновляем локально
-          const c = this._contacts.find(x => x.number === number);
-          if (c) c.unread = 0;
+          const c = contact;
+          if (c) c.unread = shouldMarkRead ? 0 : Math.max(1, c.unread || 0);
           this._renderContacts();
         } else if (action === "mute") {
           const c = this._contacts.find(x => x.number === number);
@@ -3656,6 +3911,500 @@ class SmsGammuPanel extends HTMLElement {
           });
         }
       });
+    });
+  }
+
+  _renderFolders() {
+    const host = this.shadowRoot.getElementById("folder-tabs");
+    if (!host) return;
+    const previousScroller = host.querySelector(".folder-tab-scroll");
+    const scrollLeft = previousScroller ? previousScroller.scrollLeft : this._folderScrollLeft;
+    const tabs = this._folderTabDefinitions();
+    if (!tabs.some((item) => item.id === this._activeFolderId)) this._activeFolderId = tabs[0]?.id || "all";
+    host.innerHTML = `<div class="folder-tab-shell"><div class="folder-tab-scroll">${tabs.map((folder) => `
+      <button class="folder-tab ${this._activeFolderId === folder.id ? "active" : ""}" data-folder-id="${this._esc(folder.id)}">
+        ${folder.icon ? this._esc(folder.icon) + " " : ""}${this._esc(folder.name)}
+      </button>`).join("")}<button class="folder-tab add" id="folder-add" title="${this._esc(this._t("new_folder"))}">＋</button></div><div class="folder-tab-actions"><button class="folder-tab add" id="folder-settings" title="${this._esc(this._t("folder_settings"))}">⚙</button></div></div>`;
+    const newScroller = host.querySelector(".folder-tab-scroll");
+    if (newScroller) {
+      newScroller.scrollLeft = scrollLeft;
+      this._folderScrollLeft = scrollLeft;
+    }
+    host.style.removeProperty("top");
+    host.querySelectorAll("[data-folder-id]").forEach((button) => button.addEventListener("click", () => {
+      if (button.dataset.longpress === "1") { button.dataset.longpress = "0"; return; }
+      const previous = host.querySelector(".folder-tab.active");
+      previous?.classList.remove("active");
+      button.classList.add("active");
+      this._activeFolderId = button.dataset.folderId;
+      this._renderContacts(true);
+    }));
+    host.querySelectorAll("[data-folder-id]").forEach((button) => {
+      let timer = null;
+      const openPressedFolder = () => {
+        const id = button.dataset.folderId;
+        // "Все чаты" is a view, not an editable folder.
+        if (id === "all") return;
+        const folder = this._chatFolders.find((item) => item.id === id);
+        if (folder) this._openFolderEditor(folder);
+        else if (id === "brands") this._openBrandsEditor();
+        else if (id === "people") this._openPeopleEditor();
+        else this._openFolderSettings();
+      };
+      button.addEventListener("pointerdown", (event) => {
+        if (event.pointerType === "mouse" && event.button !== 0) return;
+        if (button.dataset.folderId === "all") return;
+        if (event.pointerType !== "mouse") event.preventDefault();
+        timer = setTimeout(() => {
+          button.dataset.longpress = "1";
+          window.getSelection?.()?.removeAllRanges?.();
+          openPressedFolder();
+        }, 550);
+      });
+      const cancel = () => { if (timer) clearTimeout(timer); timer = null; };
+      button.addEventListener("pointerup", cancel);
+      button.addEventListener("pointercancel", cancel);
+      button.addEventListener("pointerleave", cancel);
+      button.addEventListener("contextmenu", (event) => {
+        event.preventDefault();
+        cancel();
+        openPressedFolder();
+      });
+    });
+    const folderScroller = host.querySelector(".folder-tab-scroll");
+    folderScroller?.addEventListener("wheel", (event) => {
+      if (!folderScroller || folderScroller.scrollWidth <= folderScroller.clientWidth) return;
+      const delta = Math.abs(event.deltaY) > Math.abs(event.deltaX) ? event.deltaY : event.deltaX;
+      if (!delta) return;
+      event.preventDefault();
+      folderScroller.scrollLeft += delta;
+      this._folderScrollLeft = folderScroller.scrollLeft;
+    }, { passive: false });
+    folderScroller?.addEventListener("scroll", () => {
+      this._folderScrollLeft = folderScroller.scrollLeft;
+    }, { passive: true });
+    host.querySelector("#folder-add")?.addEventListener("click", () => this._openFolderEditor());
+    host.querySelector("#folder-settings")?.addEventListener("click", () => this._openFolderSettings());
+    host.querySelectorAll("[data-folder-id]:not([data-folder-id=all])").forEach((button) => {
+      button.addEventListener("dblclick", () => {
+        const folder = this._chatFolders.find((item) => item.id === button.dataset.folderId);
+        if (folder) this._openFolderEditor(folder);
+        else if (button.dataset.folderId === "brands") this._openBrandsEditor();
+      });
+    });
+  }
+
+  _folderTabDefinitions() {
+    const tabs = [];
+    if (this._folderOptions.show_all !== false) tabs.push({ id: "all", name: this._t("all_chats"), icon: "", system: true });
+    if (this._folderOptions.people_enabled) {
+      tabs.push({ id: "people", name: this._t("people_folder"), icon: "👤", system: true });
+    }
+    if (this._folderOptions.brands_enabled) {
+      tabs.push({ id: "brands", name: this._t("brands_folder"), icon: "🏷️", system: true });
+    }
+    tabs.push(...this._chatFolders.map((folder) => ({ ...folder, system: false })));
+    const byId = new Map(tabs.map((folder) => [folder.id, folder]));
+    const ordered = [];
+    for (const id of (Array.isArray(this._folderOptions.folder_order) ? this._folderOptions.folder_order : [])) {
+      if (byId.has(id)) { ordered.push(byId.get(id)); byId.delete(id); }
+    }
+    return [...ordered, ...byId.values()];
+  }
+
+  _openFolderSettings() {
+    const overlay = this.shadowRoot.getElementById("contact-modal-overlay");
+    const modal = this.shadowRoot.getElementById("contact-modal");
+    if (!overlay || !modal) return;
+    modal.innerHTML = `<div class="contact-form" style="padding:20px">
+      <div class="contact-form-header"><h2>${this._esc(this._t("folder_settings"))}</h2></div>
+      <label class="folder-editor-chat"><input type="checkbox" id="folder-show-all" ${this._folderOptions.show_all !== false ? "checked" : ""}/> ${this._esc(this._t("show_all_chats"))}</label>
+      <label class="folder-editor-chat"><input type="checkbox" id="folder-people-enabled" ${this._folderOptions.people_enabled ? "checked" : ""}/> ${this._esc(this._t("enable_people_folder"))}</label>
+      <label class="folder-editor-chat"><input type="checkbox" id="folder-brands-enabled" ${this._folderOptions.brands_enabled ? "checked" : ""}/> ${this._esc(this._t("enable_brands_folder"))}</label>
+      <button id="folder-manage-people" ${this._folderOptions.people_enabled ? "" : "disabled"}>${this._esc(this._t("manage_people_folder"))}</button>
+      <button id="folder-manage-brands" ${this._folderOptions.brands_enabled ? "" : "disabled"}>${this._esc(this._t("manage_brands_folder"))}</button>
+      <h3>${this._esc(this._t("custom_folders"))}</h3>
+      <div class="folder-settings-list">${this._folderTabDefinitions().length ? this._folderTabDefinitions().map((folder, index, all) => `<div class="folder-settings-row"><span>${folder.icon ? this._esc(folder.icon) + " " : ""}${this._esc(folder.name)}</span><span><button data-move-folder-up="${this._esc(folder.id)}" ${index === 0 ? "disabled" : ""} aria-label="${this._esc(this._t("move_folder_up"))}">↑</button><button data-move-folder-down="${this._esc(folder.id)}" ${index === all.length - 1 ? "disabled" : ""} aria-label="${this._esc(this._t("move_folder_down"))}">↓</button>${folder.system ? "" : `<button data-edit-folder="${this._esc(folder.id)}">${this._esc(this._t("edit_folder"))}</button><button data-delete-folder="${this._esc(folder.id)}">${this._esc(this._t("delete_folder"))}</button>`}</span></div>`).join("") : `<p class="form-help">${this._esc(this._t("no_custom_folders"))}</p>`}</div>
+      <button id="folder-create">＋ ${this._esc(this._t("new_folder"))}</button>
+      <div class="contact-form-actions"><button id="folder-settings-cancel">${this._esc(this._t("cancel"))}</button><button class="primary" id="folder-settings-save">${this._esc(this._t("save"))}</button></div>
+    </div>`;
+    overlay.classList.add("open");
+    const close = () => overlay.classList.remove("open");
+    modal.querySelector("#folder-settings-close")?.addEventListener("click", close);
+    modal.querySelector("#folder-settings-cancel")?.addEventListener("click", close);
+    modal.querySelector("#folder-create")?.addEventListener("click", () => {
+      close();
+      this._openFolderEditor();
+    });
+    const moveFolder = async (folderId, direction) => {
+      const currentTabs = this._folderTabDefinitions();
+      const index = currentTabs.findIndex((item) => item.id === folderId);
+      const nextIndex = index + direction;
+      if (index < 0 || nextIndex < 0 || nextIndex >= currentTabs.length) return;
+      const order = currentTabs.map((item) => item.id);
+      [order[index], order[nextIndex]] = [order[nextIndex], order[index]];
+      const options = { ...this._folderOptions, folder_order: order };
+      await this._api("save_chat_folder_options", "POST", options);
+      this._folderOptions = options;
+      close();
+      this._renderContacts();
+    };
+    modal.querySelectorAll("[data-move-folder-up]").forEach((button) => button.addEventListener("click", () => moveFolder(button.dataset.moveFolderUp, -1)));
+    modal.querySelectorAll("[data-move-folder-down]").forEach((button) => button.addEventListener("click", () => moveFolder(button.dataset.moveFolderDown, 1)));
+    modal.querySelectorAll("[data-edit-folder]").forEach((button) => button.addEventListener("click", () => {
+      const folder = this._chatFolders.find((item) => item.id === button.dataset.editFolder);
+      if (!folder) return;
+      close();
+      this._openFolderEditor(folder);
+    }));
+    modal.querySelectorAll("[data-delete-folder]").forEach((button) => button.addEventListener("click", async () => {
+      const folder = this._chatFolders.find((item) => item.id === button.dataset.deleteFolder);
+      if (!folder || !window.confirm(this._t("delete_folder_confirm"))) return;
+      const folders = this._chatFolders.filter((item) => item.id !== folder.id);
+      await this._api("save_chat_folders", "POST", { folders });
+      this._chatFolders = folders;
+      if (this._activeFolderId === folder.id) this._activeFolderId = this._folderTabDefinitions()[0]?.id || "all";
+      close();
+      this._renderContacts();
+    }));
+    modal.querySelector("#folder-brands-enabled")?.addEventListener("change", (event) => {
+      const button = modal.querySelector("#folder-manage-brands");
+      if (button) button.disabled = !event.target.checked;
+    });
+    modal.querySelector("#folder-people-enabled")?.addEventListener("change", (event) => {
+      const button = modal.querySelector("#folder-manage-people");
+      if (button) button.disabled = !event.target.checked;
+    });
+    modal.querySelector("#folder-manage-people")?.addEventListener("click", async () => {
+      const options = { ...this._folderOptions,
+        show_all: modal.querySelector("#folder-show-all")?.checked !== false,
+        people_enabled: modal.querySelector("#folder-people-enabled")?.checked === true,
+        brands_enabled: modal.querySelector("#folder-brands-enabled")?.checked === true,
+      };
+      await this._api("save_chat_folder_options", "POST", options);
+      this._folderOptions = options;
+      close();
+      this._openPeopleEditor();
+    });
+    modal.querySelector("#folder-manage-brands")?.addEventListener("click", async () => {
+      const options = { ...this._folderOptions,
+        show_all: modal.querySelector("#folder-show-all")?.checked !== false,
+        people_enabled: modal.querySelector("#folder-people-enabled")?.checked === true,
+        brands_enabled: modal.querySelector("#folder-brands-enabled")?.checked === true,
+      };
+      await this._api("save_chat_folder_options", "POST", options);
+      this._folderOptions = options;
+      close();
+      this._openBrandsEditor();
+    });
+    modal.querySelector("#folder-settings-save")?.addEventListener("click", async () => {
+      const options = { ...this._folderOptions,
+        show_all: modal.querySelector("#folder-show-all")?.checked !== false,
+        people_enabled: modal.querySelector("#folder-people-enabled")?.checked === true,
+        brands_enabled: modal.querySelector("#folder-brands-enabled")?.checked === true,
+      };
+      await this._api("save_chat_folder_options", "POST", options);
+      this._folderOptions = options;
+      close(); this._renderContacts();
+    });
+  }
+
+  _openBrandsEditor() {
+    const overlay = this.shadowRoot.getElementById("contact-modal-overlay");
+    const modal = this.shadowRoot.getElementById("contact-modal");
+    if (!overlay || !modal) return;
+    const manual = new Set(this._folderOptions.brands_manual || []);
+    const excluded = new Set(this._folderOptions.brands_excluded || []);
+    modal.innerHTML = `<div class="contact-form" style="padding:20px">
+      <div class="contact-form-header"><h2>🏷️ ${this._esc(this._t("brands_folder"))}</h2></div>
+      <p class="form-help">${this._esc(this._t("brands_folder_help"))}</p>
+      <div class="folder-editor-list">${this._contacts.map((chat) => { const checked = !excluded.has(chat.number) && (manual.has(chat.number) || this._isBrandChat(chat)); return `<label class="folder-editor-chat"><input type="checkbox" data-brand-number="${this._esc(chat.number)}" ${checked ? "checked" : ""}/><span>${this._esc(chat.contact_name || chat.number)}</span></label>`; }).join("")}</div>
+      <div class="contact-form-actions"><button id="brands-cancel">${this._esc(this._t("cancel"))}</button><button class="primary" id="brands-save">${this._esc(this._t("save"))}</button></div>
+    </div>`;
+    overlay.classList.add("open");
+    const close = () => overlay.classList.remove("open");
+    modal.querySelector("#brands-close")?.addEventListener("click", close);
+    modal.querySelector("#brands-cancel")?.addEventListener("click", close);
+    modal.querySelector("#brands-save")?.addEventListener("click", async () => {
+      const selected = new Set([...modal.querySelectorAll("[data-brand-number]:checked")].map((el) => el.dataset.brandNumber));
+      const auto = new Set(this._contacts.filter((chat) => this._isBrandChat(chat)).map((chat) => chat.number));
+      const options = { ...this._folderOptions,
+        brands_manual: [...selected].filter((number) => !auto.has(number)),
+        brands_excluded: [...auto].filter((number) => !selected.has(number)),
+      };
+      await this._api("save_chat_folder_options", "POST", options);
+      this._folderOptions = options; close(); this._renderContacts();
+    });
+  }
+
+  _showChatFolderMenu(event, number) {
+    if (!number) return;
+    this.shadowRoot.querySelector(".chat-folder-menu")?.remove();
+    this.shadowRoot.querySelector(".chat-folder-preview-overlay")?.remove();
+    const contact = this._contacts.find((item) => item.number === number);
+    if (!contact) return;
+    const mobile = window.matchMedia?.("(max-width: 580px)").matches === true;
+    const folders = this._folderTabDefinitions().filter((folder) => folder.id !== "all");
+    const brandSelected = this._isInBrandsFolder(contact);
+    const rows = folders.map((folder) => {
+      const isPeople = folder.id === "people";
+      const isBrands = folder.id === "brands";
+      const custom = !isPeople && !isBrands ? this._chatFolders.find((item) => item.id === folder.id) : null;
+      const checked = isPeople ? this._isInPeopleFolder(contact) : isBrands ? brandSelected : Boolean(custom?.numbers?.includes(number));
+      return `<label class="chat-folder-menu-row"><input type="checkbox" data-menu-folder="${this._esc(folder.id)}" ${checked ? "checked" : ""}/><span>${folder.icon ? this._esc(folder.icon) + " " : ""}${this._esc(folder.name)}</span></label>`;
+    }).join("");
+    const menu = document.createElement("div");
+    menu.className = mobile ? "chat-folder-menu chat-folder-menu-sheet" : "chat-folder-menu";
+    const pinLabel = contact.is_pinned ? this._t("unpin") : this._t("pin");
+    const muteLabel = contact.is_muted ? this._t("notifications_on") : this._t("notifications_off");
+    menu.innerHTML = `<div class="chat-folder-menu-track">
+      <div class="chat-folder-menu-page chat-folder-menu-main">
+        <button class="chat-folder-menu-row" id="chat-action-folders"><span class="chat-folder-menu-icon">📁</span><span>${this._esc(this._t("add_to_folder"))}</span><span class="chat-folder-menu-chevron">›</span></button>
+        <button class="chat-folder-menu-row" id="chat-action-unread"><span class="chat-folder-menu-icon">${contact.unread > 0 ? "☑" : "☐"}</span><span>${this._esc(this._t(contact.unread > 0 ? "mark_read" : "mark_unread"))}</span></button>
+        <button class="chat-folder-menu-row" id="chat-action-pin"><span class="chat-folder-menu-icon">📌</span><span>${this._esc(pinLabel)}</span></button>
+        <button class="chat-folder-menu-row" id="chat-action-mute"><span class="chat-folder-menu-icon">${contact.is_muted ? "🔔" : "🔕"}</span><span>${this._esc(muteLabel)}</span></button>
+        <button class="chat-folder-menu-row danger" id="chat-action-delete"><span class="chat-folder-menu-icon">🗑</span><span>${this._esc(this._t("delete_msg"))}</span></button>
+      </div>
+      <div class="chat-folder-menu-page chat-folder-menu-folders">
+        <button class="chat-folder-menu-row chat-folder-menu-back" id="chat-folder-back"><span class="chat-folder-menu-icon">‹</span><span>${this._esc(this._t("back"))}</span></button>
+        <div class="chat-folder-menu-title">${this._esc(this._t("add_to_folder"))}</div>
+        ${rows || `<div class="form-help">${this._esc(this._t("no_custom_folders"))}</div>`}
+        <button class="chat-folder-menu-row chat-folder-menu-new" id="chat-folder-create"><span class="chat-folder-menu-icon">＋</span><span>${this._esc(this._t("new_folder_with_contact"))}</span></button>
+      </div>
+    </div>`;
+    let host = menu;
+    let previewMessages = null;
+    if (mobile) {
+      const overlay = document.createElement("div");
+      overlay.className = "chat-folder-preview-overlay";
+      const preview = document.createElement("div");
+      preview.className = "chat-folder-preview-card";
+      preview.innerHTML = `<div class="chat-folder-preview-head"><div class="chat-folder-preview-avatar">${this._chatAvatarMarkup(contact)}</div><div><div class="chat-folder-preview-name">${this._esc(contact.contact_name || number)}</div><div class="chat-folder-preview-number">${this._esc(number)}</div></div></div><div class="chat-folder-preview-messages" id="chat-folder-preview-messages"><div class="chat-folder-preview-message">${this._esc((contact.last_text || this._t("no_messages")).slice(0, 220))}</div></div>`;
+      previewMessages = preview.querySelector("#chat-folder-preview-messages");
+      overlay.appendChild(preview);
+      overlay.appendChild(menu);
+      this.shadowRoot.appendChild(overlay);
+      host = overlay;
+    } else {
+      this.shadowRoot.appendChild(menu);
+      const point = event?.clientX != null ? { x: event.clientX, y: event.clientY } : { x: 20, y: 80 };
+      const margin = 8;
+      menu.style.left = `${Math.max(margin, Math.min(point.x, window.innerWidth - menu.offsetWidth - margin))}px`;
+      menu.style.top = `${Math.max(margin, Math.min(point.y, window.innerHeight - menu.offsetHeight - margin))}px`;
+    }
+    let closed = false;
+    const close = () => {
+      if (closed) return;
+      closed = true;
+      host.remove();
+      this.shadowRoot.removeEventListener("pointerdown", onOutside);
+    };
+    const onOutside = (pointerEvent) => {
+      if (!mobile && !menu.contains(pointerEvent.target)) {
+        close();
+      }
+    };
+    setTimeout(() => this.shadowRoot.addEventListener("pointerdown", onOutside), 0);
+    if (mobile) {
+      // The long-press pointer is still held when the sheet is inserted. Keep
+      // both panels inert until that pointer is released, otherwise its
+      // pointerup/click can activate the button under the finger (especially
+      // for chats near the bottom of the list).
+      let menuReady = false;
+      previewMessages?.closest(".chat-folder-preview-card")?.style.setProperty("pointer-events", "none");
+      menu.style.pointerEvents = "none";
+      const armMenu = () => setTimeout(() => {
+        menuReady = true;
+        previewMessages?.closest(".chat-folder-preview-card")?.style.removeProperty("pointer-events");
+        menu.style.pointerEvents = "";
+      }, 80);
+      window.addEventListener("pointerup", armMenu, { once: true, capture: true });
+      window.addEventListener("pointercancel", armMenu, { once: true, capture: true });
+      let backdropPointer = null;
+      const beginBackdropDismiss = (pointerEvent) => {
+        if (pointerEvent.target !== host || !menuReady) return;
+        pointerEvent.preventDefault();
+        pointerEvent.stopPropagation();
+        backdropPointer = pointerEvent.pointerId;
+        try { host.setPointerCapture?.(pointerEvent.pointerId); } catch (_) {}
+        this._suppressNextChatClick = true;
+        clearTimeout(this._suppressNextChatClickTimer);
+        this._suppressNextChatClickTimer = setTimeout(() => { this._suppressNextChatClick = false; }, 700);
+      };
+      const finishBackdropDismiss = (pointerEvent) => {
+        if (backdropPointer == null || pointerEvent.pointerId !== backdropPointer) return;
+        pointerEvent.preventDefault();
+        pointerEvent.stopPropagation();
+        try { host.releasePointerCapture?.(pointerEvent.pointerId); } catch (_) {}
+        backdropPointer = null;
+        // Keep the overlay mounted until pointerup has fully finished so the
+        // release cannot be retargeted to Search or another control below.
+        setTimeout(close, 80);
+      };
+      host.addEventListener("pointerdown", beginBackdropDismiss, { capture: true });
+      host.addEventListener("pointerup", finishBackdropDismiss, { capture: true });
+      host.addEventListener("pointercancel", finishBackdropDismiss, { capture: true });
+      host.addEventListener("click", (clickEvent) => {
+        if (clickEvent.target !== host) return;
+        clickEvent.preventDefault();
+        clickEvent.stopPropagation();
+        if (menuReady) setTimeout(close, 0);
+      }, { capture: true });
+      const preview = host.querySelector(".chat-folder-preview-card");
+      preview?.addEventListener("click", (clickEvent) => {
+        if (!menuReady || clickEvent.target.closest(".chat-folder-menu")) return;
+        clickEvent.preventDefault();
+        clickEvent.stopPropagation();
+        close();
+        this._selectContact(number);
+      });
+      const renderPreviewMessages = (messages) => {
+        if (!previewMessages || !previewMessages.isConnected || !Array.isArray(messages) || !messages.length) return;
+        let lastLabel = "";
+        previewMessages.innerHTML = messages.map((message, index) => {
+          const outgoing = message.direction === "out" || message.direction === "outgoing" || message.type === "sent";
+          const unread = !outgoing && !message.is_read;
+          const text = String(message.text || message.body || message.Text || message.message || "").slice(0, 220);
+          const label = this._fmtDateLabel(message.date);
+          const divider = label && label !== lastLabel ? `<div class="date-divider"><span>${this._esc(label)}</span></div>` : "";
+          if (label) lastLabel = label;
+          return `${divider}<div class="chat-folder-preview-message ${outgoing ? "outgoing" : ""} ${unread ? "unread-preview" : ""}" data-preview-index="${index}">${this._esc(text)}</div>`;
+        }).join("");
+        // Keep unread state untouched: this is a read-only preview. Position
+        // the scroll at the latest unread message, or at the newest message
+        // when the conversation has no unread incoming messages.
+        const lastUnread = messages.reduce((index, message, current) => {
+          const outgoing = message.direction === "out" || message.direction === "outgoing" || message.type === "sent";
+          return !outgoing && !message.is_read ? current : index;
+        }, -1);
+        requestAnimationFrame(() => {
+          const target = lastUnread >= 0
+            ? previewMessages.querySelector(`[data-preview-index="${lastUnread}"]`)
+            : previewMessages.querySelector("[data-preview-index]:last-of-type");
+          if (target) previewMessages.scrollTop = Math.max(0, target.offsetTop - previewMessages.clientHeight + target.offsetHeight + 8);
+          else previewMessages.scrollTop = previewMessages.scrollHeight;
+        });
+      };
+      // Reuse an already loaded chat immediately, avoiding an empty frame
+      // while the network request for the preview is in flight.
+      if (this._activeNumber === number && Array.isArray(this._messages) && this._messages.length) {
+        renderPreviewMessages(this._messages);
+      }
+      this._api(`messages/${encodeURIComponent(number)}`).then(renderPreviewMessages).catch(() => {});
+    }
+    menu.querySelector("#chat-action-folders")?.addEventListener("click", (event) => {
+      event.currentTarget.blur();
+      menu.classList.add("folders-open");
+    });
+    menu.querySelector("#chat-folder-back")?.addEventListener("click", () => menu.classList.remove("folders-open"));
+    menu.querySelector("#chat-action-unread")?.addEventListener("click", async () => {
+      close();
+      const shouldMarkRead = Number(contact.unread || 0) > 0;
+      await this._api(`${shouldMarkRead ? "mark_read" : "mark_unread"}/${encodeURIComponent(number)}`, "POST").catch(() => {});
+      const item = this._contacts.find((entry) => entry.number === number);
+      if (item) item.unread = shouldMarkRead ? 0 : Math.max(1, item.unread || 0);
+      this._updateBadge();
+      this._renderContacts();
+    });
+    menu.querySelector("#chat-action-pin")?.addEventListener("click", async () => {
+      const wasPinned = Boolean(contact.is_pinned);
+      contact.is_pinned = !wasPinned;
+      close();
+      this._renderContacts();
+      await this._api(`${wasPinned ? "unpin" : "pin"}/${encodeURIComponent(number)}`, "POST").catch(() => {
+        contact.is_pinned = wasPinned;
+        this._renderContacts();
+      });
+    });
+    menu.querySelector("#chat-action-mute")?.addEventListener("click", () => {
+      close();
+      this._toggleMute(number);
+    });
+    menu.querySelector("#chat-action-delete")?.addEventListener("click", () => {
+      close();
+      this._deleteContact(number);
+    });
+    menu.querySelector("#chat-folder-create")?.addEventListener("click", () => { close(); this._openFolderEditor(null, number); });
+    menu.querySelectorAll("[data-menu-folder]").forEach((input) => input.addEventListener("change", async () => {
+      const folderId = input.dataset.menuFolder;
+      if (folderId === "people") {
+        const manual = new Set(this._folderOptions.people_manual || []);
+        const excluded = new Set(this._folderOptions.people_excluded || []);
+        if (input.checked) {
+          excluded.delete(number);
+          if (this._isBrandChat(contact)) manual.add(number); else manual.delete(number);
+        } else if (this._isBrandChat(contact)) {
+          manual.delete(number);
+          excluded.add(number);
+        } else {
+          manual.delete(number);
+          excluded.add(number);
+        }
+        this._folderOptions = { ...this._folderOptions, people_manual: [...manual], people_excluded: [...excluded] };
+        await this._api("save_chat_folder_options", "POST", this._folderOptions);
+      } else if (folderId === "brands") {
+        const manual = new Set(this._folderOptions.brands_manual || []);
+        const excluded = new Set(this._folderOptions.brands_excluded || []);
+        if (input.checked) {
+          if (this._isBrandChat(contact)) excluded.delete(number); else manual.add(number);
+        } else if (this._isBrandChat(contact)) {
+          excluded.add(number);
+        } else {
+          manual.delete(number);
+        }
+        this._folderOptions = { ...this._folderOptions, brands_manual: [...manual], brands_excluded: [...excluded] };
+        await this._api("save_chat_folder_options", "POST", this._folderOptions);
+      } else {
+        const folder = this._chatFolders.find((item) => item.id === folderId);
+        if (!folder) return;
+        const numbers = new Set(folder.numbers || []);
+        if (input.checked) numbers.add(number); else numbers.delete(number);
+        const foldersNext = this._chatFolders.map((item) => item.id === folderId ? { ...item, numbers: [...numbers] } : item);
+        await this._api("save_chat_folders", "POST", { folders: foldersNext });
+        this._chatFolders = foldersNext;
+      }
+      this._renderContacts();
+    }));
+  }
+
+  _openFolderEditor(folder = null, preselectedNumber = null) {
+    const overlay = this.shadowRoot.getElementById("contact-modal-overlay");
+    const modal = this.shadowRoot.getElementById("contact-modal");
+    if (!overlay || !modal) return;
+    const current = folder || { id: `folder-${Date.now()}`, name: "", icon: "", numbers: [] };
+    const selected = new Set(current.numbers || []);
+    if (preselectedNumber) selected.add(preselectedNumber);
+    const folderTabs = this._folderTabDefinitions();
+    const currentPosition = Math.max(0, folderTabs.findIndex(item => item.id === current.id));
+    modal.innerHTML = `<div class="contact-form" style="padding:20px">
+      <div class="contact-form-header"><h2>${this._esc(folder ? this._t("edit_folder") : this._t("new_folder"))}</h2></div>
+      <label class="folder-edit-field">${this._esc(this._t("folder_name"))}<input id="folder-name" maxlength="80" value="${this._esc(current.name)}" /></label>
+      <label class="folder-edit-field">${this._esc(this._t("folder_icon"))}<input id="folder-icon" maxlength="8" placeholder="📁" value="${this._esc(current.icon || "")}" /></label>
+      ${folder ? `<label class="folder-edit-field">Позиция в списке папок<select id="folder-position">${folderTabs.map((item, index) => `<option value="${index}" ${index === currentPosition ? "selected" : ""}>${index + 1}. ${this._esc(item.name)}</option>`).join("")}</select></label>` : ""}
+      <div class="folder-editor-list">${this._contacts.map((chat) => `<label class="folder-editor-chat"><input type="checkbox" data-folder-number="${this._esc(chat.number)}" ${selected.has(chat.number) ? "checked" : ""}/><span>${this._esc(chat.contact_name || chat.number)}</span></label>`).join("")}</div>
+      <div class="contact-form-actions"><button id="folder-cancel">${this._esc(this._t("cancel"))}</button><button class="primary" id="folder-save">${this._esc(this._t("save"))}</button></div>
+    </div>`;
+    overlay.classList.add("open");
+    const close = () => overlay.classList.remove("open");
+    modal.querySelector("#folder-close")?.addEventListener("click", close);
+    modal.querySelector("#folder-cancel")?.addEventListener("click", close);
+    modal.querySelector("#folder-save")?.addEventListener("click", async () => {
+      const name = modal.querySelector("#folder-name")?.value.trim();
+      if (!name) return;
+      const numbers = [...modal.querySelectorAll("[data-folder-number]:checked")].map((el) => el.dataset.folderNumber);
+      const next = { id: current.id, name, icon: modal.querySelector("#folder-icon")?.value.trim() || "", numbers };
+      const folders = folder ? this._chatFolders.map((item) => item.id === folder.id ? next : item) : [...this._chatFolders, next];
+      await this._api("save_chat_folders", "POST", { folders });
+      this._chatFolders = folders;
+      if (folder) {
+        const order = this._folderTabDefinitions().map(item => item.id).filter(id => id !== folder.id);
+        const position = Math.max(0, Math.min(order.length, Number(modal.querySelector("#folder-position")?.value || 0)));
+        order.splice(position, 0, folder.id);
+        this._folderOptions = { ...this._folderOptions, folder_order: order };
+        await this._api("save_chat_folder_options", "POST", this._folderOptions).catch(() => {});
+      }
+      this._activeFolderId = next.id;
+      close(); this._renderContacts();
     });
   }
 
@@ -3736,6 +4485,7 @@ class SmsGammuPanel extends HTMLElement {
       if (!bubble) { console.error("no bubble"); return; }
       const msgId = parseInt(bubble.dataset.id);
       const isStarred = bubble.dataset.starred === "1";
+      const isMessagePinned = bubble.dataset.messagePinned === "1";
       const isOut = bubble.classList.contains("outgoing");
       const text = bubble.querySelector(".msg-text")?.textContent || "";
 
@@ -3749,7 +4499,7 @@ class SmsGammuPanel extends HTMLElement {
       `;
       menu.innerHTML = `
         <div class="msg-ctx-item" data-action="copy" style="display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:14px;color:#fff;cursor:pointer">📋 ${this._t("copy")}</div>
-        <div class="msg-ctx-item" data-action="star" style="display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:14px;color:#fff;cursor:pointer">${isStarred ? "★" : "☆"} ${isStarred ? this._t("unstar") : this._t("star")}</div>
+        <div class="msg-ctx-item" data-action="pin-message" style="display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:14px;color:#fff;cursor:pointer">${isMessagePinned ? "📌 Открепить сообщение" : "📍 Закрепить сообщение"}</div>
         <div class="msg-ctx-item" data-action="delete" style="display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:14px;color:#e53935;cursor:pointer">🗑 ${this._t("delete_msg")}</div>
       `;
 
@@ -3789,6 +4539,11 @@ class SmsGammuPanel extends HTMLElement {
             } catch(err) {
               this._showToast(this._t("copy_failed"));
             }
+          } else if (action === "pin-message") {
+            await this._api(`${isMessagePinned ? "unpin_message" : "pin_message"}/${msgId}`, "POST").catch(() => {});
+            const msg = this._messages.find(m => m.id === msgId);
+            if (msg) msg.is_message_pinned = isMessagePinned ? 0 : 1;
+            this._renderMessages();
           } else if (action === "star") {
             const ep = isStarred ? `unstar/${msgId}` : `star/${msgId}`;
             await this._api(ep, "POST").catch(() => {});
@@ -3826,6 +4581,89 @@ class SmsGammuPanel extends HTMLElement {
   }
 
 
+  _showPinnedMessages() {
+    document.querySelector(".pinned-dialog")?.remove();
+    const pins = this._messages.filter(m => m.is_message_pinned);
+    if (!pins.length) return;
+    const overlay = document.createElement("div");
+    overlay.className = "pinned-dialog";
+    overlay.style.cssText = "position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.62);display:flex;align-items:center;justify-content:center;padding:18px";
+    const sheet = document.createElement("div");
+    sheet.style.cssText = "width:min(720px,100%);max-height:min(85vh,760px);display:flex;flex-direction:column;background:var(--card,#202020);color:var(--text,#fff);border:1px solid var(--line,#444);border-radius:16px;overflow:hidden;box-shadow:0 16px 50px rgba(0,0,0,.5)";
+    const head = document.createElement("div");
+    head.style.cssText = "display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--line,#444);font-weight:600";
+    head.innerHTML = `<span>📌 Закреплено ${pins.length}</span><button style="border:0;background:none;color:inherit;font-size:24px;cursor:pointer">×</button>`;
+    const list = document.createElement("div");
+    list.style.cssText = "overflow:auto;padding:12px;display:flex;flex-direction:column;gap:8px";
+    let last = "";
+    for (const m of pins) {
+      const day = this._fmtDateLabel(m.date);
+      if (day !== last) { const d = document.createElement("div"); d.textContent = day; d.style.cssText = "text-align:center;color:var(--sub);font-size:12px;margin:8px"; list.appendChild(d); last = day; }
+      const item = document.createElement("button");
+      item.textContent = m.text || "";
+      item.style.cssText = `text-align:left;border:0;border-radius:12px;padding:10px 12px;background:${m.direction === "out" ? "var(--accent)" : "var(--bg,#151515)"};color:var(--text,#fff);cursor:pointer;white-space:pre-wrap`;
+      item.addEventListener("click", () => { overlay.remove(); const bubble = [...this.shadowRoot.querySelectorAll(".msg-bubble")].find(el => el.dataset.id === String(m.id)); bubble?.scrollIntoView({behavior:"smooth",block:"center"}); });
+      list.appendChild(item);
+    }
+    head.querySelector("button").addEventListener("click", () => overlay.remove());
+    overlay.addEventListener("click", e => { if (e.target === overlay) overlay.remove(); });
+    sheet.append(head, list); overlay.appendChild(sheet); document.body.appendChild(overlay);
+  }
+
+  _openPeopleEditor() {
+    const overlay = this.shadowRoot.getElementById("contact-modal-overlay");
+    const modal = this.shadowRoot.getElementById("contact-modal");
+    if (!overlay || !modal) return;
+    const manual = new Set(this._folderOptions.people_manual || []);
+    const excluded = new Set(this._folderOptions.people_excluded || []);
+    modal.innerHTML = `<div class="contact-form" style="padding:20px">
+      <div class="contact-form-header"><h2>👤 ${this._esc(this._t("people_folder"))}</h2></div>
+      <p class="form-help">${this._esc(this._t("people_folder_help"))}</p>
+      <div class="folder-editor-list">${this._contacts.map((chat) => { const checked = !excluded.has(chat.number) && (manual.has(chat.number) || this._isInPeopleFolder(chat)); return `<label class="folder-editor-chat"><input type="checkbox" data-people-number="${this._esc(chat.number)}" ${checked ? "checked" : ""}/><span>${this._esc(chat.contact_name || chat.number)}</span></label>`; }).join("")}</div>
+      <div class="contact-form-actions"><button id="people-cancel">${this._esc(this._t("cancel"))}</button><button class="primary" id="people-save">${this._esc(this._t("save"))}</button></div>
+    </div>`;
+    overlay.classList.add("open");
+    const close = () => overlay.classList.remove("open");
+    modal.querySelector("#people-cancel")?.addEventListener("click", close);
+    modal.querySelector("#people-save")?.addEventListener("click", async () => {
+      const selected = new Set([...modal.querySelectorAll("[data-people-number]:checked")].map((el) => el.dataset.peopleNumber));
+      const auto = new Set(this._contacts.filter((chat) => !this._isBrandChat(chat)).map((chat) => chat.number));
+      const options = { ...this._folderOptions,
+        people_manual: [...selected].filter((number) => !auto.has(number)),
+        people_excluded: [...auto].filter((number) => !selected.has(number)),
+      };
+      await this._api("save_chat_folder_options", "POST", options);
+      this._folderOptions = options; close(); this._renderContacts();
+    });
+  }
+  _updatePinnedBanner() {
+    const area = this.shadowRoot?.getElementById("messages-area");
+    const banner = this.shadowRoot?.getElementById("pinned-banner");
+    if (!area || !banner) return;
+    const pins = this._messages.filter(m => m.is_message_pinned).sort((a, b) => new Date(a.date) - new Date(b.date) || Number(a.id) - Number(b.id));
+    if (!pins.length) { banner.classList.remove("visible"); return; }
+    let index = 0;
+    const top = area.getBoundingClientRect().top + 12;
+    pins.forEach((message, i) => {
+      const bubble = [...area.querySelectorAll(".msg-bubble")].find(el => el.dataset.id === String(message.id));
+      if (bubble && bubble.getBoundingClientRect().top <= top) index = i;
+    });
+    this._pinnedCycle = index;
+    const current = pins[index];
+    const jump = this.shadowRoot.getElementById("pinned-jump");
+    if (jump) jump.textContent = current?.text || "Закреплённое сообщение";
+    const list = this.shadowRoot.getElementById("pinned-list");
+    if (list) { list.title = `Все закреплённые (${pins.length})`; list.setAttribute("aria-label", list.title); }
+  }
+
+  _updateScrollBottomButton() {
+    const area = this.shadowRoot?.getElementById("messages-area");
+    const button = this.shadowRoot?.getElementById("scroll-bottom-btn");
+    if (!area || !button) return;
+    const away = area.scrollHeight - area.scrollTop - area.clientHeight;
+    button.classList.toggle("visible", away > 180);
+  }
+
   _renderMessages() {
     // Защита от гонки: пока показан оверлей (статус модема/телефонная
     // книга), эта функция не должна трогать шапку/send-bar вообще —
@@ -3846,6 +4684,9 @@ class SmsGammuPanel extends HTMLElement {
     const sendBar = this.shadowRoot.getElementById("send-bar");
 
     if (!this._activeNumber) {
+      this.shadowRoot.getElementById("pinned-banner")?.classList.remove("visible");
+      this.shadowRoot.getElementById("scroll-bottom-btn")?.classList.remove("visible");
+      area.classList.remove("has-pinned-banner");
       titleEl && (titleEl.textContent = this._t("select_dialog"));
       subEl && (subEl.textContent = "");
       delBtn && (delBtn.style.display = "none");
@@ -3889,6 +4730,17 @@ class SmsGammuPanel extends HTMLElement {
     }
     const starFilterBtn = this.shadowRoot.getElementById("star-filter-btn");
     if (starFilterBtn) starFilterBtn.style.display = "";
+    const pinned = this._messages.filter(m => m.is_message_pinned);
+    const pinnedBanner = this.shadowRoot.getElementById("pinned-banner");
+    if (pinnedBanner) {
+      pinnedBanner.classList.toggle("visible", pinned.length > 0);
+      const jump = this.shadowRoot.getElementById("pinned-jump");
+      const list = this.shadowRoot.getElementById("pinned-list");
+      const item = pinned[this._pinnedCycle % Math.max(1, pinned.length)];
+      if (jump) jump.textContent = item?.text || "Закреплённое сообщение";
+      if (list) { list.title = `Все закреплённые (${pinned.length})`; list.setAttribute("aria-label", list.title); }
+    }
+    area.classList.toggle("has-pinned-banner", pinned.length > 0);
 
     if (this._messages.length === 0) {
       area.innerHTML = `<div class="empty"><p>Нет сообщений</p></div>`;
@@ -3906,16 +4758,21 @@ class SmsGammuPanel extends HTMLElement {
       }
       const isOut = m.direction === "out";
       html += `
-        <div class="msg-bubble ${isOut ? "outgoing" : (!m.is_read ? "unread" : "")}" data-id="${m.id}" data-starred="${m.is_starred ? '1' : '0'}">
+        <div class="msg-bubble ${isOut ? "outgoing" : (!m.is_read ? "unread" : "")}" data-id="${m.id}" data-starred="${m.is_starred ? '1' : '0'}" data-message-pinned="${m.is_message_pinned ? '1' : '0'}">
           <div class="msg-text">${this._esc(m.text)}</div>
           <div class="msg-meta">
             ${!isOut && !m.is_read ? '<span class="msg-unread-dot"></span>' : ""}
-            ${m.is_starred ? '<span style="font-size:11px;margin-right:2px">⭐</span>' : ''}<span class="msg-date">${this._formatFull(m.date)}</span>
+            ${m.is_message_pinned ? '<span style="font-size:11px;margin-right:2px">📌</span>' : ''}${m.is_starred ? '<span style="font-size:11px;margin-right:2px">⭐</span>' : ''}<span class="msg-date">${this._formatFull(m.date)}</span>
             ${isOut ? '<span style="font-size:11px;color:rgba(255,255,255,.7)">✓</span>' : ""}
           </div>
         </div>`;
     }
     area.innerHTML = html;
+    if (!this._pinnedScrollBound) {
+      area.addEventListener("scroll", () => { this._updatePinnedBanner(); this._updateScrollBottomButton(); }, { passive: true });
+      this._pinnedScrollBound = true;
+    }
+    requestAnimationFrame(() => { this._updatePinnedBanner(); this._updateScrollBottomButton(); });
 
 
 
