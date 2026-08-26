@@ -413,8 +413,9 @@ const CSS = `
     border-bottom: 1px solid var(--line);
     min-height: 58px;
   }
-  .pinned-banner { display:none; align-items:center; gap:10px; min-height:40px; padding:6px 16px; background:var(--card); border-bottom:1px solid var(--line); }
-  .pinned-banner.visible { display:flex; }
+  .pinned-banner { display:none; padding:0; background:transparent !important; border:0 !important; box-shadow:none !important; }
+  .pinned-banner.visible { display:block; }
+  .pinned-banner-shell { display:flex; align-items:center; gap:10px; min-height:40px; padding:6px 16px; background:var(--card); border-bottom:1px solid var(--line); }
   .pinned-banner button { border:0; background:transparent; color:var(--text); cursor:pointer; min-width:0; }
   .pinned-banner .pinned-jump { flex:1; overflow:hidden; text-align:left; white-space:nowrap; text-overflow:ellipsis; font-size:13px; }
   .pinned-banner .pinned-jump::before { content:'📌 '; color:var(--accent); }
@@ -422,9 +423,10 @@ const CSS = `
   .chat-header > svg { display:none; }
   .pinned-highlight { outline:2px solid var(--accent); outline-offset:2px; }
   @media (max-width: 580px) {
-    .pinned-banner { position:relative; margin:0; border:0 !important; border-radius:0; padding:9px 26px; min-height:38px; background:transparent !important; background-color:transparent !important; box-shadow:none !important; overflow:visible; }
-    .pinned-banner::before { content:''; position:absolute; inset:3px 12px; z-index:0; border:1px solid var(--line); border-radius:999px; background:var(--card); box-shadow:0 2px 8px rgba(0,0,0,.18); }
-    .pinned-banner button { position:relative; z-index:1; }
+    .pinned-banner { margin:0; padding:3px 0 7px; background:transparent !important; }
+    .pinned-banner-shell { margin:0 12px; padding:3px; min-height:38px; border:1px solid var(--line); border-radius:999px; overflow:hidden; background:var(--card); box-shadow:0 2px 8px rgba(0,0,0,.18); }
+    .pinned-banner-shell .pinned-jump { padding:7px 10px; }
+    .pinned-banner-shell .pinned-list { padding:7px 10px; }
   }
   .chat-profile-trigger {
     flex: 1; min-width: 0; cursor: pointer;
@@ -3371,7 +3373,7 @@ class SmsGammuPanel extends HTMLElement {
               </svg>
             </button>
           </div>
-          <div class="pinned-banner" id="pinned-banner"><button class="pinned-jump" id="pinned-jump"></button><button class="pinned-list" id="pinned-list"></button></div>
+          <div class="pinned-banner" id="pinned-banner"><div class="pinned-banner-shell"><button class="pinned-jump" id="pinned-jump"></button><button class="pinned-list" id="pinned-list"></button></div></div>
           <div class="messages-area" id="messages-area">
             <div class="empty">
               <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
