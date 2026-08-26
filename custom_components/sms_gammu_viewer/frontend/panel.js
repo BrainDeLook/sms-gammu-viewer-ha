@@ -486,6 +486,9 @@ const CSS = `
     -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 60px), transparent 100%);
     mask-image: linear-gradient(to bottom, black calc(100% - 60px), transparent 100%);
   }
+  .messages-area.has-pinned-banner { padding-top:72px; }
+  .scroll-bottom-btn { display:none; position:absolute; right:20px; bottom:86px; z-index:9; width:44px; height:44px; align-items:center; justify-content:center; border:1px solid var(--line); border-radius:50%; background:color-mix(in srgb, var(--card) 92%, var(--sub)); color:var(--text); box-shadow:0 4px 14px rgba(0,0,0,.28); cursor:pointer; }
+  .scroll-bottom-btn.visible { display:flex; }
 
   .msg-ctx-menu {
     position: absolute; z-index: 999;
@@ -4568,10 +4571,6 @@ class SmsGammuPanel extends HTMLElement {
     overlay.addEventListener("click", e => { if (e.target === overlay) overlay.remove(); });
     sheet.append(head, list); overlay.appendChild(sheet); document.body.appendChild(overlay);
   }
-  .messages-area.has-pinned-banner { padding-top:72px; }
-  .scroll-bottom-btn { display:none; position:absolute; right:20px; bottom:86px; z-index:9; width:44px; height:44px; align-items:center; justify-content:center; border:1px solid var(--line); border-radius:50%; background:color-mix(in srgb, var(--card) 92%, var(--sub)); color:var(--text); box-shadow:0 4px 14px rgba(0,0,0,.28); cursor:pointer; }
-  .scroll-bottom-btn.visible { display:flex; }
-
   _updatePinnedBanner() {
     const area = this.shadowRoot?.getElementById("messages-area");
     const banner = this.shadowRoot?.getElementById("pinned-banner");
