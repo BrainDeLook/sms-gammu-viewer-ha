@@ -346,6 +346,8 @@ const CSS = `
   @media (min-width: 581px) { .chat-folder-preview-overlay { display: none; } }
   .contact-form-actions button.primary { background: var(--accent); color: #fff; }
   .contact-form-actions button.secondary { background: transparent; color: var(--sub); }
+  .contact-form-actions button.danger { margin-right: auto; background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger); }
+  .contact-form-actions button.danger:hover { background: color-mix(in srgb, var(--danger) 24%, transparent); }
   .folder-settings-row button:disabled { opacity: .35; cursor: default; }
   /* Brand marks in the chat list use the same full circular treatment as the
      chat header; don't add the old white inset ring around the logo. */
@@ -4445,12 +4447,21 @@ class SmsGammuPanel extends HTMLElement {
       <label class="folder-edit-field">${this._esc(this._t("folder_icon"))}<input id="folder-icon" maxlength="8" placeholder="📁" value="${this._esc(current.icon || "")}" /></label>
       ${folder ? `<label class="folder-edit-field">Позиция в списке папок<select id="folder-position">${folderTabs.map((item, index) => `<option value="${index}" ${index === currentPosition ? "selected" : ""}>${index + 1}. ${this._esc(item.name)}</option>`).join("")}</select></label>` : ""}
       <div class="folder-editor-list">${this._contacts.map((chat) => `<label class="folder-editor-chat"><input type="checkbox" data-folder-number="${this._esc(chat.number)}" ${selected.has(chat.number) ? "checked" : ""}/><span>${this._esc(chat.contact_name || chat.number)}</span></label>`).join("")}</div>
-      <div class="contact-form-actions"><button id="folder-cancel">${this._esc(this._t("cancel"))}</button><button class="primary" id="folder-save">${this._esc(this._t("save"))}</button></div>
+      <div class="contact-form-actions">${folder ? `<button class="danger" id="folder-delete">${this._esc(this._t("delete_folder"))}</button>` : ""}<button id="folder-cancel">${this._esc(this._t("cancel"))}</button><button class="primary" id="folder-save">${this._esc(this._t("save"))}</button></div>
     </div>`;
     overlay.classList.add("open");
     const close = () => overlay.classList.remove("open");
     modal.querySelector("#folder-close")?.addEventListener("click", close);
     modal.querySelector("#folder-cancel")?.addEventListener("click", close);
+    modal.querySelector("#folder-delete")?.addEventListener("click", async () => {
+      if (!folder || !window.confirm(this._t("delete_folder_confirm"))) return;
+      const folders = this._chatFolders.filter((item) => item.id !== folder.id);
+      await this._api("save_chat_folders", "POST", { folders });
+      this._chatFolders = folders;
+      this._folderOptions = { ...this._folderOptions, folder_order: (this._folderOptions.folder_order || []).filter((id) => id !== folder.id) };
+      if (this._activeFolderId === folder.id) this._activeFolderId = this._folderTabDefinitions()[0]?.id || "all";
+      close(); this._renderContacts();
+    });
     modal.querySelector("#folder-save")?.addEventListener("click", async () => {
       const name = modal.querySelector("#folder-name")?.value.trim();
       if (!name) return;
