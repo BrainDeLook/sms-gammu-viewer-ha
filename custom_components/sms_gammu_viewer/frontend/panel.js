@@ -149,6 +149,7 @@ const CSS = `
     mask-image: linear-gradient(to bottom, black calc(100% - 60px), transparent 100%);
   }
   .contact-list::-webkit-scrollbar { display: none; width: 0; height: 0; }
+  .contact-list.folder-swipe-lock { touch-action: none; overscroll-behavior: none; }
 
 
   .swipe-wrap { position: relative; overflow: hidden; border-bottom: 0.5px solid var(--line); background: var(--card); }
@@ -4007,7 +4008,11 @@ class SmsGammuPanel extends HTMLElement {
     let startY = 0;
     let tracking = false;
     let switched = false;
-    const reset = () => { tracking = false; switched = false; };
+    let horizontalIntent = false;
+    const reset = () => {
+      tracking = false; switched = false; horizontalIntent = false;
+      list.classList.remove("folder-swipe-lock");
+    };
     list.addEventListener("pointerdown", (event) => {
       if (event.pointerType === "mouse" || event.button !== 0) return;
       if (this._swipeState && [...this._swipeState.values()].some((value) => value !== 0)) return;
@@ -4020,12 +4025,22 @@ class SmsGammuPanel extends HTMLElement {
       startY = event.clientY;
       tracking = true;
       switched = false;
+      horizontalIntent = false;
     }, { capture: true, passive: true });
     list.addEventListener("pointermove", (event) => {
       if (!tracking || switched) return;
       const dx = event.clientX - startX;
       const dy = event.clientY - startY;
-      if (Math.abs(dy) > 30 && Math.abs(dy) > Math.abs(dx) * 0.65) { reset(); return; }
+      if (!horizontalIntent) {
+        if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+        if (Math.abs(dy) > Math.abs(dx) * 1.15) { reset(); return; }
+        horizontalIntent = true;
+        list.classList.add("folder-swipe-lock");
+      }
+      // Once horizontal intent is established, freeze vertical scrolling and
+      // let this gesture belong exclusively to folder navigation.
+      event.preventDefault();
+      event.stopPropagation();
       if (Math.abs(dx) < 54 || Math.abs(dx) < Math.abs(dy) * 1.25) return;
       const tabs = this._folderTabDefinitions();
       if (tabs.length < 2) { reset(); return; }
@@ -4033,8 +4048,6 @@ class SmsGammuPanel extends HTMLElement {
       const next = (current + (dx < 0 ? 1 : -1) + tabs.length) % tabs.length;
       this._activeFolderId = tabs[next].id;
       switched = true;
-      event.preventDefault();
-      event.stopPropagation();
       const folderHost = this.shadowRoot.getElementById("folder-tabs");
       folderHost?.querySelectorAll("[data-folder-id]").forEach((tab) => {
         tab.classList.toggle("active", tab.dataset.folderId === this._activeFolderId);
