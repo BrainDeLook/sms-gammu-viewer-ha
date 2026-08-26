@@ -3948,6 +3948,7 @@ class SmsGammuPanel extends HTMLElement {
         const folder = this._chatFolders.find((item) => item.id === id);
         if (folder) this._openFolderEditor(folder);
         else if (id === "brands") this._openBrandsEditor();
+        else if (id === "people") this._openPeopleEditor();
         else this._openFolderSettings();
       };
       button.addEventListener("pointerdown", (event) => {
@@ -4020,6 +4021,7 @@ class SmsGammuPanel extends HTMLElement {
       <label class="folder-editor-chat"><input type="checkbox" id="folder-show-all" ${this._folderOptions.show_all !== false ? "checked" : ""}/> ${this._esc(this._t("show_all_chats"))}</label>
       <label class="folder-editor-chat"><input type="checkbox" id="folder-people-enabled" ${this._folderOptions.people_enabled ? "checked" : ""}/> ${this._esc(this._t("enable_people_folder"))}</label>
       <label class="folder-editor-chat"><input type="checkbox" id="folder-brands-enabled" ${this._folderOptions.brands_enabled ? "checked" : ""}/> ${this._esc(this._t("enable_brands_folder"))}</label>
+      <button id="folder-manage-people" ${this._folderOptions.people_enabled ? "" : "disabled"}>${this._esc(this._t("manage_people_folder"))}</button>
       <button id="folder-manage-brands" ${this._folderOptions.brands_enabled ? "" : "disabled"}>${this._esc(this._t("manage_brands_folder"))}</button>
       <h3>${this._esc(this._t("custom_folders"))}</h3>
       <div class="folder-settings-list">${this._folderTabDefinitions().length ? this._folderTabDefinitions().map((folder, index, all) => `<div class="folder-settings-row"><span>${folder.icon ? this._esc(folder.icon) + " " : ""}${this._esc(folder.name)}</span><span><button data-move-folder-up="${this._esc(folder.id)}" ${index === 0 ? "disabled" : ""} aria-label="${this._esc(this._t("move_folder_up"))}">↑</button><button data-move-folder-down="${this._esc(folder.id)}" ${index === all.length - 1 ? "disabled" : ""} aria-label="${this._esc(this._t("move_folder_down"))}">↓</button>${folder.system ? "" : `<button data-edit-folder="${this._esc(folder.id)}">${this._esc(this._t("edit_folder"))}</button><button data-delete-folder="${this._esc(folder.id)}">${this._esc(this._t("delete_folder"))}</button>`}</span></div>`).join("") : `<p class="form-help">${this._esc(this._t("no_custom_folders"))}</p>`}</div>
@@ -4068,6 +4070,21 @@ class SmsGammuPanel extends HTMLElement {
     modal.querySelector("#folder-brands-enabled")?.addEventListener("change", (event) => {
       const button = modal.querySelector("#folder-manage-brands");
       if (button) button.disabled = !event.target.checked;
+    });
+    modal.querySelector("#folder-people-enabled")?.addEventListener("change", (event) => {
+      const button = modal.querySelector("#folder-manage-people");
+      if (button) button.disabled = !event.target.checked;
+    });
+    modal.querySelector("#folder-manage-people")?.addEventListener("click", async () => {
+      const options = { ...this._folderOptions,
+        show_all: modal.querySelector("#folder-show-all")?.checked !== false,
+        people_enabled: modal.querySelector("#folder-people-enabled")?.checked === true,
+        brands_enabled: modal.querySelector("#folder-brands-enabled")?.checked === true,
+      };
+      await this._api("save_chat_folder_options", "POST", options);
+      this._folderOptions = options;
+      close();
+      this._openPeopleEditor();
     });
     modal.querySelector("#folder-manage-brands")?.addEventListener("click", async () => {
       const options = { ...this._folderOptions,
@@ -4591,6 +4608,33 @@ class SmsGammuPanel extends HTMLElement {
     head.querySelector("button").addEventListener("click", () => overlay.remove());
     overlay.addEventListener("click", e => { if (e.target === overlay) overlay.remove(); });
     sheet.append(head, list); overlay.appendChild(sheet); document.body.appendChild(overlay);
+  }
+
+  _openPeopleEditor() {
+    const overlay = this.shadowRoot.getElementById("contact-modal-overlay");
+    const modal = this.shadowRoot.getElementById("contact-modal");
+    if (!overlay || !modal) return;
+    const manual = new Set(this._folderOptions.people_manual || []);
+    const excluded = new Set(this._folderOptions.people_excluded || []);
+    modal.innerHTML = `<div class="contact-form" style="padding:20px">
+      <div class="contact-form-header"><h2>👤 ${this._esc(this._t("people_folder"))}</h2></div>
+      <p class="form-help">${this._esc(this._t("people_folder_help"))}</p>
+      <div class="folder-editor-list">${this._contacts.map((chat) => { const checked = !excluded.has(chat.number) && (manual.has(chat.number) || this._isInPeopleFolder(chat)); return `<label class="folder-editor-chat"><input type="checkbox" data-people-number="${this._esc(chat.number)}" ${checked ? "checked" : ""}/><span>${this._esc(chat.contact_name || chat.number)}</span></label>`; }).join("")}</div>
+      <div class="contact-form-actions"><button id="people-cancel">${this._esc(this._t("cancel"))}</button><button class="primary" id="people-save">${this._esc(this._t("save"))}</button></div>
+    </div>`;
+    overlay.classList.add("open");
+    const close = () => overlay.classList.remove("open");
+    modal.querySelector("#people-cancel")?.addEventListener("click", close);
+    modal.querySelector("#people-save")?.addEventListener("click", async () => {
+      const selected = new Set([...modal.querySelectorAll("[data-people-number]:checked")].map((el) => el.dataset.peopleNumber));
+      const auto = new Set(this._contacts.filter((chat) => !this._isBrandChat(chat)).map((chat) => chat.number));
+      const options = { ...this._folderOptions,
+        people_manual: [...selected].filter((number) => !auto.has(number)),
+        people_excluded: [...auto].filter((number) => !selected.has(number)),
+      };
+      await this._api("save_chat_folder_options", "POST", options);
+      this._folderOptions = options; close(); this._renderContacts();
+    });
   }
   _updatePinnedBanner() {
     const area = this.shadowRoot?.getElementById("messages-area");
