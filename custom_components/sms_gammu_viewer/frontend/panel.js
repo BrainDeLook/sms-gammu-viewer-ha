@@ -422,7 +422,7 @@ const CSS = `
   .chat-header > svg { display:none; }
   .pinned-highlight { outline:2px solid var(--accent); outline-offset:2px; }
   @media (max-width: 580px) {
-    .pinned-banner { position:relative; margin:0; border:0; border-radius:0; padding:9px 26px; min-height:38px; background:transparent; box-shadow:none; }
+    .pinned-banner { position:relative; margin:0; border:0 !important; border-radius:0; padding:9px 26px; min-height:38px; background:transparent !important; background-color:transparent !important; box-shadow:none !important; overflow:visible; }
     .pinned-banner::before { content:''; position:absolute; inset:3px 12px; z-index:0; border:1px solid var(--line); border-radius:999px; background:var(--card); box-shadow:0 2px 8px rgba(0,0,0,.18); }
     .pinned-banner button { position:relative; z-index:1; }
   }
