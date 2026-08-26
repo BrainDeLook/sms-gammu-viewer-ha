@@ -3577,6 +3577,7 @@ class SmsGammuPanel extends HTMLElement {
       this._search = e.target.value;
       this._renderContacts();
     });
+    this._initFolderSwipe();
 
 
     this._initPbSheet();
@@ -3995,6 +3996,45 @@ class SmsGammuPanel extends HTMLElement {
         else if (button.dataset.folderId === "brands") this._openBrandsEditor();
       });
     });
+  }
+
+  _initFolderSwipe() {
+    const list = this.shadowRoot.getElementById("contact-list");
+    if (!list || list.dataset.folderSwipeBound === "1") return;
+    list.dataset.folderSwipeBound = "1";
+    let startX = 0;
+    let startY = 0;
+    let tracking = false;
+    let switched = false;
+    const reset = () => { tracking = false; switched = false; };
+    list.addEventListener("pointerdown", (event) => {
+      if (event.pointerType === "mouse" || event.button !== 0) return;
+      const rect = list.getBoundingClientRect();
+      const ratio = (event.clientX - rect.left) / Math.max(1, rect.width);
+      // Reserve the outer quarters for native chat swipe actions.
+      if (ratio < 0.25 || ratio > 0.75) return;
+      startX = event.clientX;
+      startY = event.clientY;
+      tracking = true;
+      switched = false;
+    }, { capture: true, passive: true });
+    list.addEventListener("pointermove", (event) => {
+      if (!tracking || switched) return;
+      const dx = event.clientX - startX;
+      const dy = event.clientY - startY;
+      if (Math.abs(dy) > 30 && Math.abs(dy) > Math.abs(dx) * 0.65) { reset(); return; }
+      if (Math.abs(dx) < 54 || Math.abs(dx) < Math.abs(dy) * 1.25) return;
+      const tabs = this._folderTabDefinitions();
+      if (tabs.length < 2) { reset(); return; }
+      const current = Math.max(0, tabs.findIndex((tab) => tab.id === this._activeFolderId));
+      const next = (current + (dx < 0 ? 1 : -1) + tabs.length) % tabs.length;
+      this._activeFolderId = tabs[next].id;
+      switched = true;
+      event.preventDefault();
+      event.stopPropagation();
+      this._renderContacts(true);
+    }, { capture: true, passive: false });
+    ["pointerup", "pointercancel", "pointerleave"].forEach((name) => list.addEventListener(name, reset, { capture: true, passive: true }));
   }
 
   _folderTabDefinitions() {
