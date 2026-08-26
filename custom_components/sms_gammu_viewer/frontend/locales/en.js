@@ -14,6 +14,8 @@ export default {
   manage_people_folder: "Manage People folder",
   add_to_folder: "Add to folder",
   mark_unread: "Mark as unread",
+  mark_read_short: "Read",
+  mark_unread_short: "Unread",
   notifications_on: "Turn notifications on",
   notifications_off: "Turn notifications off",
   back: "Back",

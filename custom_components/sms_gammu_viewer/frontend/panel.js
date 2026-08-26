@@ -149,6 +149,7 @@ const CSS = `
     mask-image: linear-gradient(to bottom, black calc(100% - 60px), transparent 100%);
   }
   .contact-list::-webkit-scrollbar { display: none; width: 0; height: 0; }
+  .contact-list.folder-swipe-lock { touch-action: none; overscroll-behavior: none; }
 
 
   .swipe-wrap { position: relative; overflow: hidden; border-bottom: 0.5px solid var(--line); background: var(--card); }
@@ -167,7 +168,8 @@ const CSS = `
   .swipe-wrap:last-child { border-bottom: none; }
   .swipe-actions-left { position: absolute; left: 0; top: 0; bottom: 0; width: 160px; display: flex; align-items: center; gap: 8px; padding: 0 10px; box-sizing: border-box; background: var(--card); z-index: 1; opacity: 0; }
   .swipe-actions-right { position: absolute; right: 0; top: 0; bottom: 0; width: 160px; display: flex; align-items: center; gap: 8px; padding: 0 10px; box-sizing: border-box; background: var(--card); z-index: 1;  opacity: 0; }
-  .swipe-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 8px 4px; font-size: 11px; font-weight: 500; color: #fff; border: none; border-radius: 12px; cursor: pointer; }
+  .swipe-btn { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 8px 4px; font-size: 11px; font-weight: 500; color: #fff; border: none; border-radius: 12px; cursor: pointer; }
+  .swipe-btn span { min-width: 0; max-width: 100%; text-align: center; overflow-wrap: anywhere; }
   .swipe-btn.read { background: #378ADD; }
   .swipe-btn.pin { background: #1D9E75; }
   .swipe-btn.mute { background: #888780; }
@@ -273,8 +275,9 @@ const CSS = `
     background: transparent; color: var(--sub); padding: 5px 10px;
     font: inherit; font-size: 12px; cursor: pointer; white-space: nowrap;
     user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
-    transition: color .22s ease, background-color .22s ease, border-color .22s ease, box-shadow .22s ease;
+    transition: color .22s ease, background-color .22s ease, border-color .22s ease, box-shadow .22s ease, transform .12s ease;
   }
+  .folder-tab:active, .folder-tab.pressing { transform: scale(.95); background: color-mix(in srgb, var(--accent) 18%, var(--card)); box-shadow: 0 1px 2px rgba(0,0,0,.25) inset; }
   .folder-tab.active { color: var(--accent); border-color: var(--accent); background: rgba(3,169,244,.1); }
   .folder-tab.add { font-size: 17px; line-height: 15px; padding: 4px 9px; }
   .folder-editor-list { max-height: 260px; overflow: auto; margin-top: 12px; border-top: 1px solid var(--border); }
@@ -297,7 +300,7 @@ const CSS = `
     position: fixed; z-index: 1000; min-width: 220px; max-width: min(300px, calc(100vw - 16px));
     max-height: min(420px, calc(100vh - 16px)); overflow: hidden; padding: 8px;
     border: 1px solid var(--line); border-radius: 16px; background: var(--card); color: var(--text);
-    box-shadow: 0 8px 28px rgba(0,0,0,.35);
+    box-shadow: 0 8px 28px rgba(0,0,0,.35); contain: paint; isolation: isolate;
   }
   .chat-folder-menu-title { padding: 6px 8px 8px; font-size: 13px; font-weight: 600; border-bottom: 1px solid var(--line); }
   .chat-folder-menu-row { display: flex; align-items: center; gap: 8px; width: 100%; padding: 9px 8px; border: 0; border-radius: 10px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
@@ -311,6 +314,7 @@ const CSS = `
   .chat-folder-menu-track { display: flex; width: 200%; align-items: flex-start; transform: translateX(0); transition: transform .24s cubic-bezier(.2,.7,.2,1); }
   .chat-folder-menu.folders-open .chat-folder-menu-track { transform: translateX(-50%); }
   .chat-folder-menu.folders-open .chat-folder-menu-main { pointer-events: none; visibility: hidden; }
+  .chat-folder-menu:not(.folders-open) .chat-folder-menu-folders { pointer-events: none; visibility: hidden; }
   .chat-folder-menu-page { flex: 0 0 50%; width: 50%; min-width: 0; box-sizing: border-box; max-height: min(46vh, 420px); overflow-y: auto; overflow-x: hidden; }
   .chat-folder-menu-back { border-bottom: 1px solid var(--line); margin-bottom: 4px; font-weight: 600; }
   .chat-folder-preview-overlay {
@@ -3575,6 +3579,7 @@ class SmsGammuPanel extends HTMLElement {
       this._search = e.target.value;
       this._renderContacts();
     });
+    this._initFolderSwipe();
 
 
     this._initPbSheet();
@@ -3726,7 +3731,7 @@ class SmsGammuPanel extends HTMLElement {
     list.innerHTML = items.map((c) => `
       <div class="swipe-wrap" data-number="${this._esc(c.number)}">
         <div class="swipe-actions-left">
-          <button class="swipe-btn read" data-action="read" data-number="${this._esc(c.number)}">${svgCheck}<span>${this._t(c.unread > 0 ? "mark_read" : "mark_unread")}</span></button>
+          <button class="swipe-btn read" data-action="read" data-number="${this._esc(c.number)}">${svgCheck}<span>${this._t(c.unread > 0 ? "mark_read_short" : "mark_unread_short")}</span></button>
           <button class="swipe-btn pin" data-action="pin" data-number="${this._esc(c.number)}" data-pinned="${c.is_pinned ? '1' : '0'}">${svgPin}<span>${c.is_pinned ? this._t("unpin") : this._t("pin")}</span></button>
         </div>
         <div class="swipe-actions-right">
@@ -3955,13 +3960,14 @@ class SmsGammuPanel extends HTMLElement {
         if (event.pointerType === "mouse" && event.button !== 0) return;
         if (button.dataset.folderId === "all") return;
         if (event.pointerType !== "mouse") event.preventDefault();
+        button.classList.add("pressing");
         timer = setTimeout(() => {
           button.dataset.longpress = "1";
           window.getSelection?.()?.removeAllRanges?.();
           openPressedFolder();
         }, 550);
       });
-      const cancel = () => { if (timer) clearTimeout(timer); timer = null; };
+      const cancel = () => { if (timer) clearTimeout(timer); timer = null; button.classList.remove("pressing"); };
       button.addEventListener("pointerup", cancel);
       button.addEventListener("pointercancel", cancel);
       button.addEventListener("pointerleave", cancel);
@@ -3992,6 +3998,63 @@ class SmsGammuPanel extends HTMLElement {
         else if (button.dataset.folderId === "brands") this._openBrandsEditor();
       });
     });
+  }
+
+  _initFolderSwipe() {
+    const list = this.shadowRoot.getElementById("contact-list");
+    if (!list || list.dataset.folderSwipeBound === "1") return;
+    list.dataset.folderSwipeBound = "1";
+    let startX = 0;
+    let startY = 0;
+    let tracking = false;
+    let switched = false;
+    let horizontalIntent = false;
+    const reset = () => {
+      tracking = false; switched = false; horizontalIntent = false;
+      list.classList.remove("folder-swipe-lock");
+    };
+    list.addEventListener("pointerdown", (event) => {
+      if (event.pointerType === "mouse" || event.button !== 0) return;
+      if (this._swipeState && [...this._swipeState.values()].some((value) => value !== 0)) return;
+      if (event.target.closest?.(".folder-tabs")) return;
+      const rect = list.getBoundingClientRect();
+      const ratio = (event.clientX - rect.left) / Math.max(1, rect.width);
+      // Reserve the outer quarters for native chat swipe actions.
+      if (ratio < 0.25 || ratio > 0.75) return;
+      startX = event.clientX;
+      startY = event.clientY;
+      tracking = true;
+      switched = false;
+      horizontalIntent = false;
+    }, { capture: true, passive: true });
+    list.addEventListener("pointermove", (event) => {
+      if (!tracking || switched) return;
+      const dx = event.clientX - startX;
+      const dy = event.clientY - startY;
+      if (!horizontalIntent) {
+        if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+        if (Math.abs(dy) > Math.abs(dx) * 1.15) { reset(); return; }
+        horizontalIntent = true;
+        list.classList.add("folder-swipe-lock");
+      }
+      // Once horizontal intent is established, freeze vertical scrolling and
+      // let this gesture belong exclusively to folder navigation.
+      event.preventDefault();
+      event.stopPropagation();
+      if (Math.abs(dx) < 54 || Math.abs(dx) < Math.abs(dy) * 1.25) return;
+      const tabs = this._folderTabDefinitions();
+      if (tabs.length < 2) { reset(); return; }
+      const current = Math.max(0, tabs.findIndex((tab) => tab.id === this._activeFolderId));
+      const next = (current + (dx < 0 ? 1 : -1) + tabs.length) % tabs.length;
+      this._activeFolderId = tabs[next].id;
+      switched = true;
+      const folderHost = this.shadowRoot.getElementById("folder-tabs");
+      folderHost?.querySelectorAll("[data-folder-id]").forEach((tab) => {
+        tab.classList.toggle("active", tab.dataset.folderId === this._activeFolderId);
+      });
+      this._renderContacts(true);
+    }, { capture: true, passive: false });
+    ["pointerup", "pointercancel", "pointerleave"].forEach((name) => list.addEventListener(name, reset, { capture: true, passive: true }));
   }
 
   _folderTabDefinitions() {
