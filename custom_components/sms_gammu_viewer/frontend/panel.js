@@ -4032,6 +4032,10 @@ class SmsGammuPanel extends HTMLElement {
       switched = true;
       event.preventDefault();
       event.stopPropagation();
+      const folderHost = this.shadowRoot.getElementById("folder-tabs");
+      folderHost?.querySelectorAll("[data-folder-id]").forEach((tab) => {
+        tab.classList.toggle("active", tab.dataset.folderId === this._activeFolderId);
+      });
       this._renderContacts(true);
     }, { capture: true, passive: false });
     ["pointerup", "pointercancel", "pointerleave"].forEach((name) => list.addEventListener(name, reset, { capture: true, passive: true }));
