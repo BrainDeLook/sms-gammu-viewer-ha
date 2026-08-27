@@ -704,10 +704,14 @@ class SmsCoordinator:
         # Prefer PNG for iOS attachments; SVG is valid for the card but not a
         # reliably supported UNNotificationAttachment image type.
         svg_url = str(selected.get("svgUrl") or "").strip()
-        derived_png = svg_url.replace("/assets/logos/svgs/", "/assets/logos/pngs/")
-        if derived_png.lower().endswith(".svg"):
-            derived_png = derived_png[:-4] + ".png"
-        candidates = [selected.get("pngUrl"), derived_png, svg_url]
+        # Use only URLs explicitly published by the catalog. Guessing a PNG
+        # path causes 404s for assets which are export-only in the web UI.
+        variant_pngs = [
+            variant.get("pngUrl")
+            for variant in (selected.get("variants") or [])
+            if isinstance(variant, dict) and variant.get("pngUrl")
+        ]
+        candidates = [selected.get("pngUrl"), *variant_pngs, svg_url]
         if source and source not in candidates:
             candidates.append(source)
         for asset_url in candidates:

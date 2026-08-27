@@ -1936,7 +1936,7 @@ class SmsGammuPanel extends HTMLElement {
         )
       ));
     });
-    return found?.localUrl || found?.svgUrl || found?.pngUrl || "";
+    return found?.localUrl || found?.pngUrl || found?.svgUrl || "";
   }
 
   _brandSourceUrl(logo) {
