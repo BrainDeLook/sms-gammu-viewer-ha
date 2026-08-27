@@ -19,5 +19,5 @@
     "cairosvg>=2.7.1"
   ],
   "single_config_entry": true,
-  "version": "3.19.1b11"
+  "version": "3.19.1b12"
 }
