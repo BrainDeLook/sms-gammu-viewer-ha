@@ -27,6 +27,9 @@ class SmsGammuViewerCard extends HTMLElement {
     this._error = null;
     this._stateObj = undefined; // форсируем перечитывание сенсора
     this._liveContactsPromise = null;
+    this._statusPromise = null;
+    this._apiStatus = null;
+    this._statusFetchedAt = 0;
     this._render();
     if (this._hass) this.hass = this._hass;
   }
@@ -44,6 +47,7 @@ class SmsGammuViewerCard extends HTMLElement {
     // объекте чатов, но тяжёлый рендер списка не повторяем.
     if (st === this._stateObj) {
       this._updateModemInfo();
+      this._loadModemStatus();
       return;
     }
     this._stateObj = st;
@@ -56,6 +60,7 @@ class SmsGammuViewerCard extends HTMLElement {
     }
     this._renderList();
     this._updateModemInfo();
+    this._loadModemStatus();
     this._loadLiveContacts();
   }
 
@@ -115,7 +120,9 @@ class SmsGammuViewerCard extends HTMLElement {
     const networkState = configuredNetwork || findState(["_network", "_network_operator", "_operator"], ["network operator", "operator", "оператор", "сеть"]);
     const rawSignal = attrs.signal_percent ?? signalState?.state;
     const configuredName = String(this._config.operator_name || "").trim();
-    const rawNetwork = configuredName || attrs.network_name || networkState?.state;
+    const apiNetwork = this._apiStatus?.network;
+    const rawNetwork = configuredName || attrs.network_name || networkState?.state ||
+      (typeof apiNetwork === "object" ? (apiNetwork.NetworkName || apiNetwork.network_name || apiNetwork.Operator || apiNetwork.operator || apiNetwork.name) : apiNetwork);
     const invalid = (value) => value === null || value === undefined || ["", "unknown", "unavailable", "none", "null"].includes(String(value).trim().toLowerCase());
     const parsedSignal = invalid(rawSignal) ? NaN : Number.parseFloat(String(rawSignal).replace(",", "."));
     const pct = Number.isFinite(parsedSignal) ? Math.max(0, Math.min(100, Math.round(parsedSignal))) : null;
@@ -124,6 +131,19 @@ class SmsGammuViewerCard extends HTMLElement {
     if (!invalid(rawNetwork)) parts.push(String(rawNetwork));
     if (pct !== null) parts.push(pct + "%");
     text.textContent = parts.length ? parts.join(" · ") : "—";
+  }
+
+  async _loadModemStatus() {
+    if (!this._hass?.callApi || this._statusPromise || Date.now() - this._statusFetchedAt < 5000) return;
+    this._statusPromise = this._hass.callApi("GET", "sms_gammu_viewer/status")
+      .then((status) => {
+        this._apiStatus = status || null;
+        this._statusFetchedAt = Date.now();
+        this._updateModemInfo();
+      })
+      .catch(() => {})
+      .finally(() => { this._statusPromise = null; });
+    await this._statusPromise;
   }
 
   _esc(s) {
