@@ -120,10 +120,23 @@ class SmsGammuViewerCard extends HTMLElement {
     const networkState = configuredNetwork || findState(["_network", "_network_operator", "_operator"], ["network operator", "operator", "оператор", "сеть"]);
     const rawSignal = attrs.signal_percent ?? signalState?.state;
     const configuredName = String(this._config.operator_name || "").trim();
-    const apiNetwork = this._apiStatus?.network;
-    const rawNetwork = configuredName || attrs.network_name || networkState?.state ||
-      (typeof apiNetwork === "object" ? (apiNetwork.NetworkName || apiNetwork.network_name || apiNetwork.Operator || apiNetwork.operator || apiNetwork.name) : apiNetwork);
     const invalid = (value) => value === null || value === undefined || ["", "unknown", "unavailable", "none", "null"].includes(String(value).trim().toLowerCase());
+    const apiNetwork = this._apiStatus?.network;
+    const findOperator = (value) => {
+      if (!value || typeof value !== "object") return typeof value === "string" ? value : null;
+      const keys = ["NetworkName", "network_name", "Operator", "operator", "Carrier", "carrier", "Provider", "provider", "name"];
+      for (const key of keys) {
+        const candidate = value[key];
+        if (!invalid(candidate)) return String(candidate);
+      }
+      for (const child of Object.values(value)) {
+        const found = findOperator(child);
+        if (found) return found;
+      }
+      return null;
+    };
+    const rawNetwork = configuredName || attrs.network_name || networkState?.state ||
+      findOperator(apiNetwork) || findOperator(this._apiStatus?.modem);
     const parsedSignal = invalid(rawSignal) ? NaN : Number.parseFloat(String(rawSignal).replace(",", "."));
     const pct = Number.isFinite(parsedSignal) ? Math.max(0, Math.min(100, Math.round(parsedSignal))) : null;
     dot.style.background = pct === null ? "#9e9e9e" : pct >= 50 ? "#4caf50" : pct >= 20 ? "#ff9800" : "#f44336";
