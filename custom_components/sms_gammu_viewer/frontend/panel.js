@@ -4098,14 +4098,17 @@ class SmsGammuPanel extends HTMLElement {
       begin(event.clientX, event.clientY, event.target, event.pointerId);
     }, { capture: true, passive: true });
     list.addEventListener("pointermove", (event) => move(event.clientX, event.clientY, event), { capture: true, passive: false });
-    ["pointerup", "pointercancel", "pointerleave"].forEach((name) => list.addEventListener(name, (event) => finish(name !== "pointerup"), { capture: true, passive: name !== "pointerup" }));
-    // Older Android WebViews may expose touch events without a usable pointer stream.
-    if (!window.PointerEvent) {
-      list.addEventListener("touchstart", (event) => { const t = event.touches[0]; if (t) begin(t.clientX, t.clientY, event.target); }, { capture: true, passive: true });
-      list.addEventListener("touchmove", (event) => { const t = event.touches[0]; if (t) move(t.clientX, t.clientY, event); }, { capture: true, passive: false });
-      list.addEventListener("touchend", () => finish(false), { capture: true, passive: true });
-      list.addEventListener("touchcancel", () => finish(true), { capture: true, passive: true });
-    }
+    // Do not treat pointerleave as cancellation: mobile browsers can emit it
+    // while the finger is still down, which used to reduce the gesture to a
+    // small initial nudge. Pointer capture keeps the stream alive.
+    ["pointerup", "pointercancel"].forEach((name) => list.addEventListener(name, (event) => finish(name !== "pointerup"), { capture: true, passive: name !== "pointerup" }));
+    // Keep a touch-event fallback even where PointerEvent exists. iOS Safari
+    // and some Android WebViews may start a touch stream but cancel its
+    // pointer stream when native scrolling is negotiated.
+    list.addEventListener("touchstart", (event) => { const t = event.touches[0]; if (t) begin(t.clientX, t.clientY, event.target); }, { capture: true, passive: true });
+    list.addEventListener("touchmove", (event) => { const t = event.touches[0]; if (t) move(t.clientX, t.clientY, event); }, { capture: true, passive: false });
+    list.addEventListener("touchend", () => finish(false), { capture: true, passive: true });
+    list.addEventListener("touchcancel", () => finish(true), { capture: true, passive: true });
   }
 
   _folderTabDefinitions() {
