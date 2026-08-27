@@ -114,7 +114,8 @@ class SmsGammuViewerCard extends HTMLElement {
     const configuredNetwork = this._config.operator_entity && states[this._config.operator_entity];
     const networkState = configuredNetwork || findState(["_network", "_network_operator", "_operator"], ["network operator", "operator", "оператор", "сеть"]);
     const rawSignal = attrs.signal_percent ?? signalState?.state;
-    const rawNetwork = attrs.network_name || networkState?.state;
+    const configuredName = String(this._config.operator_name || "").trim();
+    const rawNetwork = configuredName || attrs.network_name || networkState?.state;
     const invalid = (value) => value === null || value === undefined || ["", "unknown", "unavailable", "none", "null"].includes(String(value).trim().toLowerCase());
     const parsedSignal = invalid(rawSignal) ? NaN : Number.parseFloat(String(rawSignal).replace(",", "."));
     const pct = Number.isFinite(parsedSignal) ? Math.max(0, Math.min(100, Math.round(parsedSignal))) : null;
@@ -437,7 +438,7 @@ class SmsGammuViewerCard extends HTMLElement {
   }
 
   static getStubConfig() {
-    return { title: "SMS", max_items: 5, show_unread_only: false, show_modem_info: false, operator_entity: "" };
+    return { title: "SMS", max_items: 5, show_unread_only: false, show_modem_info: false, operator_entity: "", operator_name: "" };
   }
 }
 
@@ -457,6 +458,7 @@ class SmsGammuViewerCardEditor extends HTMLElement {
         show_unread_only: config.show_unread_only ?? false,
         show_modem_info: config.show_modem_info ?? false,
         operator_entity: config.operator_entity ?? "",
+        operator_name: config.operator_name ?? "",
       };
     } else {
       this._render();
@@ -479,6 +481,7 @@ class SmsGammuViewerCardEditor extends HTMLElement {
       { name: "show_unread_only", selector: { boolean: {} } },
       { name: "show_modem_info", selector: { boolean: {} } },
       { name: "operator_entity", selector: { entity: { domain: "sensor", multiple: false } } },
+      { name: "operator_name", selector: { text: {} } },
     ];
   }
 
@@ -489,6 +492,7 @@ class SmsGammuViewerCardEditor extends HTMLElement {
       show_unread_only: "Показывать только непрочитанные",
       show_modem_info: "Показывать оператор и сигнал",
       operator_entity: "Сенсор оператора (необязательно)",
+      operator_name: "Имя оператора (необязательно)",
     };
     return labels[schema.name] || schema.name;
   }
@@ -504,6 +508,7 @@ class SmsGammuViewerCardEditor extends HTMLElement {
       show_unread_only: this._config.show_unread_only ?? false,
       show_modem_info: this._config.show_modem_info ?? false,
       operator_entity: this._config.operator_entity ?? "",
+      operator_name: this._config.operator_name ?? "",
     };
     form.schema = SmsGammuViewerCardEditor._schema;
     form.computeLabel = this._computeLabel;
