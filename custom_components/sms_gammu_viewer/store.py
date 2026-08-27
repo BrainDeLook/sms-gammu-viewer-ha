@@ -330,6 +330,7 @@ class SmsStore:
                     (SELECT 1 FROM muted_numbers mn WHERE mn.number = m.number) as is_muted,
                     pb.name as contact_name,
                     pb.label as contact_label,
+                    pb.avatar as avatar,
                     (SELECT source_url FROM brand_logo_overrides blo
                      WHERE blo.number = m.number) as brand_logo_url,
                     (SELECT 1 FROM pinned_numbers pn WHERE pn.number = m.number) as is_pinned

@@ -6,7 +6,7 @@
  * https://github.com/BrainDeLook/sms-gammu-viewer-ha
  */
 
-const CARD_VERSION = "2.0.0";
+const CARD_VERSION = "2.1.0";
 
 console.info(
   `%c SMS-GAMMU-VIEWER-CARD %c v${CARD_VERSION} `,
@@ -93,8 +93,10 @@ class SmsGammuViewerCard extends HTMLElement {
     const text = this.querySelector("#sgv-modem-text");
     if (!dot || !text) return;
     const attrs = this._stateObj?.attributes || {};
-    const signal = attrs.signal_percent;
-    const network = attrs.network_name;
+    const signalState = Object.entries(this._hass?.states || {}).find(([id]) => id.startsWith("sensor.") && id.endsWith("_signal"))?.[1];
+    const networkState = Object.entries(this._hass?.states || {}).find(([id]) => id.startsWith("sensor.") && id.endsWith("_network"))?.[1];
+    const signal = attrs.signal_percent ?? signalState?.state;
+    const network = attrs.network_name || networkState?.state;
     const pct = parseInt(signal) || 0;
     dot.style.background = pct >= 50 ? "#4caf50" : pct >= 20 ? "#ff9800" : "#f44336";
     const parts = [];
@@ -118,6 +120,18 @@ class SmsGammuViewerCard extends HTMLElement {
     if (digits.length > 0) return digits.slice(-2);
     const letters = s.replace(/[^a-zA-Zа-яёА-ЯЁ]/g, "");
     return letters.slice(0, 2).toUpperCase() || "?";
+  }
+
+  _avatarUrl(contact) {
+    const value = String(contact?.avatar || contact?.brand_logo_url || "").trim();
+    return /^(data:image\/(?:jpeg|png|webp);base64,|https?:\/\/|\/)/i.test(value) ? value : "";
+  }
+
+  _avatarMarkup(contact) {
+    const url = this._avatarUrl(contact);
+    const fallback = contact.contact_name ? contact.contact_name.slice(0, 1).toUpperCase() : this._avatar(contact.number);
+    if (!url) return this._esc(fallback);
+    return `<img src="${this._esc(url)}" alt="" loading="lazy" decoding="async" onerror="this.remove()" /><span class="sgv-avatar-fallback">${this._esc(fallback)}</span>`;
   }
 
   _isAlphaTag(number) {
@@ -216,6 +230,10 @@ class SmsGammuViewerCard extends HTMLElement {
           background: var(--secondary-text-color, #78909c);
           font-size: 12px;
         }
+        .sgv-avatar { position: relative; overflow: hidden; }
+        .sgv-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; position: relative; z-index: 1; }
+        .sgv-avatar img[src*=".svg"], .sgv-avatar img[src^="data:image/svg"] { object-fit: contain; background: #fff; }
+        .sgv-avatar-fallback { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
         .sgv-info {
           flex: 1;
           min-width: 0;
@@ -334,7 +352,7 @@ class SmsGammuViewerCard extends HTMLElement {
       .map(
         (c) => `
       <div class="sgv-item ${c.unread > 0 ? "unread" : ""}" data-number="${this._esc(c.number)}">
-        <div class="sgv-avatar ${this._isAlphaTag(c.number) ? "alpha" : ""}">${this._esc(c.contact_name ? c.contact_name.slice(0, 1).toUpperCase() : this._avatar(c.number))}</div>
+        <div class="sgv-avatar ${this._isAlphaTag(c.number) ? "alpha" : ""}">${this._avatarMarkup(c)}</div>
         <div class="sgv-info">
           <div class="sgv-row1">
             <span class="sgv-number">

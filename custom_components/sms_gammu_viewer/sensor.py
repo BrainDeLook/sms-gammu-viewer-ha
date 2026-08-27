@@ -324,6 +324,8 @@ class SmsChatsSensor(_BaseSmsSensor):
             {
                 "number": c.get("number"),
                 "contact_name": c.get("contact_name"),
+                "avatar": c.get("avatar") or "",
+                "brand_logo_url": c.get("brand_logo_url") or "",
                 "last_text": (c.get("last_text") or "")[:CHAT_PREVIEW_MAXLEN],
                 "last_date": c.get("last_date"),
                 "unread": c.get("unread") or 0,
