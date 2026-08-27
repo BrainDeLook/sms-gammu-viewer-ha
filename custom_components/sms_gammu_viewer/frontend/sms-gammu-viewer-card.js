@@ -26,6 +26,7 @@ class SmsGammuViewerCard extends HTMLElement {
     this._contacts = [];
     this._error = null;
     this._stateObj = undefined; // форсируем перечитывание сенсора
+    this._liveContactsPromise = null;
     this._render();
     if (this._hass) this.hass = this._hass;
   }
@@ -49,6 +50,7 @@ class SmsGammuViewerCard extends HTMLElement {
     }
     this._renderList();
     this._updateModemInfo();
+    this._loadLiveContacts();
   }
 
   set editMode(value) {
@@ -122,9 +124,49 @@ class SmsGammuViewerCard extends HTMLElement {
     return letters.slice(0, 2).toUpperCase() || "?";
   }
 
+  async _loadLiveContacts() {
+    if (this._liveContactsPromise || !this._hass?.callApi) return;
+    this._liveContactsPromise = Promise.all([
+      this._hass.callApi("GET", "sms_gammu_viewer/contacts"),
+      this._hass.callApi("GET", "sms_gammu_viewer/brand_catalog").catch(() => ({ logos: [] })),
+    ])
+      .then(([contacts, catalog]) => {
+        if (!Array.isArray(contacts)) return;
+        this._brandCatalog = Array.isArray(catalog?.logos) ? catalog.logos : [];
+        this._contacts = contacts;
+        this._error = null;
+        this._renderList();
+      })
+      .catch(() => {})
+      .finally(() => { this._liveContactsPromise = null; });
+  }
+
   _avatarUrl(contact) {
-    const value = String(contact?.avatar || contact?.brand_logo_url || "").trim();
+    const value = String(contact?.avatar || this._brandLogoFor(contact) || contact?.brand_logo_url || "").trim();
     return /^(data:image\/(?:jpeg|png|webp);base64,|https?:\/\/|\/)/i.test(value) ? value : "";
+  }
+
+  _normalizeBrand(value) {
+    return String(value || "").toLowerCase()
+      .replace(/\.(?:ru|рф|com|net|org|io|su|me|tv|online)\b/gi, " ")
+      .replace(/[«»"'’.,()\[\]{}_/\\-]+/g, " ")
+      .replace(/\s+/g, " ").trim();
+  }
+
+  _brandLogoFor(contact) {
+    if (!this._isAlphaTag(contact?.number) || !this._brandCatalog?.length) return "";
+    const override = String(contact?.brand_logo_url || "").trim();
+    if (override) {
+      const selected = this._brandCatalog.find((logo) => String(logo.svgUrl || logo.pngUrl || "") === override);
+      return selected?.localUrl || selected?.pngUrl || selected?.svgUrl || override;
+    }
+    const needle = this._normalizeBrand(contact?.contact_name || contact?.number);
+    const found = this._brandCatalog.find((logo) => {
+      const haystack = this._normalizeBrand(`${logo.name || ""} ${logo.name_en || ""} ${logo.tags || ""}`);
+      const tokens = haystack.split(/\s+/).filter(Boolean);
+      return needle && (haystack === needle || haystack.includes(needle) || needle.split(/\s+/).some((token) => token.length >= 2 && tokens.includes(token)));
+    });
+    return found?.localUrl || found?.pngUrl || found?.svgUrl || "";
   }
 
   _avatarMarkup(contact) {
