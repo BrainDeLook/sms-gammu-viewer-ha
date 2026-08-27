@@ -111,7 +111,8 @@ class SmsGammuViewerCard extends HTMLElement {
     // Entity IDs can be prefixed by the config-entry title, so match both
     // their stable suffixes and friendly names rather than a hard-coded ID.
     const signalState = findState(["_signal"], ["signal quality", "signal", "сигнал"]);
-    const networkState = findState(["_network"], ["network operator", "operator", "оператор", "сеть"]);
+    const configuredNetwork = this._config.operator_entity && states[this._config.operator_entity];
+    const networkState = configuredNetwork || findState(["_network", "_network_operator", "_operator"], ["network operator", "operator", "оператор", "сеть"]);
     const rawSignal = attrs.signal_percent ?? signalState?.state;
     const rawNetwork = attrs.network_name || networkState?.state;
     const invalid = (value) => value === null || value === undefined || ["", "unknown", "unavailable", "none", "null"].includes(String(value).trim().toLowerCase());
@@ -436,7 +437,7 @@ class SmsGammuViewerCard extends HTMLElement {
   }
 
   static getStubConfig() {
-    return { title: "SMS", max_items: 5, show_unread_only: false, show_modem_info: false };
+    return { title: "SMS", max_items: 5, show_unread_only: false, show_modem_info: false, operator_entity: "" };
   }
 }
 
@@ -455,6 +456,7 @@ class SmsGammuViewerCardEditor extends HTMLElement {
         max_items: config.max_items ?? 5,
         show_unread_only: config.show_unread_only ?? false,
         show_modem_info: config.show_modem_info ?? false,
+        operator_entity: config.operator_entity ?? "",
       };
     } else {
       this._render();
@@ -476,6 +478,7 @@ class SmsGammuViewerCardEditor extends HTMLElement {
       },
       { name: "show_unread_only", selector: { boolean: {} } },
       { name: "show_modem_info", selector: { boolean: {} } },
+      { name: "operator_entity", selector: { entity: { domain: "sensor", multiple: false } } },
     ];
   }
 
@@ -485,6 +488,7 @@ class SmsGammuViewerCardEditor extends HTMLElement {
       max_items: "Количество диалогов",
       show_unread_only: "Показывать только непрочитанные",
       show_modem_info: "Показывать оператор и сигнал",
+      operator_entity: "Сенсор оператора (необязательно)",
     };
     return labels[schema.name] || schema.name;
   }
@@ -499,6 +503,7 @@ class SmsGammuViewerCardEditor extends HTMLElement {
       max_items: this._config.max_items ?? 5,
       show_unread_only: this._config.show_unread_only ?? false,
       show_modem_info: this._config.show_modem_info ?? false,
+      operator_entity: this._config.operator_entity ?? "",
     };
     form.schema = SmsGammuViewerCardEditor._schema;
     form.computeLabel = this._computeLabel;
