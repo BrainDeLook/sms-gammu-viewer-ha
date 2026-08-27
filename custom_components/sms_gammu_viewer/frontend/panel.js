@@ -30,6 +30,7 @@ const CSS = `
     height: 100dvh;
     min-height: 0;
     overflow: hidden;
+    overscroll-behavior: none;
     box-sizing: border-box;
     /* Content extends behind the bottom safe area; only controls avoid it. */
     padding:
@@ -56,6 +57,7 @@ const CSS = `
     height: 100%;
     min-height: 0;
     overflow: hidden;
+    overscroll-behavior: none;
     background: var(--bg);
   }
 
@@ -141,6 +143,10 @@ const CSS = `
   .contact-list {
     flex: 1;
     overflow-y: auto;
+    /* Keep pull-to-refresh and rubber-band overscroll inside the SMS panel. */
+    overscroll-behavior-y: contain;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
     -ms-overflow-style: none;
     padding-bottom: calc(80px + var(--safe-area-inset-bottom, 0px));
@@ -4028,6 +4034,7 @@ class SmsGammuPanel extends HTMLElement {
       tracking = true;
       switched = false;
       horizontalIntent = false;
+      list.setPointerCapture?.(event.pointerId);
     }, { capture: true, passive: true });
     list.addEventListener("pointermove", (event) => {
       if (!tracking || switched) return;
