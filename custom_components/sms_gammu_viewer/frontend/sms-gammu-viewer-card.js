@@ -95,16 +95,26 @@ class SmsGammuViewerCard extends HTMLElement {
     const text = this.querySelector("#sgv-modem-text");
     if (!dot || !text) return;
     const attrs = this._stateObj?.attributes || {};
-    const signalState = Object.entries(this._hass?.states || {}).find(([id]) => id.startsWith("sensor.") && id.endsWith("_signal"))?.[1];
-    const networkState = Object.entries(this._hass?.states || {}).find(([id]) => id.startsWith("sensor.") && id.endsWith("_network"))?.[1];
-    const signal = attrs.signal_percent ?? signalState?.state;
-    const network = attrs.network_name || networkState?.state;
-    const pct = parseInt(signal) || 0;
-    dot.style.background = pct >= 50 ? "#4caf50" : pct >= 20 ? "#ff9800" : "#f44336";
+    const states = this._hass?.states || {};
+    const findState = (suffixes, hints) => Object.entries(states).find(([id, state]) => {
+      const entity = String(id).toLowerCase();
+      const name = String(state?.attributes?.friendly_name || "").toLowerCase();
+      return suffixes.some((suffix) => entity.endsWith(suffix)) || hints.some((hint) => name.includes(hint));
+    })?.[1];
+    // Entity IDs can be prefixed by the config-entry title, so match both
+    // their stable suffixes and friendly names rather than a hard-coded ID.
+    const signalState = findState(["_signal"], ["signal quality", "signal", "сигнал"]);
+    const networkState = findState(["_network"], ["network operator", "operator", "оператор", "сеть"]);
+    const rawSignal = attrs.signal_percent ?? signalState?.state;
+    const rawNetwork = attrs.network_name || networkState?.state;
+    const invalid = (value) => value === null || value === undefined || ["", "unknown", "unavailable", "none", "null"].includes(String(value).trim().toLowerCase());
+    const parsedSignal = invalid(rawSignal) ? NaN : Number.parseFloat(String(rawSignal).replace(",", "."));
+    const pct = Number.isFinite(parsedSignal) ? Math.max(0, Math.min(100, Math.round(parsedSignal))) : null;
+    dot.style.background = pct === null ? "#9e9e9e" : pct >= 50 ? "#4caf50" : pct >= 20 ? "#ff9800" : "#f44336";
     const parts = [];
-    if (network) parts.push(network);
-    if (signal !== null && signal !== undefined) parts.push(pct + "%");
-    text.textContent = parts.length ? parts.join(" · ") : "…";
+    if (!invalid(rawNetwork)) parts.push(String(rawNetwork));
+    if (pct !== null) parts.push(pct + "%");
+    text.textContent = parts.length ? parts.join(" · ") : "—";
   }
 
   _esc(s) {
