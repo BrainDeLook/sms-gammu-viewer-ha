@@ -4015,55 +4015,97 @@ class SmsGammuPanel extends HTMLElement {
     let startX = 0;
     let startY = 0;
     let tracking = false;
-    let switched = false;
     let horizontalIntent = false;
+    let offsetX = 0;
+    let animating = false;
+    const items = () => list.querySelector("#contact-items");
     const reset = () => {
-      tracking = false; switched = false; horizontalIntent = false;
+      tracking = false; horizontalIntent = false; offsetX = 0;
       list.classList.remove("folder-swipe-lock");
     };
-    list.addEventListener("pointerdown", (event) => {
-      if (event.pointerType === "mouse" || event.button !== 0) return;
+    const begin = (x, y, target, pointerId = null) => {
+      if (animating || tracking) return;
       if (this._swipeState && [...this._swipeState.values()].some((value) => value !== 0)) return;
-      if (event.target.closest?.(".folder-tabs")) return;
+      if (target?.closest?.(".folder-tabs")) return;
       const rect = list.getBoundingClientRect();
-      const ratio = (event.clientX - rect.left) / Math.max(1, rect.width);
+      const ratio = (x - rect.left) / Math.max(1, rect.width);
       // Reserve the outer quarters for native chat swipe actions.
       if (ratio < 0.25 || ratio > 0.75) return;
-      startX = event.clientX;
-      startY = event.clientY;
+      startX = x; startY = y;
       tracking = true;
-      switched = false;
       horizontalIntent = false;
-      list.setPointerCapture?.(event.pointerId);
-    }, { capture: true, passive: true });
-    list.addEventListener("pointermove", (event) => {
-      if (!tracking || switched) return;
-      const dx = event.clientX - startX;
-      const dy = event.clientY - startY;
+      offsetX = 0;
+      if (pointerId != null) list.setPointerCapture?.(pointerId);
+    };
+    const move = (x, y, event) => {
+      if (!tracking || animating) return;
+      const dx = x - startX;
+      const dy = y - startY;
       if (!horizontalIntent) {
         if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
         if (Math.abs(dy) > Math.abs(dx) * 1.15) { reset(); return; }
         horizontalIntent = true;
         list.classList.add("folder-swipe-lock");
       }
-      // Once horizontal intent is established, freeze vertical scrolling and
-      // let this gesture belong exclusively to folder navigation.
       event.preventDefault();
       event.stopPropagation();
-      if (Math.abs(dx) < 54 || Math.abs(dx) < Math.abs(dy) * 1.25) return;
+      if (Math.abs(dx) < Math.abs(dy) * 1.25) return;
+      const width = Math.max(1, list.clientWidth);
+      offsetX = Math.max(-width * 0.92, Math.min(width * 0.92, dx));
+      const currentItems = items();
+      if (currentItems) {
+        currentItems.style.transition = "none";
+        currentItems.style.transform = `translate3d(${offsetX}px,0,0)`;
+      }
+    };
+    const finish = (cancel = false) => {
+      if (!tracking) return;
+      const dx = offsetX;
+      const intent = horizontalIntent;
+      reset();
+      const currentItems = items();
+      if (cancel || !intent || Math.abs(dx) < Math.min(90, Math.max(54, list.clientWidth * 0.18))) {
+        if (currentItems) {
+          currentItems.style.transition = "transform .18s ease-out";
+          currentItems.style.transform = "translate3d(0,0,0)";
+          setTimeout(() => { currentItems.style.transition = ""; currentItems.style.transform = ""; }, 190);
+        }
+        return;
+      }
       const tabs = this._folderTabDefinitions();
-      if (tabs.length < 2) { reset(); return; }
+      if (tabs.length < 2) return;
       const current = Math.max(0, tabs.findIndex((tab) => tab.id === this._activeFolderId));
       const next = (current + (dx < 0 ? 1 : -1) + tabs.length) % tabs.length;
       this._activeFolderId = tabs[next].id;
-      switched = true;
       const folderHost = this.shadowRoot.getElementById("folder-tabs");
       folderHost?.querySelectorAll("[data-folder-id]").forEach((tab) => {
         tab.classList.toggle("active", tab.dataset.folderId === this._activeFolderId);
       });
-      this._renderContacts(true);
-    }, { capture: true, passive: false });
-    ["pointerup", "pointercancel", "pointerleave"].forEach((name) => list.addEventListener(name, reset, { capture: true, passive: true }));
+      animating = true;
+      if (currentItems) {
+        currentItems.style.transition = "transform .18s ease-out";
+        currentItems.style.transform = `translate3d(${dx < 0 ? -list.clientWidth : list.clientWidth}px,0,0)`;
+      }
+      setTimeout(() => {
+        this._renderContacts(true);
+        const fresh = items();
+        if (fresh) { fresh.style.transition = "none"; fresh.style.transform = "translate3d(0,0,0)"; requestAnimationFrame(() => { fresh.style.transition = ""; }); }
+        animating = false;
+      }, 185);
+    };
+    list.addEventListener("pointerdown", (event) => {
+      if (event.pointerType === "mouse" || event.button !== 0) return;
+      begin(event.clientX, event.clientY, event.target, event.pointerId);
+    }, { capture: true, passive: true });
+    list.addEventListener("pointermove", (event) => move(event.clientX, event.clientY, event), { capture: true, passive: false });
+    ["pointerup", "pointercancel", "pointerleave"].forEach((name) => list.addEventListener(name, (event) => finish(name !== "pointerup"), { capture: true, passive: name !== "pointerup" }));
+    // Older Android WebViews may expose touch events without a usable pointer stream.
+    if (!window.PointerEvent) {
+      list.addEventListener("touchstart", (event) => { const t = event.touches[0]; if (t) begin(t.clientX, t.clientY, event.target); }, { capture: true, passive: true });
+      list.addEventListener("touchmove", (event) => { const t = event.touches[0]; if (t) move(t.clientX, t.clientY, event); }, { capture: true, passive: false });
+      list.addEventListener("touchend", () => finish(false), { capture: true, passive: true });
+      list.addEventListener("touchcancel", () => finish(true), { capture: true, passive: true });
+    }
   }
 
   _folderTabDefinitions() {
