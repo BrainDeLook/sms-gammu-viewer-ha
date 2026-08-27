@@ -39,7 +39,13 @@ class SmsGammuViewerCard extends HTMLElement {
     this._hass = hass;
     const entityId = this._chatsEntity();
     const st = entityId ? hass.states[entityId] : null;
-    if (st === this._stateObj) return; // наш сенсор не менялся — не рендерим
+    // Сигнал и оператор живут в отдельных сенсорах и могут обновляться без
+    // изменения списка чатов. Обновляем компактный статус даже при прежнем
+    // объекте чатов, но тяжёлый рендер списка не повторяем.
+    if (st === this._stateObj) {
+      this._updateModemInfo();
+      return;
+    }
     this._stateObj = st;
     if (st) {
       this._contacts = st.attributes.chats || [];
@@ -99,7 +105,8 @@ class SmsGammuViewerCard extends HTMLElement {
     const findState = (suffixes, hints) => Object.entries(states).find(([id, state]) => {
       const entity = String(id).toLowerCase();
       const name = String(state?.attributes?.friendly_name || "").toLowerCase();
-      return suffixes.some((suffix) => entity.endsWith(suffix)) || hints.some((hint) => name.includes(hint));
+      return suffixes.some((suffix) => entity.endsWith(suffix)) ||
+        hints.some((hint) => name.includes(hint) || entity.includes(hint));
     })?.[1];
     // Entity IDs can be prefixed by the config-entry title, so match both
     // their stable suffixes and friendly names rather than a hard-coded ID.
