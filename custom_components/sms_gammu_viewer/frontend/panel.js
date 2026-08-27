@@ -212,7 +212,7 @@ const CSS = `
   .contact-item.active { background: rgba(3,169,244,.1); }
   .pin-static-icon {
     position: absolute;
-    top: 6px; left: 2px;
+    top: 6px; left: 5px;
     width: 14px; height: 14px;
     color: var(--accent);
     display: flex; align-items: center; justify-content: center;
@@ -220,7 +220,7 @@ const CSS = `
   }
   .pin-hover-btn {
     position: absolute;
-    top: 6px; left: 2px;
+    top: 6px; left: 5px;
     width: 14px; height: 14px;
     background: none; border: none; cursor: pointer;
     color: var(--sub); padding: 0; border-radius: 4px;
@@ -432,7 +432,7 @@ const CSS = `
   .pinned-banner button { position:relative; z-index:1; border:0; background:transparent; color:var(--text); cursor:pointer; min-width:0; pointer-events:auto; }
   .pinned-banner .pinned-jump { flex:1; overflow:hidden; text-align:left; white-space:nowrap; text-overflow:ellipsis; font-size:13px; }
   .pinned-banner .pinned-jump::before { content:'📌 '; color:var(--accent); }
-  .pinned-banner .pinned-list { color:var(--accent); white-space:nowrap; font-size:12px; }
+  .pinned-banner .pinned-list { color:var(--accent); white-space:nowrap; font-size:12px; line-height:1; display:flex; align-items:center; justify-content:center; }
   .chat-header > svg { display:none; }
   .pinned-highlight { outline:2px solid var(--accent); outline-offset:2px; }
   @media (max-width: 580px) {
@@ -4780,6 +4780,10 @@ class SmsGammuPanel extends HTMLElement {
     head.querySelector("button").addEventListener("click", () => overlay.remove());
     overlay.addEventListener("click", e => { if (e.target === overlay) overlay.remove(); });
     sheet.append(head, list); overlay.appendChild(sheet); document.body.appendChild(overlay);
+    requestAnimationFrame(() => {
+      list.scrollTop = list.scrollHeight;
+      requestAnimationFrame(() => { list.scrollTop = list.scrollHeight; });
+    });
   }
 
   _openPeopleEditor() {
