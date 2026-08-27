@@ -4018,7 +4018,38 @@ class SmsGammuPanel extends HTMLElement {
     let horizontalIntent = false;
     let offsetX = 0;
     let animating = false;
+    let preview = null;
+    let previewFolderId = null;
     const items = () => list.querySelector("#contact-items");
+    const removePreview = () => {
+      preview?.remove();
+      preview = null;
+      previewFolderId = null;
+    };
+    const preparePreview = (direction) => {
+      const currentItems = items();
+      if (!currentItems) return;
+      const tabs = this._folderTabDefinitions();
+      if (tabs.length < 2) return;
+      const current = Math.max(0, tabs.findIndex((tab) => tab.id === this._activeFolderId));
+      const nextId = tabs[(current + (direction < 0 ? 1 : -1) + tabs.length) % tabs.length]?.id;
+      if (!nextId || nextId === previewFolderId) return;
+      removePreview();
+      const savedActive = this._activeFolderId;
+      const holder = document.createElement("div");
+      holder.id = "contact-items";
+      holder.className = "contact-items folder-swipe-preview";
+      holder.style.cssText = `position:absolute;left:0;right:0;top:${currentItems.offsetTop}px;pointer-events:none;z-index:3;transform:translate3d(${direction < 0 ? list.clientWidth : -list.clientWidth}px,0,0)`;
+      currentItems.removeAttribute("id");
+      list.appendChild(holder);
+      this._activeFolderId = nextId;
+      this._renderContacts(true);
+      this._activeFolderId = savedActive;
+      holder.removeAttribute("id");
+      currentItems.id = "contact-items";
+      preview = holder;
+      previewFolderId = nextId;
+    };
     const reset = () => {
       tracking = false; horizontalIntent = false; offsetX = 0;
       list.classList.remove("folder-swipe-lock");
@@ -4046,6 +4077,7 @@ class SmsGammuPanel extends HTMLElement {
         if (Math.abs(dy) > Math.abs(dx) * 1.15) { reset(); return; }
         horizontalIntent = true;
         list.classList.add("folder-swipe-lock");
+        preparePreview(dx < 0 ? -1 : 1);
       }
       event.preventDefault();
       event.stopPropagation();
@@ -4056,6 +4088,12 @@ class SmsGammuPanel extends HTMLElement {
       if (currentItems) {
         currentItems.style.transition = "none";
         currentItems.style.transform = `translate3d(${offsetX}px,0,0)`;
+      }
+      if (preview) {
+        const width = Math.max(1, list.clientWidth);
+        const direction = offsetX < 0 ? -1 : 1;
+        preview.style.transition = "none";
+        preview.style.transform = `translate3d(${offsetX + (direction < 0 ? width : -width)}px,0,0)`;
       }
     };
     const finish = (cancel = false) => {
@@ -4070,10 +4108,11 @@ class SmsGammuPanel extends HTMLElement {
           currentItems.style.transform = "translate3d(0,0,0)";
           setTimeout(() => { currentItems.style.transition = ""; currentItems.style.transform = ""; }, 190);
         }
+        removePreview();
         return;
       }
       const tabs = this._folderTabDefinitions();
-      if (tabs.length < 2) return;
+      if (tabs.length < 2) { removePreview(); return; }
       const current = Math.max(0, tabs.findIndex((tab) => tab.id === this._activeFolderId));
       const next = (current + (dx < 0 ? 1 : -1) + tabs.length) % tabs.length;
       this._activeFolderId = tabs[next].id;
@@ -4086,7 +4125,12 @@ class SmsGammuPanel extends HTMLElement {
         currentItems.style.transition = "transform .18s ease-out";
         currentItems.style.transform = `translate3d(${dx < 0 ? -list.clientWidth : list.clientWidth}px,0,0)`;
       }
+      if (preview) {
+        preview.style.transition = "transform .18s ease-out";
+        preview.style.transform = "translate3d(0,0,0)";
+      }
       setTimeout(() => {
+        removePreview();
         this._renderContacts(true);
         const fresh = items();
         if (fresh) { fresh.style.transition = "none"; fresh.style.transform = "translate3d(0,0,0)"; requestAnimationFrame(() => { fresh.style.transition = ""; }); }
