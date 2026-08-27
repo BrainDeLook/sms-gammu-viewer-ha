@@ -4059,9 +4059,11 @@ class SmsGammuPanel extends HTMLElement {
       if (this._swipeState && [...this._swipeState.values()].some((value) => value !== 0)) return;
       if (target?.closest?.(".folder-tabs")) return;
       const rect = list.getBoundingClientRect();
-      const ratio = (x - rect.left) / Math.max(1, rect.width);
-      // Reserve the outer quarters for native chat swipe actions.
-      if (ratio < 0.25 || ratio > 0.75) return;
+      // Chat actions own only the 44px edge strips. Folder navigation owns
+      // the entire area between them, so a swipe feels available everywhere
+      // without stealing the edge gestures of individual chats.
+      const chatSwipeEdge = 48;
+      if (x < rect.left + chatSwipeEdge || x > rect.right - chatSwipeEdge) return;
       startX = x; startY = y;
       tracking = true;
       horizontalIntent = false;
@@ -4073,7 +4075,7 @@ class SmsGammuPanel extends HTMLElement {
       const dx = x - startX;
       const dy = y - startY;
       if (!horizontalIntent) {
-        if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
         if (Math.abs(dy) > Math.abs(dx) * 1.15) { reset(); return; }
         horizontalIntent = true;
         list.classList.add("folder-swipe-lock");
@@ -4102,7 +4104,7 @@ class SmsGammuPanel extends HTMLElement {
       const intent = horizontalIntent;
       reset();
       const currentItems = items();
-      if (cancel || !intent || Math.abs(dx) < Math.min(90, Math.max(54, list.clientWidth * 0.18))) {
+      if (cancel || !intent || Math.abs(dx) < Math.min(72, Math.max(48, list.clientWidth * 0.14))) {
         if (currentItems) {
           currentItems.style.transition = "transform .18s ease-out";
           currentItems.style.transform = "translate3d(0,0,0)";

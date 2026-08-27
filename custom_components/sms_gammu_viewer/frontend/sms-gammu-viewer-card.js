@@ -6,7 +6,7 @@
  * https://github.com/BrainDeLook/sms-gammu-viewer-ha
  */
 
-const CARD_VERSION = "2.0.0";
+const CARD_VERSION = "2.1.0";
 
 console.info(
   `%c SMS-GAMMU-VIEWER-CARD %c v${CARD_VERSION} `,
@@ -26,6 +26,10 @@ class SmsGammuViewerCard extends HTMLElement {
     this._contacts = [];
     this._error = null;
     this._stateObj = undefined; // форсируем перечитывание сенсора
+    this._liveContactsPromise = null;
+    this._statusPromise = null;
+    this._apiStatus = null;
+    this._statusFetchedAt = 0;
     this._render();
     if (this._hass) this.hass = this._hass;
   }
@@ -38,7 +42,14 @@ class SmsGammuViewerCard extends HTMLElement {
     this._hass = hass;
     const entityId = this._chatsEntity();
     const st = entityId ? hass.states[entityId] : null;
-    if (st === this._stateObj) return; // наш сенсор не менялся — не рендерим
+    // Сигнал и оператор живут в отдельных сенсорах и могут обновляться без
+    // изменения списка чатов. Обновляем компактный статус даже при прежнем
+    // объекте чатов, но тяжёлый рендер списка не повторяем.
+    if (st === this._stateObj) {
+      this._updateModemInfo();
+      this._loadModemStatus();
+      return;
+    }
     this._stateObj = st;
     if (st) {
       this._contacts = st.attributes.chats || [];
@@ -49,6 +60,8 @@ class SmsGammuViewerCard extends HTMLElement {
     }
     this._renderList();
     this._updateModemInfo();
+    this._loadModemStatus();
+    this._loadLiveContacts();
   }
 
   set editMode(value) {
@@ -93,14 +106,57 @@ class SmsGammuViewerCard extends HTMLElement {
     const text = this.querySelector("#sgv-modem-text");
     if (!dot || !text) return;
     const attrs = this._stateObj?.attributes || {};
-    const signal = attrs.signal_percent;
-    const network = attrs.network_name;
-    const pct = parseInt(signal) || 0;
-    dot.style.background = pct >= 50 ? "#4caf50" : pct >= 20 ? "#ff9800" : "#f44336";
+    const states = this._hass?.states || {};
+    const findState = (suffixes, hints) => Object.entries(states).find(([id, state]) => {
+      const entity = String(id).toLowerCase();
+      const name = String(state?.attributes?.friendly_name || "").toLowerCase();
+      return suffixes.some((suffix) => entity.endsWith(suffix)) ||
+        hints.some((hint) => name.includes(hint) || entity.includes(hint));
+    })?.[1];
+    // Entity IDs can be prefixed by the config-entry title, so match both
+    // their stable suffixes and friendly names rather than a hard-coded ID.
+    const signalState = findState(["_signal"], ["signal quality", "signal", "сигнал"]);
+    const configuredNetwork = this._config.operator_entity && states[this._config.operator_entity];
+    const networkState = configuredNetwork || findState(["_network", "_network_operator", "_operator"], ["network operator", "operator", "оператор", "сеть"]);
+    const rawSignal = attrs.signal_percent ?? signalState?.state;
+    const configuredName = String(this._config.operator_name || "").trim();
+    const invalid = (value) => value === null || value === undefined || ["", "unknown", "unavailable", "none", "null"].includes(String(value).trim().toLowerCase());
+    const apiNetwork = this._apiStatus?.network;
+    const findOperator = (value) => {
+      if (!value || typeof value !== "object") return typeof value === "string" ? value : null;
+      const keys = ["NetworkName", "network_name", "Operator", "operator", "Carrier", "carrier", "Provider", "provider", "name"];
+      for (const key of keys) {
+        const candidate = value[key];
+        if (!invalid(candidate)) return String(candidate);
+      }
+      for (const child of Object.values(value)) {
+        const found = findOperator(child);
+        if (found) return found;
+      }
+      return null;
+    };
+    const rawNetwork = configuredName || attrs.network_name || networkState?.state ||
+      findOperator(apiNetwork) || findOperator(this._apiStatus?.modem);
+    const parsedSignal = invalid(rawSignal) ? NaN : Number.parseFloat(String(rawSignal).replace(",", "."));
+    const pct = Number.isFinite(parsedSignal) ? Math.max(0, Math.min(100, Math.round(parsedSignal))) : null;
+    dot.style.background = pct === null ? "#9e9e9e" : pct >= 50 ? "#4caf50" : pct >= 20 ? "#ff9800" : "#f44336";
     const parts = [];
-    if (network) parts.push(network);
-    if (signal !== null && signal !== undefined) parts.push(pct + "%");
-    text.textContent = parts.length ? parts.join(" · ") : "…";
+    if (!invalid(rawNetwork)) parts.push(String(rawNetwork));
+    if (pct !== null) parts.push(pct + "%");
+    text.textContent = parts.length ? parts.join(" · ") : "—";
+  }
+
+  async _loadModemStatus() {
+    if (!this._hass?.callApi || this._statusPromise || Date.now() - this._statusFetchedAt < 5000) return;
+    this._statusPromise = this._hass.callApi("GET", "sms_gammu_viewer/status")
+      .then((status) => {
+        this._apiStatus = status || null;
+        this._statusFetchedAt = Date.now();
+        this._updateModemInfo();
+      })
+      .catch(() => {})
+      .finally(() => { this._statusPromise = null; });
+    await this._statusPromise;
   }
 
   _esc(s) {
@@ -118,6 +174,58 @@ class SmsGammuViewerCard extends HTMLElement {
     if (digits.length > 0) return digits.slice(-2);
     const letters = s.replace(/[^a-zA-Zа-яёА-ЯЁ]/g, "");
     return letters.slice(0, 2).toUpperCase() || "?";
+  }
+
+  async _loadLiveContacts() {
+    if (this._liveContactsPromise || !this._hass?.callApi) return;
+    this._liveContactsPromise = Promise.all([
+      this._hass.callApi("GET", "sms_gammu_viewer/contacts"),
+      this._hass.callApi("GET", "sms_gammu_viewer/brand_catalog").catch(() => ({ logos: [] })),
+    ])
+      .then(([contacts, catalog]) => {
+        if (!Array.isArray(contacts)) return;
+        this._brandCatalog = Array.isArray(catalog?.logos) ? catalog.logos : [];
+        this._contacts = contacts;
+        this._error = null;
+        this._renderList();
+      })
+      .catch(() => {})
+      .finally(() => { this._liveContactsPromise = null; });
+  }
+
+  _avatarUrl(contact) {
+    const value = String(contact?.avatar || this._brandLogoFor(contact) || contact?.brand_logo_url || "").trim();
+    return /^(data:image\/(?:jpeg|png|webp);base64,|https?:\/\/|\/)/i.test(value) ? value : "";
+  }
+
+  _normalizeBrand(value) {
+    return String(value || "").toLowerCase()
+      .replace(/\.(?:ru|рф|com|net|org|io|su|me|tv|online)\b/gi, " ")
+      .replace(/[«»"'’.,()\[\]{}_/\\-]+/g, " ")
+      .replace(/\s+/g, " ").trim();
+  }
+
+  _brandLogoFor(contact) {
+    if (!this._isAlphaTag(contact?.number) || !this._brandCatalog?.length) return "";
+    const override = String(contact?.brand_logo_url || "").trim();
+    if (override) {
+      const selected = this._brandCatalog.find((logo) => String(logo.svgUrl || logo.pngUrl || "") === override);
+      return selected?.localUrl || selected?.pngUrl || selected?.svgUrl || override;
+    }
+    const needle = this._normalizeBrand(contact?.contact_name || contact?.number);
+    const found = this._brandCatalog.find((logo) => {
+      const haystack = this._normalizeBrand(`${logo.name || ""} ${logo.name_en || ""} ${logo.tags || ""}`);
+      const tokens = haystack.split(/\s+/).filter(Boolean);
+      return needle && (haystack === needle || haystack.includes(needle) || needle.split(/\s+/).some((token) => token.length >= 2 && tokens.includes(token)));
+    });
+    return found?.localUrl || found?.pngUrl || found?.svgUrl || "";
+  }
+
+  _avatarMarkup(contact) {
+    const url = this._avatarUrl(contact);
+    const fallback = contact.contact_name ? contact.contact_name.slice(0, 1).toUpperCase() : this._avatar(contact.number);
+    if (!url) return this._esc(fallback);
+    return `<img src="${this._esc(url)}" alt="" loading="lazy" decoding="async" onerror="this.remove()" /><span class="sgv-avatar-fallback">${this._esc(fallback)}</span>`;
   }
 
   _isAlphaTag(number) {
@@ -216,6 +324,10 @@ class SmsGammuViewerCard extends HTMLElement {
           background: var(--secondary-text-color, #78909c);
           font-size: 12px;
         }
+        .sgv-avatar { position: relative; overflow: hidden; }
+        .sgv-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; position: relative; z-index: 1; }
+        .sgv-avatar img[src*=".svg"], .sgv-avatar img[src^="data:image/svg"] { object-fit: contain; background: #fff; }
+        .sgv-avatar-fallback { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
         .sgv-info {
           flex: 1;
           min-width: 0;
@@ -334,7 +446,7 @@ class SmsGammuViewerCard extends HTMLElement {
       .map(
         (c) => `
       <div class="sgv-item ${c.unread > 0 ? "unread" : ""}" data-number="${this._esc(c.number)}">
-        <div class="sgv-avatar ${this._isAlphaTag(c.number) ? "alpha" : ""}">${this._esc(c.contact_name ? c.contact_name.slice(0, 1).toUpperCase() : this._avatar(c.number))}</div>
+        <div class="sgv-avatar ${this._isAlphaTag(c.number) ? "alpha" : ""}">${this._avatarMarkup(c)}</div>
         <div class="sgv-info">
           <div class="sgv-row1">
             <span class="sgv-number">
@@ -359,7 +471,7 @@ class SmsGammuViewerCard extends HTMLElement {
   }
 
   static getStubConfig() {
-    return { title: "SMS", max_items: 5, show_unread_only: false, show_modem_info: false };
+    return { title: "SMS", max_items: 5, show_unread_only: false, show_modem_info: false, operator_entity: "", operator_name: "" };
   }
 }
 
@@ -378,6 +490,8 @@ class SmsGammuViewerCardEditor extends HTMLElement {
         max_items: config.max_items ?? 5,
         show_unread_only: config.show_unread_only ?? false,
         show_modem_info: config.show_modem_info ?? false,
+        operator_entity: config.operator_entity ?? "",
+        operator_name: config.operator_name ?? "",
       };
     } else {
       this._render();
@@ -399,6 +513,8 @@ class SmsGammuViewerCardEditor extends HTMLElement {
       },
       { name: "show_unread_only", selector: { boolean: {} } },
       { name: "show_modem_info", selector: { boolean: {} } },
+      { name: "operator_entity", selector: { entity: { domain: "sensor", multiple: false } } },
+      { name: "operator_name", selector: { text: {} } },
     ];
   }
 
@@ -408,6 +524,8 @@ class SmsGammuViewerCardEditor extends HTMLElement {
       max_items: "Количество диалогов",
       show_unread_only: "Показывать только непрочитанные",
       show_modem_info: "Показывать оператор и сигнал",
+      operator_entity: "Сенсор оператора (необязательно)",
+      operator_name: "Имя оператора (необязательно)",
     };
     return labels[schema.name] || schema.name;
   }
@@ -422,6 +540,8 @@ class SmsGammuViewerCardEditor extends HTMLElement {
       max_items: this._config.max_items ?? 5,
       show_unread_only: this._config.show_unread_only ?? false,
       show_modem_info: this._config.show_modem_info ?? false,
+      operator_entity: this._config.operator_entity ?? "",
+      operator_name: this._config.operator_name ?? "",
     };
     form.schema = SmsGammuViewerCardEditor._schema;
     form.computeLabel = this._computeLabel;

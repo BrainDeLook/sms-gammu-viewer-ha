@@ -14,6 +14,18 @@ from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
+
+def _status_value(payload: object, keys: tuple[str, ...]):
+    """Read a status field from both legacy and lean gateway responses."""
+    if isinstance(payload, dict):
+        for key in keys:
+            value = payload.get(key)
+            if value not in (None, "", "unknown", "unavailable"):
+                return value
+    elif payload not in (None, "", "unknown", "unavailable"):
+        return payload
+    return None
+
 SCAN_INTERVAL = timedelta(seconds=10)
 MODEM_INFO_INTERVAL = timedelta(seconds=30)
 LAST_SMS_TEXT_MAXLEN = 255  # ограничение state в HA
@@ -299,8 +311,10 @@ class SmsChatsSensor(_BaseSmsSensor):
         cache = coord.status_cache
         s = cache.get("signal")
         n = cache.get("network")
-        signal = s.get("SignalPercent") if isinstance(s, dict) else None
-        network = n.get("NetworkName") if isinstance(n, dict) else None
+        signal = _status_value(s, ("SignalPercent", "signal_percent", "signal"))
+        network = _status_value(
+            n, ("NetworkName", "network_name", "Operator", "operator", "name")
+        )
         changed = signal != self._signal_percent or network != self._network_name
         self._signal_percent = signal
         self._network_name = network
@@ -324,6 +338,8 @@ class SmsChatsSensor(_BaseSmsSensor):
             {
                 "number": c.get("number"),
                 "contact_name": c.get("contact_name"),
+                "avatar": c.get("avatar") or "",
+                "brand_logo_url": c.get("brand_logo_url") or "",
                 "last_text": (c.get("last_text") or "")[:CHAT_PREVIEW_MAXLEN],
                 "last_date": c.get("last_date"),
                 "unread": c.get("unread") or 0,
@@ -364,7 +380,9 @@ class SmsNetworkSensor(_BaseSmsSensor):
         cache = coord.status_cache
         if cache is not None:
             n = cache.get("network")
-            self._operator = n.get("NetworkName") if isinstance(n, dict) else None
+            self._operator = _status_value(
+                n, ("NetworkName", "network_name", "Operator", "operator", "name")
+            )
         self.async_write_ha_state()
 
     @property
