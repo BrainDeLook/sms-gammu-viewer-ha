@@ -4779,20 +4779,20 @@ class SmsGammuPanel extends HTMLElement {
     }
     head.querySelector("button").addEventListener("click", () => overlay.remove());
     overlay.addEventListener("click", e => { if (e.target === overlay) overlay.remove(); });
-    const toTop = document.createElement("button");
-    toTop.type = "button";
-    toTop.title = "В начало";
-    toTop.setAttribute("aria-label", "В начало");
-    toTop.innerHTML = '<svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>';
-    toTop.style.cssText = "display:none;position:absolute;right:18px;bottom:16px;width:42px;height:42px;align-items:center;justify-content:center;border:1px solid var(--line,#444);border-radius:50%;background:color-mix(in srgb,var(--card,#202020) 94%,var(--sub));color:var(--text,#fff);box-shadow:0 4px 14px rgba(0,0,0,.3);cursor:pointer;z-index:2";
-    const updateTopButton = () => { toTop.style.display = list.scrollTop > 80 ? "flex" : "none"; };
-    list.addEventListener("scroll", updateTopButton, { passive: true });
-    toTop.addEventListener("click", () => list.scrollTo({ top: 0, behavior: "smooth" }));
-    sheet.append(head, list, toTop); overlay.appendChild(sheet); document.body.appendChild(overlay);
+    const toBottom = document.createElement("button");
+    toBottom.type = "button";
+    toBottom.title = "К последнему закрепу";
+    toBottom.setAttribute("aria-label", "К последнему закрепу");
+    toBottom.innerHTML = '<svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
+    toBottom.style.cssText = "display:none;position:absolute;right:18px;bottom:16px;width:42px;height:42px;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.22);border-radius:50%;background:rgba(110,110,110,.72);color:#fff;box-shadow:0 4px 14px rgba(0,0,0,.3);cursor:pointer;z-index:2";
+    const updateBottomButton = () => { toBottom.style.display = list.scrollTop < list.scrollHeight - list.clientHeight - 80 ? "flex" : "none"; };
+    list.addEventListener("scroll", updateBottomButton, { passive: true });
+    toBottom.addEventListener("click", () => list.scrollTo({ top: list.scrollHeight, behavior: "smooth" }));
+    sheet.append(head, list, toBottom); overlay.appendChild(sheet); document.body.appendChild(overlay);
     requestAnimationFrame(() => {
       list.scrollTop = list.scrollHeight;
       requestAnimationFrame(() => { list.scrollTop = list.scrollHeight; });
-      updateTopButton();
+      updateBottomButton();
     });
   }
 
