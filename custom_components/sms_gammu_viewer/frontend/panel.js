@@ -1289,6 +1289,8 @@ class SmsGammuPanel extends HTMLElement {
     this._pinnedCycle = 0;
     this._pinnedScrollBound = false;
     this._chatGesturesBound = false;
+    this._chatGestureToken = 0;
+    this._chatGestureMoved = false;
   }
 
   _t(key, ...args) {
@@ -4876,6 +4878,8 @@ class SmsGammuPanel extends HTMLElement {
     const mobile = () => window.matchMedia?.("(max-width: 580px)")?.matches !== false;
     const reset = (animate = true) => {
       const wasBack = mode === "back";
+      this._chatGestureToken++;
+      this._chatGestureMoved = false;
       if (animate && wasBack) chat.style.transition = "transform .18s ease-out";
       chat.style.transform = "";
       root?.classList.remove("chat-swipe-preview");
@@ -4893,6 +4897,7 @@ class SmsGammuPanel extends HTMLElement {
       startX = touch.clientX;
       startY = touch.clientY;
       mode = null;
+      this._chatGestureMoved = false;
     };
     const move = (event) => {
       const touch = event.touches?.[0] || event;
@@ -4901,6 +4906,7 @@ class SmsGammuPanel extends HTMLElement {
       const dy = touch.clientY - startY;
       if (!mode) {
         if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+        this._chatGestureMoved = true;
         // The whole chat surface participates, like folder paging. Vertical
         // movement remains native scrolling; horizontal intent is captured
         // only once it is clearly dominant.
@@ -5088,7 +5094,9 @@ class SmsGammuPanel extends HTMLElement {
 
       bubble.addEventListener("pointerdown", (e) => {
         startX = e.clientX; startY = e.clientY; longPressed = false;
+        const gestureToken = this._chatGestureToken;
         ltimer = setTimeout(() => {
+          if (gestureToken !== this._chatGestureToken || this._chatGestureMoved || !this._activeNumber || !bubble.isConnected) return;
           longPressed = true;
           bubble.__longPressTimer = null;
           navigator.vibrate?.(30);
