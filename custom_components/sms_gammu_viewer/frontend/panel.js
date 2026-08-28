@@ -416,6 +416,7 @@ const CSS = `
     min-width: 0;
       position: relative;
   }
+  .chat.swipe-back-completing { transition: transform .18s ease-out; }
 
   .chat-header {
     display: flex;
@@ -492,12 +493,18 @@ const CSS = `
   .messages-area {
     flex: 1;
     overflow-y: auto;
+    overscroll-behavior-y: contain;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
     padding: 16px 20px calc(80px + var(--safe-area-inset-bottom, 0px));
     display: flex;
     flex-direction: column;
     gap: 10px;
     -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 60px), transparent 100%);
     mask-image: linear-gradient(to bottom, black calc(100% - 60px), transparent 100%);
+  }
+  .messages-area.pull-down {
+    transition: transform .22s cubic-bezier(.2,.7,.2,1);
   }
   .messages-area.has-pinned-banner { padding-top:72px; }
   .scroll-bottom-btn { display:none; position:absolute; right:20px; bottom:86px; z-index:9; width:44px; height:44px; align-items:center; justify-content:center; border:1px solid var(--line); border-radius:50%; background:color-mix(in srgb, var(--card) 92%, var(--sub)); color:var(--text); box-shadow:0 4px 14px rgba(0,0,0,.28); cursor:pointer; }
@@ -1282,6 +1289,7 @@ class SmsGammuPanel extends HTMLElement {
     this._folderScrollLeft = 0;
     this._pinnedCycle = 0;
     this._pinnedScrollBound = false;
+    this._chatGesturesBound = false;
   }
 
   _t(key, ...args) {
@@ -4854,6 +4862,91 @@ class SmsGammuPanel extends HTMLElement {
     button.classList.toggle("visible", away > 180);
   }
 
+  _initChatGestures() {
+    const chat = this.shadowRoot?.getElementById("chat");
+    const area = this.shadowRoot?.getElementById("messages-area");
+    if (!chat || !area || this._chatGesturesBound) return;
+    this._chatGesturesBound = true;
+    let startX = 0;
+    let startY = 0;
+    let mode = null;
+    let pullOffset = 0;
+    let backOffset = 0;
+
+    const mobile = () => window.matchMedia?.("(max-width: 580px)")?.matches !== false;
+    const reset = (animate = true) => {
+      if (animate) area.classList.add("pull-down");
+      area.style.transform = "";
+      chat.style.transform = "";
+      setTimeout(() => area.classList.remove("pull-down"), animate ? 240 : 0);
+      mode = null;
+      pullOffset = 0;
+      backOffset = 0;
+    };
+    const begin = (event) => {
+      if (!mobile() || !this._activeNumber || event.touches.length !== 1) return;
+      const touch = event.touches[0];
+      const target = event.target;
+      if (target?.closest?.("textarea, input, button, .pinned-banner")) return;
+      startX = touch.clientX;
+      startY = touch.clientY;
+      mode = null;
+    };
+    const move = (event) => {
+      if (!mobile() || !this._activeNumber || !event.touches.length) return;
+      const touch = event.touches[0];
+      const dx = touch.clientX - startX;
+      const dy = touch.clientY - startY;
+      if (!mode) {
+        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+        // Back navigation is deliberately edge-only, leaving message swipes
+        // and horizontal controls untouched everywhere else.
+        const chatRect = chat.getBoundingClientRect();
+        if (startX - chatRect.left <= 42 && dx > 8 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+          mode = "back";
+        } else if (event.target?.closest?.("#messages-area") && area.scrollTop <= 0 && dy > 8 && Math.abs(dy) > Math.abs(dx) * 1.2) {
+          mode = "pull";
+        } else {
+          mode = "native";
+        }
+      }
+      if (mode === "back") {
+        event.preventDefault();
+        event.stopPropagation();
+        backOffset = Math.min(120, Math.max(0, dx)) * 0.42;
+        chat.style.transform = `translate3d(${backOffset}px,0,0)`;
+      } else if (mode === "pull") {
+        event.preventDefault();
+        event.stopPropagation();
+        pullOffset = Math.min(72, Math.max(0, dy) * 0.34);
+        area.classList.remove("pull-down");
+        area.style.transform = `translate3d(0,${pullOffset}px,0)`;
+      }
+    };
+    const end = () => {
+      if (mode === "back") {
+        const completed = backOffset >= 42;
+        if (completed) {
+          chat.classList.add("swipe-back-completing");
+          chat.style.transform = "translate3d(100%,0,0)";
+          setTimeout(() => {
+            this.shadowRoot.getElementById("back-btn")?.click();
+            chat.classList.remove("swipe-back-completing");
+            reset(false);
+          }, 180);
+        } else reset(true);
+      } else if (mode === "pull") {
+        reset(true);
+      } else {
+        mode = null;
+      }
+    };
+    chat.addEventListener("touchstart", begin, { capture: true, passive: true });
+    chat.addEventListener("touchmove", move, { capture: true, passive: false });
+    chat.addEventListener("touchend", end, { capture: true, passive: true });
+    chat.addEventListener("touchcancel", () => reset(true), { capture: true, passive: true });
+  }
+
   _renderMessages() {
     // Защита от гонки: пока показан оверлей (статус модема/телефонная
     // книга), эта функция не должна трогать шапку/send-bar вообще —
@@ -4863,6 +4956,7 @@ class SmsGammuPanel extends HTMLElement {
     if (this._activeTab === "status" || this._activeTab === "phonebook") return;
 
     const area = this.shadowRoot.getElementById("messages-area");
+    this._initChatGestures();
     const titleEl = this.shadowRoot.getElementById("chat-title");
     const subEl = this.shadowRoot.getElementById("chat-subtitle");
     const delBtn = this.shadowRoot.getElementById("delete-contact-btn");
