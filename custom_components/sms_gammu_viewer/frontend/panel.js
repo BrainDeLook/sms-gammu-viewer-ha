@@ -4875,6 +4875,7 @@ class SmsGammuPanel extends HTMLElement {
     let pullOffset = 0;
     let pullFrame = 0;
     let pendingPullDy = 0;
+    let pointerActive = false;
     const root = this.shadowRoot?.getElementById("root");
 
     const mobile = () => window.matchMedia?.("(max-width: 580px)")?.matches !== false;
@@ -4898,8 +4899,8 @@ class SmsGammuPanel extends HTMLElement {
       pendingPullDy = 0;
     };
     const begin = (event) => {
-      if (!mobile() || !this._activeNumber || event.touches.length !== 1) return;
-      const touch = event.touches[0];
+      const touch = event.touches?.[0] || event;
+      if (!mobile() || !this._activeNumber || !touch) return;
       const target = event.target;
       if (target?.closest?.("textarea, input, button, .pinned-banner")) return;
       startX = touch.clientX;
@@ -4907,8 +4908,8 @@ class SmsGammuPanel extends HTMLElement {
       mode = null;
     };
     const move = (event) => {
-      if (!mobile() || !this._activeNumber || !event.touches.length) return;
-      const touch = event.touches[0];
+      const touch = event.touches?.[0] || event;
+      if (!mobile() || !this._activeNumber || !touch) return;
       const dx = touch.clientX - startX;
       const dy = touch.clientY - startY;
       if (!mode) {
@@ -4962,10 +4963,32 @@ class SmsGammuPanel extends HTMLElement {
         mode = null;
       }
     };
-    chat.addEventListener("touchstart", begin, { capture: true, passive: true });
-    chat.addEventListener("touchmove", move, { capture: true, passive: false });
-    chat.addEventListener("touchend", end, { capture: true, passive: true });
-    chat.addEventListener("touchcancel", () => reset(true), { capture: true, passive: true });
+    chat.addEventListener("touchstart", (event) => { if (!pointerActive) begin(event); }, { capture: true, passive: true });
+    chat.addEventListener("touchmove", (event) => { if (!pointerActive) move(event); }, { capture: true, passive: false });
+    chat.addEventListener("touchend", () => { if (!pointerActive) end(); }, { capture: true, passive: true });
+    chat.addEventListener("touchcancel", () => { if (!pointerActive) reset(true); }, { capture: true, passive: true });
+    // Pointer Events are more reliable in modern iOS/Android WebViews. Keep
+    // touch listeners above as a fallback for older embedded browsers, but
+    // never process both streams for the same gesture.
+    chat.addEventListener("pointerdown", (event) => {
+      if (event.pointerType !== "touch" || pointerActive) return;
+      pointerActive = true;
+      chat.setPointerCapture?.(event.pointerId);
+      begin(event);
+    }, { capture: true, passive: true });
+    chat.addEventListener("pointermove", (event) => {
+      if (event.pointerType === "touch" && pointerActive) move(event);
+    }, { capture: true, passive: false });
+    chat.addEventListener("pointerup", (event) => {
+      if (event.pointerType !== "touch" || !pointerActive) return;
+      pointerActive = false;
+      end();
+    }, { capture: true, passive: true });
+    chat.addEventListener("pointercancel", (event) => {
+      if (event.pointerType !== "touch" || !pointerActive) return;
+      pointerActive = false;
+      reset(true);
+    }, { capture: true, passive: true });
   }
 
   _renderMessages() {
