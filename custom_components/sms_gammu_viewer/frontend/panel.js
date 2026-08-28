@@ -4906,6 +4906,14 @@ class SmsGammuPanel extends HTMLElement {
         // only once it is clearly dominant.
         if (dx > 8 && Math.abs(dx) > Math.abs(dy) * 1.2) {
           mode = "back";
+          // The capture-phase swipe handler can stop bubble pointermove
+          // events before a message cancels its long-press timer.
+          this.shadowRoot.querySelectorAll(".msg-bubble").forEach((bubble) => {
+            if (bubble.__longPressTimer) {
+              clearTimeout(bubble.__longPressTimer);
+              bubble.__longPressTimer = null;
+            }
+          });
           root?.classList.add("chat-swipe-preview");
         } else {
           mode = "native";
@@ -5082,15 +5090,20 @@ class SmsGammuPanel extends HTMLElement {
         startX = e.clientX; startY = e.clientY; longPressed = false;
         ltimer = setTimeout(() => {
           longPressed = true;
+          bubble.__longPressTimer = null;
           navigator.vibrate?.(30);
           this._showMsgCtxMenu(e, bubble);
         }, 700);
+        bubble.__longPressTimer = ltimer;
       });
       bubble.addEventListener("pointermove", (e) => {
-        if (Math.abs(e.clientX - startX) > 10 || Math.abs(e.clientY - startY) > 10) clearTimeout(ltimer);
+        if (Math.abs(e.clientX - startX) > 10 || Math.abs(e.clientY - startY) > 10) {
+          clearTimeout(ltimer);
+          bubble.__longPressTimer = null;
+        }
       });
-      bubble.addEventListener("pointerup", () => clearTimeout(ltimer));
-      bubble.addEventListener("pointercancel", () => clearTimeout(ltimer));
+      bubble.addEventListener("pointerup", () => { clearTimeout(ltimer); bubble.__longPressTimer = null; });
+      bubble.addEventListener("pointercancel", () => { clearTimeout(ltimer); bubble.__longPressTimer = null; });
       bubble.addEventListener("click", async () => {
         if (longPressed) return;
         const text = bubble.querySelector(".msg-text")?.textContent || "";
