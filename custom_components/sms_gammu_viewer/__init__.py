@@ -7,6 +7,7 @@ import hashlib
 import json
 import logging
 import re
+import time
 from functools import partial
 from urllib.parse import urlparse
 from datetime import datetime
@@ -73,6 +74,7 @@ _LOGGER = logging.getLogger(__name__)
 _BRAND_CATALOG_CACHE: dict | None = None
 _BRAND_CATALOG_CACHE_TS = 0.0
 _BRAND_CATALOG_CACHE_TTL = 6 * 60 * 60
+STATUS_REFRESH_INTERVAL = 45
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
@@ -590,6 +592,7 @@ class SmsCoordinator:
         self.store: SmsStore = store
         self.client: GatewayClient = client
         self._task: asyncio.Task | None = None
+        self._status_task: asyncio.Task | None = None
         self.collecting = False
         self._error_streak = 0
         self._last_event_id = 0
@@ -789,6 +792,21 @@ class SmsCoordinator:
         self._task = self.hass.async_create_background_task(
             self._loop(), f"{DOMAIN}_poll"
         )
+        self._status_task = self.hass.async_create_background_task(
+            self._status_loop(), f"{DOMAIN}_status"
+        )
+
+    async def _status_loop(self) -> None:
+        """Refresh modem status independently of SMS polling and calls."""
+        while True:
+            try:
+                await asyncio.sleep(STATUS_REFRESH_INTERVAL)
+                if not self.call_in_progress and not self.send_in_progress:
+                    await self.refresh_status_cache()
+            except asyncio.CancelledError:
+                raise
+            except Exception as error:
+                _LOGGER.debug("Status refresh loop error: %s", error)
 
     async def stop(self) -> None:
         if self._task:
@@ -798,6 +816,13 @@ class SmsCoordinator:
             except asyncio.CancelledError:
                 pass
             self._task = None
+        if self._status_task:
+            self._status_task.cancel()
+            try:
+                await self._status_task
+            except asyncio.CancelledError:
+                pass
+            self._status_task = None
 
     async def restart(self) -> None:
         await self.stop()
@@ -930,21 +955,6 @@ class SmsCoordinator:
                             await self._collect(messages)
                         elif messages is not None:
                             self._error_streak = 0
-                # Обновляем кеш статуса в фоне каждый цикл
-                try:
-                    _s, _n = await asyncio.gather(
-                        self.client.get_signal(),
-                        self.client.get_network(),
-                        return_exceptions=True,
-                    )
-                    if self._status_cache is None:
-                        self._status_cache = {}
-                    if not isinstance(_s, Exception):
-                        self._status_cache["signal"] = _s
-                    if not isinstance(_n, Exception):
-                        self._status_cache["network"] = _n
-                except Exception:
-                    pass
             except asyncio.CancelledError:
                 raise
             except Exception as e:
@@ -1454,7 +1464,10 @@ class SmsApiView(HomeAssistantView):
                 return self._json(_BRAND_CATALOG_CACHE)
             try:
                 catalog_path = Path(self.hass.config.config_dir) / ".storage" / "sms_gammu_viewer_brand_catalog.json"
-                if catalog_path.is_file():
+                catalog_fresh = catalog_path.is_file() and (
+                    time.time() - catalog_path.stat().st_mtime < _BRAND_CATALOG_CACHE_TTL
+                )
+                if catalog_fresh:
                     payload = json.loads(await self.hass.async_add_executor_job(catalog_path.read_text, "utf-8"))
                     _LOGGER.debug("Loaded persistent Trace Logo catalog from HA storage")
                 else:
@@ -1483,7 +1496,7 @@ class SmsApiView(HomeAssistantView):
                     "logos": logos,
                 }
                 _BRAND_CATALOG_CACHE_TS = now
-                if not catalog_path.is_file():
+                if not catalog_fresh:
                     await self.hass.async_add_executor_job(
                         partial(catalog_path.parent.mkdir, parents=True, exist_ok=True)
                     )
