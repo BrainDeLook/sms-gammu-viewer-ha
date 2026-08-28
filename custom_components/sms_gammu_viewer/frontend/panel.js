@@ -505,6 +505,7 @@ const CSS = `
   }
   .messages-content { min-height: 100%; display: flex; flex-direction: column; gap: 10px; }
   .messages-content.pull-down { transition: transform .22s cubic-bezier(.2,.7,.2,1); }
+  .messages-area.no-scroll-gesture { touch-action: none; }
   .messages-area.has-pinned-banner { padding-top:72px; }
   .scroll-bottom-btn { display:none; position:absolute; right:20px; bottom:86px; z-index:9; width:44px; height:44px; align-items:center; justify-content:center; border:1px solid var(--line); border-radius:50%; background:color-mix(in srgb, var(--card) 92%, var(--sub)); color:var(--text); box-shadow:0 4px 14px rgba(0,0,0,.28); cursor:pointer; }
   .scroll-bottom-btn.visible { display:flex; }
@@ -4890,6 +4891,7 @@ class SmsGammuPanel extends HTMLElement {
       }
       chat.style.transform = "";
       root?.classList.remove("chat-swipe-preview");
+      area.classList.remove("no-scroll-gesture");
       setTimeout(() => {
         if (wasBack) chat.style.transition = "";
       }, animate ? 240 : 0);
@@ -4903,6 +4905,11 @@ class SmsGammuPanel extends HTMLElement {
       if (!mobile() || !this._activeNumber || !touch) return;
       const target = event.target;
       if (target?.closest?.("textarea, input, button, .pinned-banner")) return;
+      if (target?.closest?.("#messages-area") && area.scrollHeight <= area.clientHeight + 1) {
+        // A one-message chat has no native scroll range, so iOS would
+        // otherwise hand the drag to the page-level pull-to-refresh.
+        area.classList.add("no-scroll-gesture");
+      }
       startX = touch.clientX;
       startY = touch.clientY;
       mode = null;
@@ -5113,7 +5120,7 @@ class SmsGammuPanel extends HTMLElement {
           longPressed = true;
           navigator.vibrate?.(30);
           this._showMsgCtxMenu(e, bubble);
-        }, 600);
+        }, 800);
       });
       bubble.addEventListener("pointermove", (e) => {
         if (Math.abs(e.clientX - startX) > 10 || Math.abs(e.clientY - startY) > 10) clearTimeout(ltimer);
