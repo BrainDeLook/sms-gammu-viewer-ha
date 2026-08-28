@@ -28,8 +28,9 @@ After installation, an **SMS** tab appears in the sidebar. Messages are stored i
 - 🔍 **Search** by phone number or message text
 - 📌 **Pin conversations** — pinned chats stay at the top
 - 🔕 **Mute** contacts — disable notifications per contact
-- ⭐ **Starred messages** — mark messages as favourite, filter by star in chat header
-- 👆 **Long press** (mobile) / **right click** (desktop) — copy, star, delete message
+- 📌 **Pinned messages** — pin one or more messages, jump between pins, or open the pinned-only view
+- 🗂️ **Chat folders** — custom folders plus automatic People/Brands folders
+- 👆 **Long press** (mobile) / **right click** (desktop) — copy, pin, delete and manage folders
 - 👈 **Swipe actions** (mobile) — swipe left: mute/delete, swipe right: mark read/pin
 - 📞 **Outgoing voice calls** via AT interface
 - 📖 **Contact profiles** — name, photo, label, email, company, birthday, notes and custom social/contact methods
