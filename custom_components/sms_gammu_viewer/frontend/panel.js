@@ -506,6 +506,9 @@ const CSS = `
   .messages-area.pull-down {
     transition: transform .22s cubic-bezier(.2,.7,.2,1);
   }
+  @media (max-width: 580px) {
+    .messages-area { will-change: transform; }
+  }
   .messages-area.has-pinned-banner { padding-top:72px; }
   .scroll-bottom-btn { display:none; position:absolute; right:20px; bottom:86px; z-index:9; width:44px; height:44px; align-items:center; justify-content:center; border:1px solid var(--line); border-radius:50%; background:color-mix(in srgb, var(--card) 92%, var(--sub)); color:var(--text); box-shadow:0 4px 14px rgba(0,0,0,.28); cursor:pointer; }
   .scroll-bottom-btn.visible { display:flex; }
@@ -4874,11 +4877,14 @@ class SmsGammuPanel extends HTMLElement {
     let mode = null;
     let pullOffset = 0;
     let backOffset = 0;
+    let pullFrame = 0;
+    let pendingPullDy = 0;
     const root = this.shadowRoot?.getElementById("root");
 
     const mobile = () => window.matchMedia?.("(max-width: 580px)")?.matches !== false;
     const reset = (animate = true) => {
       const wasBack = mode === "back";
+      if (pullFrame) { cancelAnimationFrame(pullFrame); pullFrame = 0; }
       if (animate) area.classList.add("pull-down");
       if (animate && wasBack) chat.style.transition = "transform .18s ease-out";
       area.style.transform = "";
@@ -4891,6 +4897,7 @@ class SmsGammuPanel extends HTMLElement {
       mode = null;
       pullOffset = 0;
       backOffset = 0;
+      pendingPullDy = 0;
     };
     const begin = (event) => {
       if (!mobile() || !this._activeNumber || event.touches.length !== 1) return;
@@ -4928,9 +4935,17 @@ class SmsGammuPanel extends HTMLElement {
       } else if (mode === "pull") {
         event.preventDefault();
         event.stopPropagation();
-        pullOffset = Math.min(72, Math.max(0, dy) * 0.34);
-        area.classList.remove("pull-down");
-        area.style.transform = `translate3d(0,${pullOffset}px,0)`;
+        pendingPullDy = Math.max(0, dy);
+        if (!pullFrame) {
+          pullFrame = requestAnimationFrame(() => {
+            pullFrame = 0;
+            // Exponential resistance keeps the first pixels responsive and
+            // smoothly damps the pull near its 64px visual limit.
+            pullOffset = Math.min(64, 64 * (1 - Math.exp(-pendingPullDy / 105)));
+            area.classList.remove("pull-down");
+            area.style.transform = `translate3d(0,${pullOffset.toFixed(2)}px,0)`;
+          });
+        }
       }
     };
     const end = () => {
