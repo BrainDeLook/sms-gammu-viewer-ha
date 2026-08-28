@@ -503,12 +503,6 @@ const CSS = `
     -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 60px), transparent 100%);
     mask-image: linear-gradient(to bottom, black calc(100% - 60px), transparent 100%);
   }
-  .messages-area.pull-down {
-    transition: transform .22s cubic-bezier(.2,.7,.2,1);
-  }
-  @media (max-width: 580px) {
-    .messages-area { will-change: transform; }
-  }
   .messages-area.has-pinned-banner { padding-top:72px; }
   .scroll-bottom-btn { display:none; position:absolute; right:20px; bottom:86px; z-index:9; width:44px; height:44px; align-items:center; justify-content:center; border:1px solid var(--line); border-radius:50%; background:color-mix(in srgb, var(--card) 92%, var(--sub)); color:var(--text); box-shadow:0 4px 14px rgba(0,0,0,.28); cursor:pointer; }
   .scroll-bottom-btn.visible { display:flex; }
@@ -4875,29 +4869,20 @@ class SmsGammuPanel extends HTMLElement {
     let startX = 0;
     let startY = 0;
     let mode = null;
-    let pullOffset = 0;
     let backOffset = 0;
-    let pullFrame = 0;
-    let pendingPullDy = 0;
     const root = this.shadowRoot?.getElementById("root");
 
     const mobile = () => window.matchMedia?.("(max-width: 580px)")?.matches !== false;
     const reset = (animate = true) => {
       const wasBack = mode === "back";
-      if (pullFrame) { cancelAnimationFrame(pullFrame); pullFrame = 0; }
-      if (animate) area.classList.add("pull-down");
       if (animate && wasBack) chat.style.transition = "transform .18s ease-out";
-      area.style.transform = "";
       chat.style.transform = "";
       root?.classList.remove("chat-swipe-preview");
       setTimeout(() => {
-        area.classList.remove("pull-down");
         if (wasBack) chat.style.transition = "";
       }, animate ? 240 : 0);
       mode = null;
-      pullOffset = 0;
       backOffset = 0;
-      pendingPullDy = 0;
     };
     const begin = (event) => {
       if (!mobile() || !this._activeNumber || event.touches.length !== 1) return;
@@ -4921,8 +4906,6 @@ class SmsGammuPanel extends HTMLElement {
         if (dx > 8 && Math.abs(dx) > Math.abs(dy) * 1.2) {
           mode = "back";
           root?.classList.add("chat-swipe-preview");
-        } else if (event.target?.closest?.("#messages-area") && area.scrollTop <= 0 && dy > 8 && Math.abs(dy) > Math.abs(dx) * 1.2) {
-          mode = "pull";
         } else {
           mode = "native";
         }
@@ -4932,20 +4915,6 @@ class SmsGammuPanel extends HTMLElement {
         event.stopPropagation();
         backOffset = Math.min(Math.max(1, chat.clientWidth) * 0.96, Math.max(0, dx));
         chat.style.transform = `translate3d(${backOffset}px,0,0)`;
-      } else if (mode === "pull") {
-        event.preventDefault();
-        event.stopPropagation();
-        pendingPullDy = Math.max(0, dy);
-        if (!pullFrame) {
-          pullFrame = requestAnimationFrame(() => {
-            pullFrame = 0;
-            // Exponential resistance keeps the first pixels responsive and
-            // smoothly damps the pull near its 64px visual limit.
-            pullOffset = Math.min(64, 64 * (1 - Math.exp(-pendingPullDy / 105)));
-            area.classList.remove("pull-down");
-            area.style.transform = `translate3d(0,${pullOffset.toFixed(2)}px,0)`;
-          });
-        }
       }
     };
     const end = () => {
@@ -4960,8 +4929,6 @@ class SmsGammuPanel extends HTMLElement {
             reset(false);
           }, 180);
         } else reset(true);
-      } else if (mode === "pull") {
-        reset(true);
       } else {
         mode = null;
       }
