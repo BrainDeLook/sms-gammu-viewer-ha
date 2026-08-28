@@ -999,6 +999,22 @@ class SmsCoordinator:
                 len(result.pending),
             )
         if result.ambiguous:
+            quarantined = [
+                {
+                    "fingerprint": part.fingerprint,
+                    "location": part.location,
+                    "number": part.number,
+                    "reference": part.reference,
+                    "sequence": part.sequence,
+                    "total": part.total,
+                    "date": part.date,
+                }
+                for part in result.ambiguous
+            ]
+            await self.hass.async_add_executor_job(
+                self.store.quarantine_raw_parts, quarantined, "ambiguous"
+            )
+            await self.hass.async_add_executor_job(self.store.prune_raw_quarantine, 30)
             _LOGGER.error(
                 "Raw SMS: quarantined %d ambiguous physical part(s); "
                 "nothing will be joined or deleted",

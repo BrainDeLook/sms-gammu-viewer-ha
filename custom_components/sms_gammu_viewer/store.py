@@ -105,6 +105,19 @@ class SmsStore:
             conn.execute("CREATE TABLE IF NOT EXISTS pinned_numbers (number TEXT PRIMARY KEY)")
             conn.execute("CREATE TABLE IF NOT EXISTS starred_messages (msg_id INTEGER PRIMARY KEY)")
             conn.execute("CREATE TABLE IF NOT EXISTS pinned_messages (msg_id INTEGER PRIMARY KEY)")
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS raw_sms_quarantine (
+                    fingerprint TEXT PRIMARY KEY,
+                    location INTEGER NOT NULL,
+                    number TEXT NOT NULL,
+                    reference INTEGER,
+                    sequence INTEGER,
+                    total INTEGER,
+                    date TEXT NOT NULL,
+                    reason TEXT NOT NULL,
+                    quarantined_at TEXT NOT NULL
+                )
+            """)
             # Старые «избранные» сообщения сохраняем как закреплённые при переходе
             # на новую модель, чтобы пользователь не потерял отметки.
             conn.execute("INSERT OR IGNORE INTO pinned_messages (msg_id) SELECT msg_id FROM starred_messages")
@@ -349,6 +362,34 @@ class SmsStore:
         """Удаляет все сообщения из базы данных."""
         with self._conn() as conn:
             conn.execute("DELETE FROM messages")
+
+    def quarantine_raw_parts(self, parts: list[dict[str, Any]], reason: str = "ambiguous") -> int:
+        """Remember ambiguous physical parts without deleting them from the modem."""
+        now = datetime.now().isoformat(timespec="seconds")
+        inserted = 0
+        with self._conn() as conn:
+            for part in parts:
+                fingerprint = str(part.get("fingerprint") or "")
+                if not fingerprint:
+                    continue
+                cur = conn.execute(
+                    """INSERT OR IGNORE INTO raw_sms_quarantine
+                       (fingerprint, location, number, reference, sequence, total, date, reason, quarantined_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (fingerprint, int(part.get("location", -1)), str(part.get("number") or ""),
+                     part.get("reference"), part.get("sequence"), part.get("total"),
+                     str(part.get("date") or ""), reason, now),
+                )
+                inserted += int(cur.rowcount > 0)
+        return inserted
+
+    def prune_raw_quarantine(self, max_age_days: int = 30) -> int:
+        with self._conn() as conn:
+            cur = conn.execute(
+                "DELETE FROM raw_sms_quarantine WHERE quarantined_at < datetime('now', ?)",
+                (f"-{max(1, int(max_age_days))} days",),
+            )
+            return cur.rowcount
 
     def star_message(self, msg_id: int) -> None:
         with self._conn() as conn:
