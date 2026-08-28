@@ -503,6 +503,8 @@ const CSS = `
     -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 60px), transparent 100%);
     mask-image: linear-gradient(to bottom, black calc(100% - 60px), transparent 100%);
   }
+  .messages-content { min-height: 100%; display: flex; flex-direction: column; gap: 10px; }
+  .messages-content.pull-down { transition: transform .22s cubic-bezier(.2,.7,.2,1); }
   .messages-area.has-pinned-banner { padding-top:72px; }
   .scroll-bottom-btn { display:none; position:absolute; right:20px; bottom:86px; z-index:9; width:44px; height:44px; align-items:center; justify-content:center; border:1px solid var(--line); border-radius:50%; background:color-mix(in srgb, var(--card) 92%, var(--sub)); color:var(--text); box-shadow:0 4px 14px rgba(0,0,0,.28); cursor:pointer; }
   .scroll-bottom-btn.visible { display:flex; }
@@ -4870,12 +4872,21 @@ class SmsGammuPanel extends HTMLElement {
     let startY = 0;
     let mode = null;
     let backOffset = 0;
+    let pullOffset = 0;
+    let pullFrame = 0;
+    let pendingPullDy = 0;
     const root = this.shadowRoot?.getElementById("root");
 
     const mobile = () => window.matchMedia?.("(max-width: 580px)")?.matches !== false;
     const reset = (animate = true) => {
       const wasBack = mode === "back";
+      const content = area.querySelector(".messages-content");
+      if (pullFrame) { cancelAnimationFrame(pullFrame); pullFrame = 0; }
       if (animate && wasBack) chat.style.transition = "transform .18s ease-out";
+      if (content) {
+        if (animate && mode === "pull") content.classList.add("pull-down");
+        content.style.transform = "";
+      }
       chat.style.transform = "";
       root?.classList.remove("chat-swipe-preview");
       setTimeout(() => {
@@ -4883,6 +4894,8 @@ class SmsGammuPanel extends HTMLElement {
       }, animate ? 240 : 0);
       mode = null;
       backOffset = 0;
+      pullOffset = 0;
+      pendingPullDy = 0;
     };
     const begin = (event) => {
       if (!mobile() || !this._activeNumber || event.touches.length !== 1) return;
@@ -4906,6 +4919,8 @@ class SmsGammuPanel extends HTMLElement {
         if (dx > 8 && Math.abs(dx) > Math.abs(dy) * 1.2) {
           mode = "back";
           root?.classList.add("chat-swipe-preview");
+        } else if (event.target?.closest?.("#messages-area") && area.scrollTop <= 0 && dy > 8 && Math.abs(dy) > Math.abs(dx) * 1.2) {
+          mode = "pull";
         } else {
           mode = "native";
         }
@@ -4915,6 +4930,20 @@ class SmsGammuPanel extends HTMLElement {
         event.stopPropagation();
         backOffset = Math.min(Math.max(1, chat.clientWidth) * 0.96, Math.max(0, dx));
         chat.style.transform = `translate3d(${backOffset}px,0,0)`;
+      } else if (mode === "pull") {
+        event.preventDefault();
+        event.stopPropagation();
+        const content = area.querySelector(".messages-content");
+        if (!content) return;
+        pendingPullDy = Math.max(0, dy);
+        if (!pullFrame) {
+          pullFrame = requestAnimationFrame(() => {
+            pullFrame = 0;
+            pullOffset = Math.min(64, 64 * (1 - Math.exp(-pendingPullDy / 105)));
+            content.classList.remove("pull-down");
+            content.style.transform = `translate3d(0,${pullOffset.toFixed(2)}px,0)`;
+          });
+        }
       }
     };
     const end = () => {
@@ -5043,7 +5072,7 @@ class SmsGammuPanel extends HTMLElement {
           </div>
         </div>`;
     }
-    area.innerHTML = html;
+    area.innerHTML = `<div class="messages-content">${html}</div>`;
     if (!this._pinnedScrollBound) {
       area.addEventListener("scroll", () => { this._updatePinnedBanner(); this._updateScrollBottomButton(); }, { passive: true });
       this._pinnedScrollBound = true;
