@@ -1412,7 +1412,9 @@ class SmsApiView(HomeAssistantView):
         if action == "db_stats":
             import os
             db_path = store._path
-            db_size = os.path.getsize(db_path) if os.path.exists(db_path) else 0
+            db_size = await self.hass.async_add_executor_job(
+                lambda: os.path.getsize(db_path) if os.path.exists(db_path) else 0
+            )
             msg_count = await self.hass.async_add_executor_job(store.get_message_count)
             return self._json({
                 "db_size": db_size,

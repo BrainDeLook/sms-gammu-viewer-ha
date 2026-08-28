@@ -3710,7 +3710,7 @@ class SmsGammuPanel extends HTMLElement {
     const _spin = this._statusLoading ? '<span class="status-refresh-spin"></span>' : "";
     bar.innerHTML = `
       <span class="signal-dot ${dotClass}"></span>
-      <span>${net ? net + " · " : ""}${pct}% · ${this._t("poll_every", interval)}</span>
+      <span>${net ? this._esc(String(net)) + " · " : ""}${this._esc(String(pct))}% · ${this._t("poll_every", interval)}</span>
       ${_spin}
     `;
   }
