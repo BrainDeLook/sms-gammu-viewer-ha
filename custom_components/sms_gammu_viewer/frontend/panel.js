@@ -1190,6 +1190,8 @@ const CSS = `
     .root.chat-open .contacts { display: none; }
     .root.chat-open .chat { display: flex; }
     .root.chat-open .back-btn { display: flex !important; }
+    .root.chat-swipe-preview .contacts { display: flex; position: absolute; inset: 0; z-index: 1; }
+    .root.chat-swipe-preview .chat { z-index: 2; }
     .status-grid { grid-template-columns: 1fr; }
     .fab {
       width: 60px; height: 60px;
@@ -4872,13 +4874,20 @@ class SmsGammuPanel extends HTMLElement {
     let mode = null;
     let pullOffset = 0;
     let backOffset = 0;
+    const root = this.shadowRoot?.getElementById("root");
 
     const mobile = () => window.matchMedia?.("(max-width: 580px)")?.matches !== false;
     const reset = (animate = true) => {
+      const wasBack = mode === "back";
       if (animate) area.classList.add("pull-down");
+      if (animate && wasBack) chat.style.transition = "transform .18s ease-out";
       area.style.transform = "";
       chat.style.transform = "";
-      setTimeout(() => area.classList.remove("pull-down"), animate ? 240 : 0);
+      root?.classList.remove("chat-swipe-preview");
+      setTimeout(() => {
+        area.classList.remove("pull-down");
+        if (wasBack) chat.style.transition = "";
+      }, animate ? 240 : 0);
       mode = null;
       pullOffset = 0;
       backOffset = 0;
@@ -4899,11 +4908,12 @@ class SmsGammuPanel extends HTMLElement {
       const dy = touch.clientY - startY;
       if (!mode) {
         if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
-        // Back navigation is deliberately edge-only, leaving message swipes
-        // and horizontal controls untouched everywhere else.
-        const chatRect = chat.getBoundingClientRect();
-        if (startX - chatRect.left <= 42 && dx > 8 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+        // The whole chat surface participates, like folder paging. Vertical
+        // movement remains native scrolling; horizontal intent is captured
+        // only once it is clearly dominant.
+        if (dx > 8 && Math.abs(dx) > Math.abs(dy) * 1.2) {
           mode = "back";
+          root?.classList.add("chat-swipe-preview");
         } else if (event.target?.closest?.("#messages-area") && area.scrollTop <= 0 && dy > 8 && Math.abs(dy) > Math.abs(dx) * 1.2) {
           mode = "pull";
         } else {
@@ -4913,7 +4923,7 @@ class SmsGammuPanel extends HTMLElement {
       if (mode === "back") {
         event.preventDefault();
         event.stopPropagation();
-        backOffset = Math.min(120, Math.max(0, dx)) * 0.42;
+        backOffset = Math.min(Math.max(1, chat.clientWidth) * 0.96, Math.max(0, dx));
         chat.style.transform = `translate3d(${backOffset}px,0,0)`;
       } else if (mode === "pull") {
         event.preventDefault();
@@ -4925,7 +4935,7 @@ class SmsGammuPanel extends HTMLElement {
     };
     const end = () => {
       if (mode === "back") {
-        const completed = backOffset >= 42;
+        const completed = backOffset >= Math.max(72, chat.clientWidth * 0.28);
         if (completed) {
           chat.classList.add("swipe-back-completing");
           chat.style.transform = "translate3d(100%,0,0)";
