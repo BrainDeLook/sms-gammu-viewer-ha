@@ -503,7 +503,7 @@ const CSS = `
     -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 60px), transparent 100%);
     mask-image: linear-gradient(to bottom, black calc(100% - 60px), transparent 100%);
   }
-  .messages-area.has-pinned-banner { padding-top:72px; }
+  .messages-area.has-pinned-banner { padding-top:72px; scroll-padding-top:72px; }
   .scroll-bottom-btn { display:none; position:absolute; right:20px; bottom:86px; z-index:9; width:44px; height:44px; align-items:center; justify-content:center; border:1px solid var(--line); border-radius:50%; background:color-mix(in srgb, var(--card) 92%, var(--sub)); color:var(--text); box-shadow:0 4px 14px rgba(0,0,0,.28); cursor:pointer; }
   .scroll-bottom-btn.visible { display:flex; }
   @media (max-width: 580px) {
@@ -1287,6 +1287,7 @@ class SmsGammuPanel extends HTMLElement {
     this._folderOptions = { show_all: true, people_enabled: false, brands_enabled: false, brands_manual: [], brands_excluded: [], people_manual: [], people_excluded: [], folder_order: [] };
     this._folderScrollLeft = 0;
     this._pinnedCycle = 0;
+    this._pinnedCycleLockUntil = 0;
     this._pinnedScrollBound = false;
     this._chatGesturesBound = false;
     this._chatGestureToken = 0;
@@ -3612,14 +3613,21 @@ class SmsGammuPanel extends HTMLElement {
       this._renderMessages();
     });
     this.shadowRoot.getElementById("pinned-jump")?.addEventListener("click", () => {
-      const pins = this._messages.filter(m => m.is_message_pinned);
+      const pins = this._messages
+        .filter(m => m.is_message_pinned)
+        .sort((a, b) => new Date(a.date) - new Date(b.date) || Number(a.id) - Number(b.id));
       if (!pins.length) return;
-      const target = pins[this._pinnedCycle % pins.length];
+      const index = this._pinnedCycle % pins.length;
+      const target = pins[index];
       const bubble = [...this.shadowRoot.querySelectorAll(".msg-bubble")].find(el => el.dataset.id === String(target.id));
-      bubble?.scrollIntoView({ behavior: "smooth", block: "center" });
+      bubble?.scrollIntoView({ behavior: "smooth", block: "start" });
       bubble?.classList.add("pinned-highlight");
       setTimeout(() => bubble?.classList.remove("pinned-highlight"), 1000);
-      this._pinnedCycle = (this._pinnedCycle + 1) % pins.length;
+      this._pinnedCycle = (index + 1) % pins.length;
+      this._pinnedCycleLockUntil = performance.now() + 1600;
+      const next = pins[this._pinnedCycle];
+      const jump = this.shadowRoot.getElementById("pinned-jump");
+      if (jump) jump.textContent = next?.text || "Закреплённое сообщение";
     });
     this.shadowRoot.getElementById("pinned-list")?.addEventListener("click", () => this._showPinnedMessages());
     this.shadowRoot.getElementById("scroll-bottom-btn")?.addEventListener("click", () => {
@@ -4841,13 +4849,16 @@ class SmsGammuPanel extends HTMLElement {
     if (!area || !banner) return;
     const pins = this._messages.filter(m => m.is_message_pinned).sort((a, b) => new Date(a.date) - new Date(b.date) || Number(a.id) - Number(b.id));
     if (!pins.length) { banner.classList.remove("visible"); return; }
-    let index = 0;
-    const top = area.getBoundingClientRect().top + 12;
-    pins.forEach((message, i) => {
-      const bubble = [...area.querySelectorAll(".msg-bubble")].find(el => el.dataset.id === String(message.id));
-      if (bubble && bubble.getBoundingClientRect().top <= top) index = i;
-    });
-    this._pinnedCycle = index;
+    let index = this._pinnedCycle % pins.length;
+    if (performance.now() >= this._pinnedCycleLockUntil) {
+      index = 0;
+      const top = area.getBoundingClientRect().top + 12;
+      pins.forEach((message, i) => {
+        const bubble = [...area.querySelectorAll(".msg-bubble")].find(el => el.dataset.id === String(message.id));
+        if (bubble && bubble.getBoundingClientRect().top <= top) index = (i + 1) % pins.length;
+      });
+      this._pinnedCycle = index;
+    }
     const current = pins[index];
     const jump = this.shadowRoot.getElementById("pinned-jump");
     if (jump) jump.textContent = current?.text || "Закреплённое сообщение";
@@ -5043,7 +5054,9 @@ class SmsGammuPanel extends HTMLElement {
     }
     const starFilterBtn = this.shadowRoot.getElementById("star-filter-btn");
     if (starFilterBtn) starFilterBtn.style.display = "";
-    const pinned = this._messages.filter(m => m.is_message_pinned);
+    const pinned = this._messages
+      .filter(m => m.is_message_pinned)
+      .sort((a, b) => new Date(a.date) - new Date(b.date) || Number(a.id) - Number(b.id));
     const pinnedBanner = this.shadowRoot.getElementById("pinned-banner");
     if (pinnedBanner) {
       pinnedBanner.classList.toggle("visible", pinned.length > 0);
