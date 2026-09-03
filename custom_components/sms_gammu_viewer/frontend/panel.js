@@ -4034,6 +4034,7 @@ class SmsGammuPanel extends HTMLElement {
     let startY = 0;
     let tracking = false;
     let horizontalIntent = false;
+    let verticalIntent = false;
     let offsetX = 0;
     let animating = false;
     let preview = null;
@@ -4069,7 +4070,7 @@ class SmsGammuPanel extends HTMLElement {
       previewFolderId = nextId;
     };
     const reset = () => {
-      tracking = false; horizontalIntent = false; offsetX = 0;
+      tracking = false; horizontalIntent = false; verticalIntent = false; offsetX = 0;
       list.classList.remove("folder-swipe-lock");
     };
     const begin = (x, y, target, pointerId = null) => {
@@ -4085,6 +4086,7 @@ class SmsGammuPanel extends HTMLElement {
       startX = x; startY = y;
       tracking = true;
       horizontalIntent = false;
+      verticalIntent = false;
       offsetX = 0;
       if (pointerId != null) list.setPointerCapture?.(pointerId);
     };
@@ -4093,15 +4095,26 @@ class SmsGammuPanel extends HTMLElement {
       const dx = x - startX;
       const dy = y - startY;
       if (!horizontalIntent) {
-        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
-        if (Math.abs(dy) > Math.abs(dx) * 1.15) { reset(); return; }
-        horizontalIntent = true;
-        list.classList.add("folder-swipe-lock");
-        preparePreview(dx < 0 ? -1 : 1);
+        const ax = Math.abs(dx);
+        const ay = Math.abs(dy);
+        if (ax < 6 && ay < 6) return;
+        // Decide the axis from the live gesture, not from whether the list
+        // has finished its previous inertial vertical scroll.  A little
+        // vertical drift is normal on touch screens, so wait for a clear
+        // horizontal lead before taking ownership of the gesture.
+        if (ax >= 10 && ax > ay * 1.05) {
+          horizontalIntent = true;
+          verticalIntent = false;
+          list.classList.add("folder-swipe-lock");
+          preparePreview(dx < 0 ? -1 : 1);
+        } else {
+          verticalIntent = ay > ax * 1.35;
+          return;
+        }
       }
       event.preventDefault();
       event.stopPropagation();
-      if (Math.abs(dx) < Math.abs(dy) * 1.25) return;
+      if (Math.abs(dx) < Math.abs(dy) * 1.05) return;
       const width = Math.max(1, list.clientWidth);
       offsetX = Math.max(-width * 0.92, Math.min(width * 0.92, dx));
       const currentItems = items();
