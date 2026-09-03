@@ -1183,11 +1183,14 @@ const CSS = `
     .profile-actions { gap: 6px; padding: 13px 8px; flex-wrap: wrap; }
     .profile-action { min-width: 62px; flex: 1 1 62px; }
     .contacts { width: 100%; border-right: none; }
-    .chat { display: none; position: absolute; inset: 0; z-index: 10; background: var(--bg); }
+    /* The host reserves the iOS top safe-area with padding.  Absolute chat
+       layers must start below that inset as well, otherwise chat, phonebook
+       and modem pages slide under the status bar. */
+    .chat { display: none; position: absolute; top: var(--safe-area-inset-top, 0px); right: 0; bottom: 0; left: 0; z-index: 10; background: var(--bg); }
     .root.chat-open .contacts { display: none; }
     .root.chat-open .chat { display: flex; }
     .root.chat-open .back-btn { display: flex !important; }
-    .root.chat-swipe-preview .contacts { display: flex; position: absolute; inset: 0; z-index: 1; }
+    .root.chat-swipe-preview .contacts { display: flex; position: absolute; top: var(--safe-area-inset-top, 0px); right: 0; bottom: 0; left: 0; z-index: 1; }
     .root.chat-swipe-preview .chat { z-index: 2; }
     .status-grid { grid-template-columns: 1fr; }
     .fab {
