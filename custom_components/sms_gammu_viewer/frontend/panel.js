@@ -4106,7 +4106,10 @@ class SmsGammuPanel extends HTMLElement {
         // already started.  Telegram-style navigation treats a decisive
         // sideways displacement as a takeover instead of waiting for the
         // vertical scroll to settle completely.
-        if (ax >= 6 && ax > ay * 0.30) {
+        // Take the gesture before the browser's momentum recognizer can
+        // reserve the stream for vertical panning.  A tiny but consistent X
+        // lead is enough; pure vertical movement still remains native.
+        if (ax >= 3 && ax > ay * 0.15) {
           horizontalIntent = true;
           verticalIntent = false;
           list.classList.add("folder-swipe-lock");
@@ -4118,7 +4121,7 @@ class SmsGammuPanel extends HTMLElement {
       }
       event.preventDefault();
       event.stopPropagation();
-      if (Math.abs(dx) < Math.abs(dy) * 0.30) return;
+      if (Math.abs(dx) < Math.abs(dy) * 0.15) return;
       const width = Math.max(1, list.clientWidth);
       offsetX = Math.max(-width * 0.92, Math.min(width * 0.92, dx));
       const currentItems = items();
