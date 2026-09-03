@@ -4198,21 +4198,25 @@ class SmsGammuPanel extends HTMLElement {
     // phase: iOS may not deliver touchstart to a decelerating scroll element,
     // while its ancestor still sees the new touch that stops the momentum.
     window.addEventListener("touchstart", (event) => {
-      if (!list.contains(event.target)) return;
+      const path = event.composedPath?.() || [];
+      if (!path.includes(list) && !list.contains(event.target)) return;
       const t = event.touches[0];
-      if (t) begin(t.clientX, t.clientY, event.target);
+      const target = path.find(node => node?.nodeType === 1 && list.contains(node)) || event.target;
+      if (t) begin(t.clientX, t.clientY, target);
     }, { capture: true, passive: true });
     // Some mobile WebViews retarget/cancel the list's touch stream as soon
     // as native vertical momentum scrolling starts.  Keep a window-level
     // capture fallback so a horizontal direction can still be recognized
     // immediately while that momentum is running.
     window.addEventListener("touchmove", (event) => {
-      if (!tracking || !list.contains(event.target)) return;
+      const path = event.composedPath?.() || [];
+      if (!tracking || (!path.includes(list) && !list.contains(event.target))) return;
       const t = event.touches[0];
       if (t) move(t.clientX, t.clientY, event);
     }, { capture: true, passive: false });
     window.addEventListener("touchend", (event) => {
-      if (tracking && list.contains(event.target)) finish(false);
+      const path = event.composedPath?.() || [];
+      if (tracking && (path.includes(list) || list.contains(event.target))) finish(false);
     }, { capture: true, passive: true });
   }
 
