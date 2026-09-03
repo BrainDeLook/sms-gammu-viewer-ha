@@ -4186,6 +4186,18 @@ class SmsGammuPanel extends HTMLElement {
     list.addEventListener("touchmove", (event) => { const t = event.touches[0]; if (t) move(t.clientX, t.clientY, event); }, { capture: true, passive: false });
     list.addEventListener("touchend", () => finish(false), { capture: true, passive: true });
     list.addEventListener("touchcancel", () => finish(true), { capture: true, passive: true });
+    // Some mobile WebViews retarget/cancel the list's touch stream as soon
+    // as native vertical momentum scrolling starts.  Keep a window-level
+    // capture fallback so a horizontal direction can still be recognized
+    // immediately while that momentum is running.
+    window.addEventListener("touchmove", (event) => {
+      if (!tracking || !list.contains(event.target)) return;
+      const t = event.touches[0];
+      if (t) move(t.clientX, t.clientY, event);
+    }, { capture: true, passive: false });
+    window.addEventListener("touchend", (event) => {
+      if (tracking && list.contains(event.target)) finish(false);
+    }, { capture: true, passive: true });
   }
 
   _folderTabDefinitions() {
