@@ -155,7 +155,9 @@ const CSS = `
     mask-image: linear-gradient(to bottom, black calc(100% - 60px), transparent 100%);
   }
   .contact-list::-webkit-scrollbar { display: none; width: 0; height: 0; }
-  .contact-list.folder-swipe-lock { touch-action: none; overscroll-behavior: none; overflow-y: hidden; }
+  .contact-list.folder-swipe-lock,
+  .contact-list.folder-gesture-lock { touch-action: none; overscroll-behavior: none; }
+  .contact-list.folder-swipe-lock { overflow-y: hidden; }
 
 
   .swipe-wrap { position: relative; overflow: hidden; border-bottom: 0.5px solid var(--line); background: var(--card); }
@@ -4035,7 +4037,12 @@ class SmsGammuPanel extends HTMLElement {
     let tracking = false;
     let horizontalIntent = false;
     let verticalIntent = false;
+    let manualVertical = false;
     let offsetX = 0;
+    let startScrollTop = 0;
+    let lastY = 0;
+    let lastMoveTime = 0;
+    let velocityY = 0;
     let animating = false;
     let preview = null;
     let previewFolderId = null;
@@ -4070,8 +4077,8 @@ class SmsGammuPanel extends HTMLElement {
       previewFolderId = nextId;
     };
     const reset = () => {
-      tracking = false; horizontalIntent = false; verticalIntent = false; offsetX = 0;
-      list.classList.remove("folder-swipe-lock");
+      tracking = false; horizontalIntent = false; verticalIntent = false; manualVertical = false; offsetX = 0;
+      list.classList.remove("folder-swipe-lock", "folder-gesture-lock");
     };
     const begin = (x, y, target, pointerId = null) => {
       if (animating || tracking) return;
@@ -4087,7 +4094,12 @@ class SmsGammuPanel extends HTMLElement {
       tracking = true;
       horizontalIntent = false;
       verticalIntent = false;
+      manualVertical = false;
       offsetX = 0;
+      startScrollTop = list.scrollTop;
+      lastY = y;
+      lastMoveTime = performance.now();
+      velocityY = 0;
       if (pointerId != null) list.setPointerCapture?.(pointerId);
     };
     const move = (x, y, event) => {
@@ -4109,10 +4121,27 @@ class SmsGammuPanel extends HTMLElement {
         if (ax >= 12 && ax > ay * 0.55) {
           horizontalIntent = true;
           verticalIntent = false;
+          manualVertical = false;
+          list.classList.remove("folder-gesture-lock");
           list.classList.add("folder-swipe-lock");
           preparePreview(dx < 0 ? -1 : 1);
         } else {
           verticalIntent = ay > ax * 1.35;
+          // Prevent the browser from committing this touch to native
+          // vertical scrolling.  Reproduce the drag ourselves so a later
+          // horizontal lead can still take over the same gesture.
+          if (ay >= 6 && ay >= ax * 0.55) {
+            manualVertical = true;
+            list.classList.add("folder-gesture-lock");
+            if (event.cancelable) event.preventDefault();
+            event.stopPropagation();
+            list.scrollTop = Math.max(0, startScrollTop - dy);
+            const now = performance.now();
+            const dt = Math.max(1, now - lastMoveTime);
+            velocityY = (y - lastY) / dt;
+            lastY = y;
+            lastMoveTime = now;
+          }
           return;
         }
       }
@@ -4132,11 +4161,15 @@ class SmsGammuPanel extends HTMLElement {
         preview.style.transition = "none";
         preview.style.transform = `translate3d(${offsetX + (direction < 0 ? width : -width)}px,0,0)`;
       }
+      lastY = y;
+      lastMoveTime = performance.now();
     };
     const finish = (cancel = false) => {
       if (!tracking) return;
       const dx = offsetX;
       const intent = horizontalIntent;
+      const wasManualVertical = manualVertical;
+      const flingVelocity = velocityY;
       reset();
       const currentItems = items();
       if (cancel || !intent || Math.abs(dx) < Math.min(72, Math.max(48, list.clientWidth * 0.14))) {
@@ -4146,6 +4179,18 @@ class SmsGammuPanel extends HTMLElement {
           setTimeout(() => { currentItems.style.transition = ""; currentItems.style.transform = ""; }, 190);
         }
         removePreview();
+        if (!cancel && wasManualVertical && Math.abs(flingVelocity) > 0.08) {
+          const from = list.scrollTop;
+          const distance = Math.max(-520, Math.min(520, -flingVelocity * 420));
+          const started = performance.now();
+          const animate = (now) => {
+            const progress = Math.min(1, (now - started) / 360);
+            const eased = 1 - Math.pow(1 - progress, 3);
+            list.scrollTop = from + distance * eased;
+            if (progress < 1) requestAnimationFrame(animate);
+          };
+          requestAnimationFrame(animate);
+        }
         return;
       }
       const tabs = this._folderTabDefinitions();
@@ -4182,7 +4227,13 @@ class SmsGammuPanel extends HTMLElement {
     // Do not treat pointerleave as cancellation: mobile browsers can emit it
     // while the finger is still down, which used to reduce the gesture to a
     // small initial nudge. Pointer capture keeps the stream alive.
-    ["pointerup", "pointercancel"].forEach((name) => list.addEventListener(name, (event) => finish(name !== "pointerup"), { capture: true, passive: name !== "pointerup" }));
+    list.addEventListener("pointerup", () => finish(false), { capture: true, passive: true });
+    list.addEventListener("pointercancel", () => {
+      // A browser may cancel the pointer stream when it initially commits
+      // vertical panning.  Keep the gesture alive for the touch fallback so
+      // a later horizontal lead can still switch folders.
+      if (horizontalIntent) finish(true);
+    }, { capture: true, passive: true });
     // Keep a touch-event fallback even where PointerEvent exists. iOS Safari
     // and some Android WebViews may start a touch stream but cancel its
     // pointer stream when native scrolling is negotiated.
