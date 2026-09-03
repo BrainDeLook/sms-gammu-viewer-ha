@@ -4193,6 +4193,15 @@ class SmsGammuPanel extends HTMLElement {
     list.addEventListener("touchmove", (event) => { const t = event.touches[0]; if (t) move(t.clientX, t.clientY, event); }, { capture: true, passive: false });
     list.addEventListener("touchend", () => finish(false), { capture: true, passive: true });
     list.addEventListener("touchcancel", () => finish(true), { capture: true, passive: true });
+    // Telegram-iOS attaches its interactive transition recognizer to the
+    // container above the scrolling list.  Do the same in the DOM capture
+    // phase: iOS may not deliver touchstart to a decelerating scroll element,
+    // while its ancestor still sees the new touch that stops the momentum.
+    window.addEventListener("touchstart", (event) => {
+      if (!list.contains(event.target)) return;
+      const t = event.touches[0];
+      if (t) begin(t.clientX, t.clientY, event.target);
+    }, { capture: true, passive: true });
     // Some mobile WebViews retarget/cancel the list's touch stream as soon
     // as native vertical momentum scrolling starts.  Keep a window-level
     // capture fallback so a horizontal direction can still be recognized
