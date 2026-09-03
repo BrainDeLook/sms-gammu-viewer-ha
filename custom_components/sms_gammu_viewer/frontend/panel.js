@@ -155,7 +155,7 @@ const CSS = `
     mask-image: linear-gradient(to bottom, black calc(100% - 60px), transparent 100%);
   }
   .contact-list::-webkit-scrollbar { display: none; width: 0; height: 0; }
-  .contact-list.folder-swipe-lock { touch-action: none; overscroll-behavior: none; }
+  .contact-list.folder-swipe-lock { touch-action: none; overscroll-behavior: none; overflow-y: hidden; }
 
 
   .swipe-wrap { position: relative; overflow: hidden; border-bottom: 0.5px solid var(--line); background: var(--card); }
@@ -4102,7 +4102,11 @@ class SmsGammuPanel extends HTMLElement {
         // has finished its previous inertial vertical scroll.  A little
         // vertical drift is normal on touch screens, so wait for a clear
         // horizontal lead before taking ownership of the gesture.
-        if (ax >= 10 && ax > ay * 1.05) {
+        // Allow the horizontal axis to win even after a vertical fling has
+        // already started.  Telegram-style navigation treats a decisive
+        // sideways displacement as a takeover instead of waiting for the
+        // vertical scroll to settle completely.
+        if (ax >= 12 && ax > ay * 0.55) {
           horizontalIntent = true;
           verticalIntent = false;
           list.classList.add("folder-swipe-lock");
@@ -4114,7 +4118,7 @@ class SmsGammuPanel extends HTMLElement {
       }
       event.preventDefault();
       event.stopPropagation();
-      if (Math.abs(dx) < Math.abs(dy) * 1.05) return;
+      if (Math.abs(dx) < Math.abs(dy) * 0.55) return;
       const width = Math.max(1, list.clientWidth);
       offsetX = Math.max(-width * 0.92, Math.min(width * 0.92, dx));
       const currentItems = items();
