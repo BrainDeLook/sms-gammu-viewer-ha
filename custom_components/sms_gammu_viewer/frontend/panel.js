@@ -4848,12 +4848,31 @@ class SmsGammuPanel extends HTMLElement {
     const area = this.shadowRoot?.getElementById("messages-area");
     const banner = this.shadowRoot?.getElementById("pinned-banner");
     if (!area || !banner) return;
+    // Keep the banner synchronized with the message that has just been
+    // passed while scrolling.  The list is rendered chronologically, so the
+    // last pinned bubble above the viewport is the current Telegram-style
+    // pinned item (at the bottom this naturally becomes the newest pin).
     const pins = this._messages
       .filter(m => m.is_message_pinned)
-      .sort((a, b) => new Date(b.date) - new Date(a.date) || Number(b.id) - Number(a.id));
+      .sort((a, b) => new Date(a.date) - new Date(b.date) || Number(a.id) - Number(b.id));
     if (!pins.length) { banner.classList.remove("visible"); return; }
-    const index = this._pinnedCycle % pins.length;
-    const current = pins[index];
+    if (performance.now() >= this._pinnedCycleLockUntil) {
+      const boundary = area.scrollTop + 16;
+      let passed = -1;
+      pins.forEach((message, i) => {
+        const bubble = [...area.querySelectorAll(".msg-bubble")]
+          .find(el => el.dataset.id === String(message.id));
+        if (bubble && bubble.offsetTop <= boundary) passed = i;
+      });
+      // At the very top, point to the first (oldest) pinned message that is
+      // still ahead of the user; otherwise use the last one already passed.
+      const target = pins[Math.max(0, passed)];
+      const descendingIndex = pins.length - 1 - Math.max(0, passed);
+      this._pinnedCycle = descendingIndex;
+      this._pinnedCurrentId = target?.id;
+    }
+    const descendingPins = [...pins].reverse();
+    const current = descendingPins[this._pinnedCycle % descendingPins.length];
     const jump = this.shadowRoot.getElementById("pinned-jump");
     if (jump) jump.textContent = current?.text || "Закреплённое сообщение";
     const list = this.shadowRoot.getElementById("pinned-list");
