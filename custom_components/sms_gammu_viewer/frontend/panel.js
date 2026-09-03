@@ -1666,6 +1666,7 @@ class SmsGammuPanel extends HTMLElement {
 
     this._activeNumber = number;
     this._firstRender = true;
+    this._pinnedCycle = 0;
     try { localStorage.setItem("sms_gammu_active_number", number); } catch {}
     this.shadowRoot.querySelector(".root")?.classList.add("chat-open");
 
@@ -3615,7 +3616,7 @@ class SmsGammuPanel extends HTMLElement {
     this.shadowRoot.getElementById("pinned-jump")?.addEventListener("click", () => {
       const pins = this._messages
         .filter(m => m.is_message_pinned)
-        .sort((a, b) => new Date(a.date) - new Date(b.date) || Number(a.id) - Number(b.id));
+        .sort((a, b) => new Date(b.date) - new Date(a.date) || Number(b.id) - Number(a.id));
       if (!pins.length) return;
       const index = this._pinnedCycle % pins.length;
       const target = pins[index];
@@ -4847,18 +4848,11 @@ class SmsGammuPanel extends HTMLElement {
     const area = this.shadowRoot?.getElementById("messages-area");
     const banner = this.shadowRoot?.getElementById("pinned-banner");
     if (!area || !banner) return;
-    const pins = this._messages.filter(m => m.is_message_pinned).sort((a, b) => new Date(a.date) - new Date(b.date) || Number(a.id) - Number(b.id));
+    const pins = this._messages
+      .filter(m => m.is_message_pinned)
+      .sort((a, b) => new Date(b.date) - new Date(a.date) || Number(b.id) - Number(a.id));
     if (!pins.length) { banner.classList.remove("visible"); return; }
-    let index = this._pinnedCycle % pins.length;
-    if (performance.now() >= this._pinnedCycleLockUntil) {
-      index = 0;
-      const top = area.getBoundingClientRect().top + 12;
-      pins.forEach((message, i) => {
-        const bubble = [...area.querySelectorAll(".msg-bubble")].find(el => el.dataset.id === String(message.id));
-        if (bubble && bubble.getBoundingClientRect().top <= top) index = (i + 1) % pins.length;
-      });
-      this._pinnedCycle = index;
-    }
+    const index = this._pinnedCycle % pins.length;
     const current = pins[index];
     const jump = this.shadowRoot.getElementById("pinned-jump");
     if (jump) jump.textContent = current?.text || "Закреплённое сообщение";
@@ -5056,7 +5050,7 @@ class SmsGammuPanel extends HTMLElement {
     if (starFilterBtn) starFilterBtn.style.display = "";
     const pinned = this._messages
       .filter(m => m.is_message_pinned)
-      .sort((a, b) => new Date(a.date) - new Date(b.date) || Number(a.id) - Number(b.id));
+      .sort((a, b) => new Date(b.date) - new Date(a.date) || Number(b.id) - Number(a.id));
     const pinnedBanner = this.shadowRoot.getElementById("pinned-banner");
     if (pinnedBanner) {
       pinnedBanner.classList.toggle("visible", pinned.length > 0);
