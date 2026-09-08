@@ -1389,7 +1389,8 @@ class SmsGammuPanel extends HTMLElement {
 
   _restoreActiveChat() {
     let saved = null;
-    try { saved = localStorage.getItem("sms_gammu_active_number"); } catch {}
+    try { saved = new URLSearchParams(location.search).get("chat"); } catch {}
+    if (!saved) { try { saved = localStorage.getItem("sms_gammu_active_number"); } catch {} }
     if (!saved) return;
 
     const tryRestore = (attemptsLeft) => {

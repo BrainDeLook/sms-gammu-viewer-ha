@@ -9,7 +9,7 @@ import logging
 import re
 import time
 from functools import partial
-from urllib.parse import urlparse
+from urllib.parse import urlparse, quote
 from datetime import datetime
 from pathlib import Path
 
@@ -54,6 +54,7 @@ from .const import (
     EVENT_SMS_SENT,
     FRONTEND_PATH,
     NOTIFY_ACTION_REPLY_PREFIX,
+    NOTIFY_ACTION_READ_PREFIX,
     PANEL_ICON,
     PANEL_TITLE,
     PANEL_URL,
@@ -158,6 +159,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # шлёт mobile_app_notification_action с введённым текстом (reply_text)
     async def _on_notification_action(event) -> None:
         action = event.data.get("action") or ""
+        if action.startswith(NOTIFY_ACTION_READ_PREFIX):
+            number = action[len(NOTIFY_ACTION_READ_PREFIX):]
+            if number:
+                await hass.async_add_executor_job(store.mark_read_by_number, number)
+                coordinator.push_event("contact_read", {"number": number})
+            return
         if not action.startswith(NOTIFY_ACTION_REPLY_PREFIX):
             return
         number = action[len(NOTIFY_ACTION_REPLY_PREFIX):]
@@ -1275,6 +1282,7 @@ class SmsCoordinator:
         lang = self.entry.data.get(CONF_LANGUAGE, DEFAULT_LANGUAGE)
         reply_title = "Ответить" if lang == "ru" else "Reply"
         open_title = "Открыть SMS" if lang == "ru" else "Open SMS"
+        read_title = "Пометить прочитанным" if lang == "ru" else "Mark as read"
 
         actions = []
         # Поле ответа показываем только для настоящих номеров — на alpha-tag
@@ -1290,7 +1298,12 @@ class SmsCoordinator:
         actions.append({
             "action": "URI",
             "title": open_title,
-            "uri": "/sms-viewer",
+            "uri": f"/sms-viewer?chat={quote(number, safe='')}",
+        })
+        actions.append({
+            "action": f"{NOTIFY_ACTION_READ_PREFIX}{number}",
+            "title": read_title,
+            "authenticationRequired": True,
         })
 
         for target in targets:
@@ -1298,7 +1311,7 @@ class SmsCoordinator:
             if len(parts) != 2:
                 continue
             notification_data = {
-                "url": "/sms-viewer",
+                "url": f"/sms-viewer?chat={quote(number, safe='')}",
                 "tag": notif_tag,
                 "group": "sms_gammu_viewer",
                 "actions": actions,

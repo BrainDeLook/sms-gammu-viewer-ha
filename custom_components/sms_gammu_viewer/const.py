@@ -76,3 +76,4 @@ BRAND_CATALOG_URL = "https://trace-logos.ru/logos.json"
 # Префикс action в мобильном уведомлении для ответа на SMS:
 # полное имя action = префикс + номер отправителя
 NOTIFY_ACTION_REPLY_PREFIX = "SMS_GAMMU_REPLY_"
+NOTIFY_ACTION_READ_PREFIX = "SMS_GAMMU_READ_"
