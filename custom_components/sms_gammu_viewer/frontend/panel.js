@@ -7,6 +7,17 @@ const AVAILABLE_LOCALES = ["ru", "en"];
 const LOCALE_NAMES = { ru: "Русский", en: "English" };
 const PANEL_BASE = new URL(import.meta.url).pathname.replace(/\/panel\.js$/, "");
 
+// Home Assistant Companion's iOS bridge listens for this event from custom
+// cards. Keep navigator.vibrate as the Android/browser fallback.
+function fireHaptic(type = "light") {
+  try {
+    const event = new Event("haptic", { bubbles: true, composed: true });
+    event.detail = type;
+    window.dispatchEvent(event);
+  } catch (_) {}
+  try { navigator.vibrate?.(type === "heavy" ? 35 : type === "medium" ? 24 : 14); } catch (_) {}
+}
+
 async function loadLocale(code) {
   const safe = AVAILABLE_LOCALES.includes(code) ? code : "en";
   try {
@@ -3854,7 +3865,7 @@ class SmsGammuPanel extends HTMLElement {
           this._suppressNextChatClick = true;
           clearTimeout(this._suppressNextChatClickTimer);
           this._suppressNextChatClickTimer = setTimeout(() => { this._suppressNextChatClick = false; }, 1000);
-          navigator.vibrate?.(18);
+          fireHaptic("selection");
           this._showChatFolderMenu(event, el.closest(".swipe-wrap")?.dataset.number);
         }, 550);
       }, { passive: true });
@@ -5176,7 +5187,7 @@ class SmsGammuPanel extends HTMLElement {
           if (gestureToken !== this._chatGestureToken || this._chatGestureMoved || !this._activeNumber || !bubble.isConnected) return;
           longPressed = true;
           bubble.__longPressTimer = null;
-          navigator.vibrate?.(30);
+          fireHaptic("medium");
           this._showMsgCtxMenu(e, bubble);
         }, 700);
         bubble.__longPressTimer = ltimer;
