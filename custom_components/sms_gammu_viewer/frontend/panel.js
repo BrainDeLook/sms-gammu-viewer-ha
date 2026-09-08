@@ -1376,6 +1376,12 @@ class SmsGammuPanel extends HTMLElement {
   }
 
   connectedCallback() {
+    this._onLocationChanged = () => {
+      let chat = null;
+      try { chat = new URLSearchParams(location.search).get("chat"); } catch {}
+      if (chat && this._contacts.some((c) => c.number === chat) && this._activeNumber !== chat) this._selectContact(chat);
+    };
+    window.addEventListener("location-changed", this._onLocationChanged);
     if (this._hass && !this._ready) {
       this._ready = true;
       this._initLocale().then(() => {
@@ -1414,6 +1420,7 @@ class SmsGammuPanel extends HTMLElement {
   }
 
   disconnectedCallback() {
+    if (this._onLocationChanged) window.removeEventListener("location-changed", this._onLocationChanged);
     this._stopTimer();
     // Закрываем bottom sheet если панель убрана из DOM (переход на другую страницу)
     this._pbDialog?.close();
