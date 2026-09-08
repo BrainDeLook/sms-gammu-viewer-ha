@@ -1376,9 +1376,15 @@ class SmsGammuPanel extends HTMLElement {
   }
 
   connectedCallback() {
-    this._onLocationChanged = () => {
+    this._onLocationChanged = (event) => {
       let chat = null;
       try { chat = new URLSearchParams(location.search).get("chat"); } catch {}
+      if (!chat) {
+        try { chat = event?.detail?.query?.chat || event?.detail?.route?.query?.chat || null; } catch {}
+      }
+      if (!chat) {
+        try { chat = new URL(location.href).searchParams.get("chat"); } catch {}
+      }
       if (chat && this._contacts.some((c) => c.number === chat) && this._activeNumber !== chat) this._selectContact(chat);
     };
     window.addEventListener("location-changed", this._onLocationChanged);
