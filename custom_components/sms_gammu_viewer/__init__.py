@@ -1281,7 +1281,7 @@ class SmsCoordinator:
 
         lang = self.entry.data.get(CONF_LANGUAGE, DEFAULT_LANGUAGE)
         reply_title = "Ответить" if lang == "ru" else "Reply"
-        open_title = "Открыть SMS" if lang == "ru" else "Open SMS"
+        open_title = "Открыть чат" if lang == "ru" else "Open chat"
         read_title = "Пометить прочитанным" if lang == "ru" else "Mark as read"
 
         actions = []
@@ -1312,6 +1312,7 @@ class SmsCoordinator:
                 continue
             notification_data = {
                 "url": f"/sms-viewer?chat={quote(number, safe='')}",
+                "clickAction": f"/sms-viewer?chat={quote(number, safe='')}",
                 "tag": notif_tag,
                 "group": "sms_gammu_viewer",
                 "actions": actions,

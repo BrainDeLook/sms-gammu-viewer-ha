@@ -1367,7 +1367,7 @@ class SmsGammuPanel extends HTMLElement {
         this._loadStatus();
         this._startTimer();
       });
-    } else if (!this._activeNumber && !this._restoreAttempted) {
+    } else if (this._chatLinkReady && !this._activeNumber && !this._restoreAttempted) {
       // Инстанс переиспользован (pull-to-refresh не пересоздал компонент) —
       // пробуем восстановить чат если ещё не пытались в этой сессии
       this._restoreAttempted = true;
@@ -1376,18 +1376,11 @@ class SmsGammuPanel extends HTMLElement {
   }
 
   connectedCallback() {
-    this._onLocationChanged = (event) => {
-      let chat = null;
-      try { chat = new URLSearchParams(location.search).get("chat"); } catch {}
-      if (!chat) {
-        try { chat = event?.detail?.query?.chat || event?.detail?.route?.query?.chat || null; } catch {}
-      }
-      if (!chat) {
-        try { chat = new URL(location.href).searchParams.get("chat"); } catch {}
-      }
-      if (chat && this._contacts.some((c) => c.number === chat) && this._activeNumber !== chat) this._selectContact(chat);
-    };
+    this._onLocationChanged ||= () => this._openChatLink();
     window.addEventListener("location-changed", this._onLocationChanged);
+    window.addEventListener("popstate", this._onLocationChanged);
+    window.addEventListener("pageshow", this._onLocationChanged);
+    this._openChatLink();
     if (this._hass && !this._ready) {
       this._ready = true;
       this._initLocale().then(() => {
@@ -1399,13 +1392,42 @@ class SmsGammuPanel extends HTMLElement {
     }
   }
 
+  set route(value) {
+    this._route = value;
+    this._openChatLink();
+  }
+
+  _openChatLink() {
+    // HA navigate updates the URL before firing location-changed. Its detail
+    // contains navigation options, not query parameters. Keep the URL pending
+    // until initial loading completes instead of dropping an early event.
+    if (!this._chatLinkReady || !this.isConnected) return false;
+    const url = new URL(window.location.href);
+    if (url.pathname.replace(/\/$/, "") !== "/sms-viewer") return false;
+    const number = url.searchParams.get("chat");
+    if (!number) return false;
+    this._restoreGeneration = (this._restoreGeneration || 0) + 1;
+    url.searchParams.delete("chat");
+    window.history.replaceState(window.history.state, "", url);
+    this._activeTab = "chats";
+    this._switchTab();
+    // Opening by number does not depend on the cached contact list: the SMS
+    // may have arrived after that list was fetched. _selectContact loads it.
+    this._selectContact(number);
+    return true;
+  }
+
   _restoreActiveChat() {
+    this._chatLinkReady = true;
+    this._restoreGeneration = (this._restoreGeneration || 0) + 1;
+    if (this._openChatLink()) return;
+    const generation = this._restoreGeneration;
     let saved = null;
-    try { saved = new URLSearchParams(location.search).get("chat"); } catch {}
-    if (!saved) { try { saved = localStorage.getItem("sms_gammu_active_number"); } catch {} }
+    try { saved = localStorage.getItem("sms_gammu_active_number"); } catch {}
     if (!saved) return;
 
     const tryRestore = (attemptsLeft) => {
+      if (generation !== this._restoreGeneration || !this.isConnected) return;
       const exists = this._contacts.some((c) => c.number === saved);
       if (exists) {
         this._selectContact(saved);
@@ -1427,6 +1449,8 @@ class SmsGammuPanel extends HTMLElement {
 
   disconnectedCallback() {
     if (this._onLocationChanged) window.removeEventListener("location-changed", this._onLocationChanged);
+    window.removeEventListener("popstate", this._onLocationChanged);
+    window.removeEventListener("pageshow", this._onLocationChanged);
     this._stopTimer();
     // Закрываем bottom sheet если панель убрана из DOM (переход на другую страницу)
     this._pbDialog?.close();
