@@ -3865,7 +3865,7 @@ class SmsGammuPanel extends HTMLElement {
           this._suppressNextChatClick = true;
           clearTimeout(this._suppressNextChatClickTimer);
           this._suppressNextChatClickTimer = setTimeout(() => { this._suppressNextChatClick = false; }, 1000);
-          fireHaptic("selection");
+          fireHaptic("heavy");
           this._showChatFolderMenu(event, el.closest(".swipe-wrap")?.dataset.number);
         }, 550);
       }, { passive: true });
@@ -4004,6 +4004,7 @@ class SmsGammuPanel extends HTMLElement {
         timer = setTimeout(() => {
           button.dataset.longpress = "1";
           window.getSelection?.()?.removeAllRanges?.();
+          fireHaptic("heavy");
           openPressedFolder();
         }, 550);
       });
