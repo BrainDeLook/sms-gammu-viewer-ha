@@ -403,6 +403,23 @@ def _svg_to_png(svg: bytes) -> bytes:
     return cairosvg.svg2png(bytestring=svg, output_width=512, output_height=512)
 
 
+def _bundled_brand_entry(source_url: str) -> dict | None:
+    """Return the bundled catalog entry matching a public Trace Logos URL."""
+    try:
+        payload = json.loads(_bundled_brand_catalog().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return next(
+        (
+            item
+            for item in payload.get("logos", [])
+            if isinstance(item, dict)
+            and source_url in (item.get("svgUrl"), item.get("pngUrl"))
+        ),
+        None,
+    )
+
+
 class BrandAssetView(HomeAssistantView):
     """Serve only previously downloaded brand assets from local HA storage."""
 
@@ -647,6 +664,70 @@ class SmsCoordinator:
     def _notify_images_enabled(self) -> bool:
         return bool(self.entry.data.get(CONF_NOTIFY_IMAGES, DEFAULT_NOTIFY_IMAGES))
 
+    def _sender_brand_png_path(self, number: str) -> tuple[str, Path]:
+        asset_id = _brand_asset_id(f"sender:{number}|notification-brand-png")
+        return asset_id, _brand_asset_dir(self.hass) / asset_id
+
+    async def _remove_sender_brand_png(self, number: str, source_url: str = "") -> None:
+        """Remove the current per-sender PNG and caches made by older builds."""
+        _, current_path = self._sender_brand_png_path(number)
+        paths = [current_path]
+        if source_url:
+            selected = await self.hass.async_add_executor_job(
+                _bundled_brand_entry, source_url
+            )
+            local_file = str((selected or {}).get("localFile") or "").strip()
+            if local_file:
+                legacy_id = _brand_asset_id(
+                    "bundled:" + local_file + "|notification-png"
+                )
+                paths.append(_brand_asset_dir(self.hass) / legacy_id)
+            paths.append(
+                _brand_asset_dir(self.hass)
+                / _brand_asset_id(source_url + "|notification-png")
+            )
+        for path in paths:
+            try:
+                await self.hass.async_add_executor_job(path.unlink, True)
+            except OSError:
+                pass
+
+    async def _cache_bundled_brand_png(
+        self, number: str, selected: dict, *, force: bool = False
+    ) -> dict | None:
+        """Rasterize and persist one sender logo before a notification needs it."""
+        local_file = str(selected.get("localFile") or "").strip()
+        if not local_file:
+            return None
+        local_path = (_bundled_brand_dir() / local_file).resolve()
+        bundled_dir = _bundled_brand_dir().resolve()
+        if not local_path.is_relative_to(bundled_dir) or not local_path.is_file():
+            return None
+        png_id, png_path = self._sender_brand_png_path(number)
+        try:
+            needs_refresh = force or not png_path.is_file()
+            if not needs_refresh:
+                needs_refresh = png_path.stat().st_mtime < local_path.stat().st_mtime
+            if needs_refresh:
+                svg_body = await self.hass.async_add_executor_job(local_path.read_bytes)
+                png_body = await self.hass.async_add_executor_job(_svg_to_png, svg_body)
+                await self.hass.async_add_executor_job(
+                    partial(png_path.parent.mkdir, parents=True, exist_ok=True)
+                )
+                await self.hass.async_add_executor_job(png_path.write_bytes, png_body)
+            return {
+                "url": f"/api/sms_gammu_viewer_brand/{png_id}.png",
+                "content_type": "image/png",
+            }
+        except Exception as error:
+            _LOGGER.debug(
+                "Could not cache bundled brand SVG for %s (%s): %s",
+                number,
+                local_file,
+                error,
+            )
+            return None
+
     @staticmethod
     def _brand_match_text(value: str) -> str:
         return re.sub(
@@ -736,18 +817,9 @@ class SmsCoordinator:
             candidates.append(source)
         local_file = str(selected.get("localFile") or "").strip()
         if local_file:
-            local_path = _bundled_brand_dir() / local_file
-            try:
-                header = await self.hass.async_add_executor_job(local_path.read_bytes)
-                png_id = _brand_asset_id("bundled:" + local_file + "|notification-png")
-                png_path = _brand_asset_dir(self.hass) / png_id
-                if not png_path.is_file():
-                    png_body = await self.hass.async_add_executor_job(_svg_to_png, header)
-                    await self.hass.async_add_executor_job(partial(png_path.parent.mkdir, parents=True, exist_ok=True))
-                    await self.hass.async_add_executor_job(png_path.write_bytes, png_body)
-                return {"url": f"/api/sms_gammu_viewer_brand/{png_id}.png", "content_type": "image/png"}
-            except Exception as error:
-                _LOGGER.debug("Could not rasterize bundled brand SVG (%s): %s", local_file, error)
+            cached = await self._cache_bundled_brand_png(number, selected)
+            if cached:
+                return cached
 
         for asset_url in candidates:
             if not asset_url:
@@ -1918,9 +1990,22 @@ class SmsApiView(HomeAssistantView):
                     or len(source_url) > 1000
                 ):
                     return self._error("Invalid brand asset URL", 400)
+            previous_url = await self.hass.async_add_executor_job(
+                store.get_brand_logo_override, number
+            )
             await self.hass.async_add_executor_job(
                 store.set_brand_logo_override, number, source_url
             )
+            if previous_url != source_url:
+                await coord._remove_sender_brand_png(number, previous_url)
+                if source_url:
+                    selected = await self.hass.async_add_executor_job(
+                        _bundled_brand_entry, source_url
+                    )
+                    if selected:
+                        await coord._cache_bundled_brand_png(
+                            number, selected, force=True
+                        )
             coord.push_event(
                 "brand_logo_changed", {"number": number, "custom": bool(source_url)}
             )

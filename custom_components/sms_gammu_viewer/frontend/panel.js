@@ -2876,8 +2876,6 @@ class SmsGammuPanel extends HTMLElement {
     const modal = this.shadowRoot.getElementById("contact-modal");
     if (!modal || !this._brandPickerContact) return;
     const contact = this._brandPickerContact;
-    const selectedUrl = String(contact.brand_logo_url || "");
-    const candidates = this._brandCandidates(query);
     modal.innerHTML = `
       <div class="brand-picker">
         <div class="brand-picker-header">
@@ -2885,18 +2883,8 @@ class SmsGammuPanel extends HTMLElement {
           <div class="brand-picker-title">${this._t("choose_brand_logo")}</div>
         </div>
         <input class="brand-picker-search" id="brand-picker-search" value="${this._esc(query || "")}" placeholder="${this._esc(this._t("search_brand_logos"))}" />
-        <button class="brand-picker-auto ${selectedUrl ? "" : "selected"}" id="brand-picker-auto">${this._t("brand_logo_auto")}</button>
-        <div class="brand-picker-grid">
-          ${candidates.length ? candidates.map((logo) => {
-            const source = this._brandSourceUrl(logo);
-            const src = this._brandAssetSrc(logo.localUrl || source);
-            const name = logo.name || logo.name_en || this._t("brand_logo");
-            return `<button class="brand-option ${selectedUrl === source ? "selected" : ""}" data-brand-source="${this._esc(source)}">
-              <span class="brand-option-logo">${src ? `<img src="${this._esc(src)}" alt="" />` : "…"}</span>
-              <span class="brand-option-name">${this._esc(name)}</span>
-            </button>`;
-          }).join("") : `<div class="brand-picker-empty">${this._t("no_brand_logos")}</div>`}
-        </div>
+        <button class="brand-picker-auto ${contact.brand_logo_url ? "" : "selected"}" id="brand-picker-auto">${this._t("brand_logo_auto")}</button>
+        <div class="brand-picker-grid" id="brand-picker-grid"></div>
       </div>`;
     modal.querySelector("#brand-picker-back")?.addEventListener("click", () => {
       const c = this._brandPickerContact;
@@ -2906,26 +2894,45 @@ class SmsGammuPanel extends HTMLElement {
     });
     const search = modal.querySelector("#brand-picker-search");
     search?.addEventListener("input", (event) => {
-      const value = event.target.value;
-      this._renderBrandLogoPicker(value);
-      const next = this.shadowRoot.querySelector("#brand-picker-search");
-      if (next) {
-        next.focus();
-        next.setSelectionRange(value.length, value.length);
-      }
+      // Do not replace the focused input while typing. Recreating it made
+      // mobile keyboards close whenever polling or a logo request completed.
+      this._renderBrandLogoOptions(event.target.value);
     });
     modal.querySelector("#brand-picker-auto")?.addEventListener("click", () => this._saveBrandLogoOverride(contact, ""));
-    modal.querySelectorAll("[data-brand-source]").forEach((button) => {
+    this._renderBrandLogoOptions(query);
+  }
+
+  _renderBrandLogoOptions(query) {
+    const modal = this.shadowRoot.getElementById("contact-modal");
+    const grid = modal?.querySelector("#brand-picker-grid");
+    const contact = this._brandPickerContact;
+    if (!grid || !contact) return;
+    const selectedUrl = String(contact.brand_logo_url || "");
+    const candidates = this._brandCandidates(query);
+    grid.innerHTML = candidates.length ? candidates.map((logo) => {
+      const source = this._brandSourceUrl(logo);
+      const src = this._brandAssetSrc(logo.localUrl || source);
+      const name = logo.name || logo.name_en || this._t("brand_logo");
+      return `<button class="brand-option ${selectedUrl === source ? "selected" : ""}" data-brand-source="${this._esc(source)}">
+        <span class="brand-option-logo">${src ? `<img src="${this._esc(src)}" alt="" />` : "…"}</span>
+        <span class="brand-option-name">${this._esc(name)}</span>
+      </button>`;
+    }).join("") : `<div class="brand-picker-empty">${this._t("no_brand_logos")}</div>`;
+    grid.querySelectorAll("[data-brand-source]").forEach((button) => {
       button.addEventListener("click", () => this._saveBrandLogoOverride(contact, button.dataset.brandSource || ""));
     });
 
     // Загружаем только варианты, видимые в окне выбора, а не весь каталог.
     const remote = candidates
+      .filter((logo) => !logo.localUrl)
       .map((logo) => this._brandSourceUrl(logo))
       .filter((source) => source && !this._brandAssetSrc(source));
     if (remote.length) {
       Promise.all(remote.map((source) => this._ensureBrandAsset(source))).then(() => {
-        if (this._brandPickerContact === contact) this._renderBrandLogoPicker(search?.value || query);
+        const search = modal.querySelector("#brand-picker-search");
+        if (this._brandPickerContact === contact && search) {
+          this._renderBrandLogoOptions(search.value);
+        }
       });
     }
   }
@@ -3520,11 +3527,6 @@ class SmsGammuPanel extends HTMLElement {
 
     this.shadowRoot.getElementById("menu-btn").addEventListener("click", () => {
       this.dispatchEvent(new Event("hass-toggle-menu", { bubbles: true, composed: true }));
-    });
-
-    // Закрываем dropdown при клике вне
-    this.shadowRoot.addEventListener("click", () => {
-      this.shadowRoot.getElementById("call-history-dropdown")?.classList.remove("open");
     });
 
     // FAB — новый чат
