@@ -1713,7 +1713,45 @@ class SmsGammuPanel extends HTMLElement {
     } catch (_) {}
   }
 
+  async _resolveChatNumber(number) {
+    const raw = String(number || "").trim();
+    if (!raw) return raw;
+    const findMatch = () => {
+      const all = [...this._contacts, ...this._phonebook];
+      const exact = all.find((item) => String(item?.number || "").trim() === raw);
+      if (exact) return String(exact.number).trim();
+      if (!/^\+?[\d\s().-]+$/.test(raw)) return raw;
+      const digits = raw.replace(/\D/g, "");
+      if (!digits) return raw;
+      const suffix = digits.slice(-10);
+      const match = all.find((item) => {
+        const candidate = String(item?.number || "").replace(/\D/g, "");
+        return candidate && (candidate === digits || candidate.slice(-10) === suffix);
+      });
+      return match ? String(match.number).trim() : raw;
+    };
+
+    let resolved = findMatch();
+    if (resolved !== raw) return resolved;
+    // A notification can be tapped before the initial contact/phonebook
+    // requests finish. Resolve the stored number before requesting messages,
+    // otherwise a blank temporary chat is shown.
+    try {
+      if (!this._contactsLoaded) {
+        this._contacts = await this._api("contacts");
+        this._contactsLoaded = true;
+      }
+      if (!this._phonebookLoaded) {
+        this._phonebook = await this._api("phonebook");
+        this._phonebookLoaded = true;
+      }
+      resolved = findMatch();
+    } catch (_) {}
+    return resolved;
+  }
+
   async _selectContact(number) {
+    number = await this._resolveChatNumber(number);
     // Сохраняем черновик текущего чата перед переключением
     if (this._activeNumber && this._activeNumber !== number) {
       const ta = this.shadowRoot.getElementById("send-input");
