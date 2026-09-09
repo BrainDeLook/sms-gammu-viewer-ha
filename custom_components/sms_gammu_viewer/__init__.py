@@ -1541,7 +1541,21 @@ class SmsApiView(HomeAssistantView):
                 return self._json(_BRAND_CATALOG_CACHE)
             except Exception as err:
                 _LOGGER.warning("Trace Logo catalog unavailable: %s", err)
-                return self._json({"updated": "", "logos": []})
+                # Сайт может быть временно недоступен. Не выбрасываем уже
+                # скачанный каталог: он нужен для отображения сохранённых
+                # логотипов и локальных asset-файлов после обновления.
+                try:
+                    fallback_path = Path(self.hass.config.config_dir) / ".storage" / "sms_gammu_viewer_brand_catalog.json"
+                    payload = json.loads(await self.hass.async_add_executor_job(fallback_path.read_text, "utf-8"))
+                    logos = [item for item in payload.get("logos", []) if isinstance(item, dict) and not item.get("comingSoon") and (item.get("svgUrl") or item.get("pngUrl"))]
+                    asset_dir = _brand_asset_dir(self.hass)
+                    for item in logos:
+                        source_url = item.get("svgUrl") or item.get("pngUrl")
+                        if (asset_dir / _brand_asset_id(source_url)).is_file():
+                            item["localUrl"] = f"/api/sms_gammu_viewer_brand/{_brand_asset_id(source_url)}"
+                    return self._json({"updated": payload.get("updated", ""), "logos": logos, "stale": True})
+                except Exception:
+                    return self._json({"updated": "", "logos": [], "stale": True})
 
         if action == "brand_asset":
             asset_url = request.rel_url.query.get("url", "")

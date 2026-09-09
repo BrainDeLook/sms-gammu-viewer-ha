@@ -1293,6 +1293,10 @@ class SmsGammuPanel extends HTMLElement {
     this._brandCatalogPromise = null;
     this._brandAssetPromises = new Map();
     this._brandAssets = {};
+    this._brandAssignments = {};
+    try {
+      this._brandAssignments = JSON.parse(localStorage.getItem("sms_gammu_brand_assignments") || "{}");
+    } catch (_) { this._brandAssignments = {}; }
     this._contactsLoaded = false;
     this._brandReady = false;
     this._brandPickerContact = null;
@@ -1978,14 +1982,17 @@ class SmsGammuPanel extends HTMLElement {
   }
 
   _brandLogoFor(contact) {
-    if (!this._status?.use_brand_logos || !this._brandCatalog?.length || !contact) return "";
+    if (!this._status?.use_brand_logos || !contact) return "";
     const value = String(contact.contact_name || contact.number || "").trim().toLowerCase();
     if (!value || !this._isAlphaTag(contact.number)) return "";
     const override = String(contact.brand_logo_url || "").trim();
     if (override) {
-      const selected = this._brandCatalog.find((logo) => this._brandSourceUrl(logo) === override);
+      const selected = (this._brandCatalog || []).find((logo) => this._brandSourceUrl(logo) === override);
       return selected?.localUrl || override;
     }
+    const cached = String(this._brandAssignments[contact.number] || "").trim();
+    if (cached) return cached;
+    if (!this._brandCatalog?.length) return "";
     const normalized = this._normalizeBrandText(value);
     const found = this._brandCatalog.find((logo) => {
       const haystack = this._normalizeBrandText(
@@ -1999,7 +2006,12 @@ class SmsGammuPanel extends HTMLElement {
         )
       ));
     });
-    return found?.localUrl || found?.pngUrl || found?.svgUrl || "";
+    const source = found?.localUrl || found?.pngUrl || found?.svgUrl || "";
+    if (source && !found.localUrl) {
+      this._brandAssignments[contact.number] = this._brandSourceUrl(found);
+      try { localStorage.setItem("sms_gammu_brand_assignments", JSON.stringify(this._brandAssignments)); } catch (_) {}
+    }
+    return source;
   }
 
   _brandSourceUrl(logo) {
