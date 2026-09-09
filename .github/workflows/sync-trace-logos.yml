@@ -1,0 +1,41 @@
+name: Sync Trace Logos
+
+on:
+  schedule:
+    - cron: "17 3 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: trace-logos-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Synchronize catalog
+        run: python .github/scripts/sync_trace_logos.py --bump-minor --notes-file "$RUNNER_TEMP/trace-logos-notes.md"
+
+      - name: Publish integration update
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if git diff --quiet; then
+            echo "Trace Logos catalog is already current"
+            exit 0
+          fi
+          VERSION="$(jq -r .version custom_components/sms_gammu_viewer/manifest.json)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add custom_components/sms_gammu_viewer/frontend/brand_assets custom_components/sms_gammu_viewer/manifest.json
+          git commit -m "Update bundled Trace Logos catalog to ${VERSION}"
+          git tag "v${VERSION}"
+          git push origin HEAD:main "v${VERSION}"
+          gh release create "v${VERSION}" --title "v${VERSION}" --notes-file "$RUNNER_TEMP/trace-logos-notes.md"

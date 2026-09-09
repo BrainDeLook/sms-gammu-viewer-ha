@@ -384,6 +384,14 @@ def _brand_asset_dir(hass: HomeAssistant) -> Path:
     return Path(hass.config.config_dir) / ".storage" / "sms_gammu_viewer_brand_assets"
 
 
+def _bundled_brand_dir() -> Path:
+    return Path(__file__).parent / FRONTEND_PATH / "brand_assets"
+
+
+def _bundled_brand_catalog() -> Path:
+    return _bundled_brand_dir() / "catalog.json"
+
+
 def _brand_asset_id(url: str) -> str:
     return hashlib.sha256(url.encode("utf-8")).hexdigest()
 
@@ -679,7 +687,7 @@ class SmsCoordinator:
                         await self.hass.async_add_executor_job(asset_path.write_bytes, body)
                     content_type = avatar_match.group(1).lower()
                     suffix = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif"}[content_type]
-                    return {"url": f"/api/sms_gammu_viewer_brand/{asset_id}.{suffix}", "content_type": suffix}
+                    return {"url": f"/api/sms_gammu_viewer_brand/{asset_id}.{suffix}", "content_type": f"image/{suffix}"}
             except Exception as error:
                 _LOGGER.debug("Contact avatar unavailable for notification: %s", error)
         source = str((contact or {}).get("brand_logo_url") or "").strip()
@@ -693,7 +701,9 @@ class SmsCoordinator:
                 ).strip()
             except Exception as error:
                 _LOGGER.debug("Could not load manual brand logo override: %s", error)
-        catalog_path = Path(self.hass.config.config_dir) / ".storage" / "sms_gammu_viewer_brand_catalog.json"
+        catalog_path = _bundled_brand_catalog()
+        if not catalog_path.is_file():
+            catalog_path = Path(self.hass.config.config_dir) / ".storage" / "sms_gammu_viewer_brand_catalog.json"
         try:
             payload = json.loads(await self.hass.async_add_executor_job(catalog_path.read_text, "utf-8"))
             logos = [item for item in payload.get("logos", []) if isinstance(item, dict) and not item.get("comingSoon")]
@@ -724,6 +734,21 @@ class SmsCoordinator:
         candidates = [selected.get("pngUrl"), *variant_pngs, svg_url]
         if source and source not in candidates:
             candidates.append(source)
+        local_file = str(selected.get("localFile") or "").strip()
+        if local_file:
+            local_path = _bundled_brand_dir() / local_file
+            try:
+                header = await self.hass.async_add_executor_job(local_path.read_bytes)
+                png_id = _brand_asset_id("bundled:" + local_file + "|notification-png")
+                png_path = _brand_asset_dir(self.hass) / png_id
+                if not png_path.is_file():
+                    png_body = await self.hass.async_add_executor_job(_svg_to_png, header)
+                    await self.hass.async_add_executor_job(partial(png_path.parent.mkdir, parents=True, exist_ok=True))
+                    await self.hass.async_add_executor_job(png_path.write_bytes, png_body)
+                return {"url": f"/api/sms_gammu_viewer_brand/{png_id}.png", "content_type": "image/png"}
+            except Exception as error:
+                _LOGGER.debug("Could not rasterize bundled brand SVG (%s): %s", local_file, error)
+
         for asset_url in candidates:
             if not asset_url:
                 continue
@@ -778,12 +803,12 @@ class SmsCoordinator:
                                 if not png_body.startswith(b"\x89PNG"):
                                     raise ValueError("image proxy did not return PNG")
                             await self.hass.async_add_executor_job(png_path.write_bytes, png_body)
-                        return {"url": f"/api/sms_gammu_viewer_brand/{png_id}.png", "content_type": "png"}
+                        return {"url": f"/api/sms_gammu_viewer_brand/{png_id}.png", "content_type": "image/png"}
                     except Exception as error:
                         _LOGGER.debug("Could not rasterize brand SVG (%s): %s", asset_url, error)
                         continue
                 suffix = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif"}[content_type]
-                return {"url": f"/api/sms_gammu_viewer_brand/{asset_id}.{suffix}", "content_type": suffix}
+                return {"url": f"/api/sms_gammu_viewer_brand/{asset_id}.{suffix}", "content_type": f"image/{suffix}"}
             except Exception as error:
                 _LOGGER.debug("Notification brand asset unavailable (%s): %s", asset_url, error)
         return None
@@ -1494,6 +1519,15 @@ class SmsApiView(HomeAssistantView):
                 and now - _BRAND_CATALOG_CACHE_TS < _BRAND_CATALOG_CACHE_TTL
             ):
                 return self._json(_BRAND_CATALOG_CACHE)
+            bundled_path = _bundled_brand_catalog()
+            if bundled_path.is_file():
+                try:
+                    bundled = json.loads(await self.hass.async_add_executor_job(bundled_path.read_text, "utf-8"))
+                    _BRAND_CATALOG_CACHE = {"updated": bundled.get("updated", ""), "logos": bundled.get("logos", [])}
+                    _BRAND_CATALOG_CACHE_TS = now
+                    return self._json(_BRAND_CATALOG_CACHE)
+                except Exception as err:
+                    _LOGGER.warning("Bundled Trace Logo catalog unavailable: %s", err)
             try:
                 catalog_path = Path(self.hass.config.config_dir) / ".storage" / "sms_gammu_viewer_brand_catalog.json"
                 catalog_fresh = catalog_path.is_file() and (

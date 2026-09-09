@@ -1991,7 +1991,10 @@ class SmsGammuPanel extends HTMLElement {
       return selected?.localUrl || override;
     }
     const cached = String(this._brandAssignments[contact.number] || "").trim();
-    if (cached) return cached;
+    if (cached) {
+      const cachedLogo = (this._brandCatalog || []).find((logo) => this._brandSourceUrl(logo) === cached);
+      return cachedLogo?.localUrl || cached;
+    }
     if (!this._brandCatalog?.length) return "";
     const normalized = this._normalizeBrandText(value);
     const found = this._brandCatalog.find((logo) => {
