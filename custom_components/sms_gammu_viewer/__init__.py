@@ -765,7 +765,13 @@ class SmsCoordinator:
             )
         ).strip()
 
-    async def _notification_brand_image(self, number: str, contact: dict | None) -> dict | None:
+    async def _notification_brand_image(
+        self,
+        number: str,
+        contact: dict | None,
+        *,
+        prewarm: bool = False,
+    ) -> dict | None:
         """Return a locally persisted image suitable for a mobile attachment.
 
         A contact photo is preferred over a catalog logo. Contact photos are
@@ -773,7 +779,7 @@ class SmsCoordinator:
         the same local asset store used by brand logos and reuse its public
         attachment endpoint.
         """
-        if not self._notify_images_enabled():
+        if not self._notify_images_enabled() and not prewarm:
             return None
         avatar = str((contact or {}).get("avatar") or "").strip()
         avatar_match = re.fullmatch(
@@ -845,6 +851,7 @@ class SmsCoordinator:
         if local_file:
             cached = await self._cache_bundled_brand_png(number, selected)
             if cached:
+                _LOGGER.debug("Notification PNG cache ready for %s", number)
                 return cached
 
         for asset_url in candidates:
@@ -901,6 +908,7 @@ class SmsCoordinator:
                                 if not png_body.startswith(b"\x89PNG"):
                                     raise ValueError("image proxy did not return PNG")
                             await self.hass.async_add_executor_job(png_path.write_bytes, png_body)
+                        _LOGGER.debug("Notification PNG cache ready for %s", number)
                         return {"url": f"/api/sms_gammu_viewer_brand/{png_id}.png", "content_type": "image/png"}
                     except Exception as error:
                         _LOGGER.debug("Could not rasterize brand SVG (%s): %s", asset_url, error)
@@ -2025,13 +2033,15 @@ class SmsApiView(HomeAssistantView):
             if previous_url != source_url:
                 await coord._remove_sender_brand_png(number, previous_url)
                 if source_url:
-                    selected = await self.hass.async_add_executor_job(
-                        _bundled_brand_entry, source_url
+                    # Use exactly the notification conversion path here, but
+                    # run it before the first message so the mobile app gets
+                    # an already cached PNG. This also handles catalog and
+                    # remote fallback assets consistently.
+                    await coord._notification_brand_image(
+                        number,
+                        {"number": number, "brand_logo_url": source_url},
+                        prewarm=True,
                     )
-                    if selected:
-                        await coord._cache_bundled_brand_png(
-                            number, selected, force=True
-                        )
             coord.push_event(
                 "brand_logo_changed", {"number": number, "custom": bool(source_url)}
             )
