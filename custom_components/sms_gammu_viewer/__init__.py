@@ -1451,10 +1451,21 @@ class SmsCoordinator:
             # Attachments are understood by the Home Assistant mobile_app
             # notifier. Keep other notify targets byte-for-byte compatible.
             if notification_image and parts[0] == "notify" and parts[1].startswith("mobile_app_"):
+                attachment_type = {
+                    "image/png": "png",
+                    "image/jpeg": "jpeg",
+                    "image/gif": "gif",
+                    "image/webp": "webp",
+                }.get(notification_image["content_type"])
                 notification_data["attachment"] = {
                     "url": notification_image["url"],
-                    "content-type": notification_image["content_type"],
                 }
+                # Companion's attachment.content-type is a file extension,
+                # not an HTTP MIME type. Supplying "image/png" makes iOS
+                # report "Unrecognized attachment file type" even when the
+                # endpoint serves a valid PNG.
+                if attachment_type:
+                    notification_data["attachment"]["content-type"] = attachment_type
             try:
                 await self.hass.services.async_call(
                     parts[0], parts[1],
