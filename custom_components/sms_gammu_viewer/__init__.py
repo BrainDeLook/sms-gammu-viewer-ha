@@ -710,7 +710,33 @@ class SmsCoordinator:
                 needs_refresh = png_path.stat().st_mtime < local_path.stat().st_mtime
             if needs_refresh:
                 svg_body = await self.hass.async_add_executor_job(local_path.read_bytes)
-                png_body = await self.hass.async_add_executor_job(_svg_to_png, svg_body)
+                try:
+                    png_body = await self.hass.async_add_executor_job(_svg_to_png, svg_body)
+                except Exception as raster_error:
+                    # Some HA installations have cairosvg but no native Cairo
+                    # library. Use the same public rasterizer fallback as the
+                    # legacy remote-asset path, then persist the result locally.
+                    svg_url = str(selected.get("svgUrl") or "").strip()
+                    parsed = urlparse(svg_url)
+                    if parsed.scheme != "https" or parsed.netloc != "trace-logos.ru":
+                        raise raster_error
+                    _LOGGER.debug(
+                        "Local SVG rasterizer unavailable for %s: %s; using image proxy",
+                        local_file,
+                        raster_error,
+                    )
+                    proxy_url = (
+                        "https://images.weserv.nl/?url="
+                        + quote(svg_url.removeprefix("https://"), safe="")
+                        + "&output=png"
+                    )
+                    timeout = aiohttp.ClientTimeout(total=20)
+                    async with aiohttp.ClientSession(timeout=timeout) as session:
+                        async with session.get(proxy_url) as response:
+                            response.raise_for_status()
+                            png_body = await response.read()
+                    if not png_body.startswith(b"\x89PNG"):
+                        raise ValueError("image proxy did not return PNG")
                 await self.hass.async_add_executor_job(
                     partial(png_path.parent.mkdir, parents=True, exist_ok=True)
                 )
