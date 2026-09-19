@@ -168,6 +168,8 @@ export default {
   search_brand_logos: "Search logos",
   brand_logo_auto: "Automatic selection",
   brand_logo_saved: "Logo saved",
+  upload_brand_icon: "Upload custom icon",
+  remove_brand_icon: "Remove custom icon",
   brand_logo: "Logo",
   no_brand_logos: "No matching logos found",
   add_to_contacts: "Add to contacts",

@@ -85,6 +85,24 @@ class ContactProfileTests(unittest.TestCase):
             store.set_brand_logo_override("VK.RU", "")
             self.assertEqual("", store.get_brand_logo_override("VK.RU"))
 
+    def test_custom_brand_icon_is_independent_from_phonebook(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = SmsStore(Path(directory) / "sms.db")
+            store.init()
+            icon = "data:image/png;base64,iVBORw0KGgo="
+            store.set_brand_custom_icon("VK.RU", icon)
+            self.assertEqual(icon, store.get_brand_custom_icon("VK.RU"))
+            store.add("VK.RU", "hello", "2026-08-16T12:00:00")
+            contact = store.get_contacts()[0]
+            self.assertEqual(icon, contact["brand_icon_data"])
+            self.assertIsNone(store.get_contact("VK.RU"))
+            store.set_brand_logo_override("VK.RU", "https://trace-logos.ru/assets/logos/vk.svg")
+            store.set_brand_custom_icon("VK.RU", "")
+            self.assertEqual("", store.get_brand_custom_icon("VK.RU"))
+            self.assertTrue(store.get_brand_logo_override("VK.RU"))
+            store.set_brand_custom_icon("VK.RU", "")
+            self.assertEqual("", store.get_brand_custom_icon("VK.RU"))
+
     def test_migrates_existing_phonebook_and_preserves_contacts(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             db_path = Path(directory) / "sms.db"

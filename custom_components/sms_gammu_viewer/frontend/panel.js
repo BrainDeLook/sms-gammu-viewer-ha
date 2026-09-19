@@ -1533,7 +1533,7 @@ class SmsGammuPanel extends HTMLElement {
       }
       const signature = JSON.stringify((contacts || []).map((c) => [
         c.number, c.contact_name, c.last_text, c.last_date, c.unread,
-        c.is_muted, c.is_pinned, c.total, c.brand_logo_url,
+        c.is_muted, c.is_pinned, c.total, c.brand_logo_url, c.brand_icon_data,
       ]));
       contactsChanged = signature !== this._contactsSignature;
       this._contactsSignature = signature;
@@ -2014,7 +2014,7 @@ class SmsGammuPanel extends HTMLElement {
     await this._ensureBrandCatalog();
     const logos = [...new Set(this._contacts
       .map((contact) => this._brandLogoFor(contact))
-      .filter((logo) => logo && !logo.startsWith("/")))];
+      .filter((logo) => logo && !logo.startsWith("/") && !logo.startsWith("data:")))];
     await Promise.all(logos.map((logo) => this._ensureBrandAsset(logo)));
     this._brandReady = true;
   }
@@ -2023,6 +2023,8 @@ class SmsGammuPanel extends HTMLElement {
     if (!this._status?.use_brand_logos || !contact) return "";
     const value = String(contact.contact_name || contact.number || "").trim().toLowerCase();
     if (!value || !this._isAlphaTag(contact.number)) return "";
+    const custom = String(contact.brand_icon_data || "").trim();
+    if (custom) return custom;
     const override = String(contact.brand_logo_url || "").trim();
     if (override) {
       const selected = (this._brandCatalog || []).find((logo) => this._brandSourceUrl(logo) === override);
@@ -2104,7 +2106,7 @@ class SmsGammuPanel extends HTMLElement {
   }
 
   _brandAssetSrc(logo) {
-    return logo ? this._brandAssets[logo] || (logo.startsWith("/") ? logo : "") : "";
+    return logo ? this._brandAssets[logo] || (logo.startsWith("/") || logo.startsWith("data:") ? logo : "") : "";
   }
 
   async _ensureBrandAsset(logo) {
@@ -2171,7 +2173,7 @@ class SmsGammuPanel extends HTMLElement {
   }
 
   _isBrandChat(contact) {
-    return Boolean(contact?.brand_logo_url || this._brandLogoFor(contact));
+    return Boolean(contact?.brand_logo_url || contact?.brand_icon_data || this._brandLogoFor(contact));
   }
 
   _isInBrandsFolder(contact) {
@@ -2825,6 +2827,7 @@ class SmsGammuPanel extends HTMLElement {
         label: chat?.contact_label || "",
         avatar: this._avatarFor(chat),
         brand_logo_url: chat?.brand_logo_url || "",
+        brand_icon_data: chat?.brand_icon_data || "",
         email: "", company: "", birthday: "", notes: "",
         _saved: false,
       };
@@ -2921,7 +2924,12 @@ class SmsGammuPanel extends HTMLElement {
           <div class="brand-picker-title">${this._t("choose_brand_logo")}</div>
         </div>
         <input class="brand-picker-search" id="brand-picker-search" value="${this._esc(query || "")}" placeholder="${this._esc(this._t("search_brand_logos"))}" />
-        <button class="brand-picker-auto ${contact.brand_logo_url ? "" : "selected"}" id="brand-picker-auto">${this._t("brand_logo_auto")}</button>
+        <button class="brand-picker-auto ${contact.brand_logo_url || contact.brand_icon_data ? "" : "selected"}" id="brand-picker-auto">${this._t("brand_logo_auto")}</button>
+        <div class="brand-picker-custom">
+          <button class="brand-picker-auto ${contact.brand_icon_data ? "selected" : ""}" id="brand-picker-upload">${this._t("upload_brand_icon")}</button>
+          <input id="brand-picker-file" type="file" accept="image/*" hidden />
+          ${contact.brand_icon_data ? `<button class="brand-picker-auto" id="brand-picker-clear">${this._t("remove_brand_icon")}</button>` : ""}
+        </div>
         <div class="brand-picker-grid" id="brand-picker-grid"></div>
       </div>`;
     modal.querySelector("#brand-picker-back")?.addEventListener("click", () => {
@@ -2937,6 +2945,17 @@ class SmsGammuPanel extends HTMLElement {
       this._renderBrandLogoOptions(event.target.value);
     });
     modal.querySelector("#brand-picker-auto")?.addEventListener("click", () => this._saveBrandLogoOverride(contact, ""));
+    modal.querySelector("#brand-picker-upload")?.addEventListener("click", () => modal.querySelector("#brand-picker-file")?.click());
+    modal.querySelector("#brand-picker-file")?.addEventListener("change", async (event) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      try {
+        await this._saveBrandCustomIcon(contact, await this._prepareAvatar(file));
+      } catch (error) {
+        this._showToast(`${this._t("send_error")}: ${error.message}`);
+      }
+    });
+    modal.querySelector("#brand-picker-clear")?.addEventListener("click", () => this._saveBrandCustomIcon(contact, ""));
     this._renderBrandLogoOptions(query);
   }
 
@@ -2981,10 +3000,32 @@ class SmsGammuPanel extends HTMLElement {
     try {
       if (sourceUrl) await this._ensureBrandAsset(sourceUrl);
       await this._api("brand_logo_override", "POST", { number: contact.number, url: sourceUrl });
-      const update = (item) => item && item.number === contact.number ? { ...item, brand_logo_url: sourceUrl } : item;
+      const update = (item) => item && item.number === contact.number ? { ...item, brand_logo_url: sourceUrl, brand_icon_data: "" } : item;
       this._contacts = this._contacts.map(update);
       this._phonebook = this._phonebook.map(update);
-      this._profileContact = { ...contact, brand_logo_url: sourceUrl };
+      this._profileContact = { ...contact, brand_logo_url: sourceUrl, brand_icon_data: "" };
+      this._brandPickerContact = null;
+      this._renderContacts();
+      this._renderMessages();
+      this._renderContactProfile();
+      this._showToast(this._t("brand_logo_saved"));
+    } catch (error) {
+      this._showToast(`${this._t("send_error")}: ${error.message}`);
+      if (button) button.disabled = false;
+    }
+  }
+
+  async _saveBrandCustomIcon(contact, dataUrl) {
+    const button = this.shadowRoot.querySelector("#brand-picker-upload");
+    if (button) button.disabled = true;
+    try {
+      await this._api("brand_icon_override", "POST", { number: contact.number, data: dataUrl });
+      const update = (item) => item && item.number === contact.number
+        ? { ...item, brand_logo_url: "", brand_icon_data: dataUrl }
+        : item;
+      this._contacts = this._contacts.map(update);
+      this._phonebook = this._phonebook.map(update);
+      this._profileContact = { ...contact, brand_logo_url: "", brand_icon_data: dataUrl };
       this._brandPickerContact = null;
       this._renderContacts();
       this._renderMessages();

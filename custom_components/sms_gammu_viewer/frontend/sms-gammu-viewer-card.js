@@ -194,7 +194,7 @@ class SmsGammuViewerCard extends HTMLElement {
   }
 
   _avatarUrl(contact) {
-    const value = String(contact?.avatar || this._brandLogoFor(contact) || contact?.brand_logo_url || "").trim();
+    const value = String(contact?.avatar || contact?.brand_icon_data || this._brandLogoFor(contact) || contact?.brand_logo_url || "").trim();
     return /^(data:image\/(?:jpeg|png|webp);base64,|https?:\/\/|\/)/i.test(value) ? value : "";
   }
 

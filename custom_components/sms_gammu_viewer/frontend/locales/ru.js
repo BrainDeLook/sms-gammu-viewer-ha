@@ -168,6 +168,8 @@ export default {
   search_brand_logos: "Поиск по логотипам",
   brand_logo_auto: "Автоматический выбор",
   brand_logo_saved: "Логотип сохранён",
+  upload_brand_icon: "Загрузить свою иконку",
+  remove_brand_icon: "Удалить свою иконку",
   brand_logo: "Логотип",
   no_brand_logos: "Подходящие логотипы не найдены",
   add_to_contacts: "Добавить в контакты",

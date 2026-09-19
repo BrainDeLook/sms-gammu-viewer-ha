@@ -803,6 +803,28 @@ class SmsCoordinator:
                     return {"url": f"/api/sms_gammu_viewer_brand/{asset_id}.{suffix}", "content_type": f"image/{suffix}"}
             except Exception as error:
                 _LOGGER.debug("Contact avatar unavailable for notification: %s", error)
+        custom_icon = str((contact or {}).get("brand_icon_data") or "").strip()
+        custom_match = re.fullmatch(
+            r"data:(image/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)",
+            custom_icon,
+            flags=re.IGNORECASE,
+        )
+        if custom_match:
+            try:
+                body = base64.b64decode(custom_match.group(2), validate=True)
+                if body:
+                    asset_id = _brand_asset_id(custom_icon)
+                    asset_path = _brand_asset_dir(self.hass) / asset_id
+                    if not asset_path.is_file():
+                        await self.hass.async_add_executor_job(
+                            partial(asset_path.parent.mkdir, parents=True, exist_ok=True)
+                        )
+                        await self.hass.async_add_executor_job(asset_path.write_bytes, body)
+                    content_type = custom_match.group(1).lower()
+                    suffix = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}[content_type]
+                    return {"url": f"/api/sms_gammu_viewer_brand/{asset_id}.{suffix}", "content_type": content_type}
+            except Exception as error:
+                _LOGGER.debug("Custom brand icon unavailable for notification: %s", error)
         source = str((contact or {}).get("brand_logo_url") or "").strip()
         if not source:
             try:
@@ -2038,9 +2060,14 @@ class SmsApiView(HomeAssistantView):
             previous_url = await self.hass.async_add_executor_job(
                 store.get_brand_logo_override, number
             )
+            previous_custom = await self.hass.async_add_executor_job(
+                store.get_brand_custom_icon, number
+            )
             await self.hass.async_add_executor_job(
                 store.set_brand_logo_override, number, source_url
             )
+            if previous_custom:
+                await self.hass.async_add_executor_job(store.set_brand_custom_icon, number, "")
             if previous_url != source_url:
                 await coord._remove_sender_brand_png(number, previous_url)
                 if source_url:
@@ -2057,6 +2084,38 @@ class SmsApiView(HomeAssistantView):
                 "brand_logo_changed", {"number": number, "custom": bool(source_url)}
             )
             return self._json({"ok": True, "number": number, "url": source_url})
+
+        if action == "brand_icon_override":
+            try:
+                body = await request.json()
+            except Exception:
+                return self._error("Invalid JSON", 400)
+            number = str(body.get("number") or "").strip()
+            data_url = str(body.get("data") or "").strip()
+            if not number or len(number) > 64:
+                return self._error("invalid sender", 400)
+            if data_url:
+                match = re.fullmatch(
+                    r"data:(image/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)",
+                    data_url,
+                    flags=re.IGNORECASE,
+                )
+                if not match or len(data_url) > 350000:
+                    return self._error("Invalid brand icon", 400)
+                try:
+                    decoded = base64.b64decode(match.group(2), validate=True)
+                except Exception:
+                    return self._error("Invalid brand icon", 400)
+                if not decoded or len(decoded) > 260000:
+                    return self._error("Invalid brand icon", 400)
+            previous_custom = await self.hass.async_add_executor_job(store.get_brand_custom_icon, number)
+            await self.hass.async_add_executor_job(store.set_brand_custom_icon, number, data_url)
+            if previous_custom and previous_custom != data_url:
+                await coord._remove_sender_brand_png(number, previous_custom)
+            if data_url:
+                await coord._notification_brand_image(number, {"number": number, "brand_icon_data": data_url}, prewarm=True)
+            coord.push_event("brand_logo_changed", {"number": number, "custom": bool(data_url)})
+            return self._json({"ok": True, "number": number, "custom": bool(data_url)})
 
         if action == "add_contact":
             try:
