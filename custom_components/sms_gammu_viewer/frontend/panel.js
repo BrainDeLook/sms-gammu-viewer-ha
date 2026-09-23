@@ -3,6 +3,8 @@
  * i18n: add your language by creating locales/{code}.js and a PR
  */
 
+import { linkifyMessage } from "./message_links.mjs";
+
 const AVAILABLE_LOCALES = ["ru", "en"];
 const LOCALE_NAMES = { ru: "Русский", en: "English" };
 const PANEL_BASE = new URL(import.meta.url).pathname.replace(/\/panel\.js$/, "");
@@ -559,6 +561,7 @@ const CSS = `
     cursor: pointer;
   }
   .msg-text:active { opacity: .7; }
+  .msg-text .msg-link { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
   .msg-bubble.copied {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
@@ -5114,6 +5117,7 @@ class SmsGammuPanel extends HTMLElement {
       const touch = event.touches?.[0] || event;
       if (!mobile() || !this._activeNumber || !touch) return;
       const target = event.target;
+      if (target?.closest?.("a.msg-link")) { mode = "link"; return; }
       if (target?.closest?.("textarea, input, button, .pinned-banner")) return;
       startX = touch.clientX;
       startY = touch.clientY;
@@ -5179,7 +5183,7 @@ class SmsGammuPanel extends HTMLElement {
     chat.addEventListener("pointerdown", (event) => {
       if (event.pointerType !== "touch" || pointerActive) return;
       pointerActive = true;
-      chat.setPointerCapture?.(event.pointerId);
+      if (!event.target?.closest?.("a.msg-link")) chat.setPointerCapture?.(event.pointerId);
       begin(event);
     }, { capture: true, passive: true });
     chat.addEventListener("pointermove", (event) => {
@@ -5295,7 +5299,7 @@ class SmsGammuPanel extends HTMLElement {
       const isOut = m.direction === "out";
       html += `
         <div class="msg-bubble ${isOut ? "outgoing" : (!m.is_read ? "unread" : "")}" data-id="${m.id}" data-starred="${m.is_starred ? '1' : '0'}" data-message-pinned="${m.is_message_pinned ? '1' : '0'}">
-          <div class="msg-text">${this._esc(m.text)}</div>
+          <div class="msg-text">${linkifyMessage(m.text, (value) => this._esc(value))}</div>
           <div class="msg-meta">
             ${!isOut && !m.is_read ? '<span class="msg-unread-dot"></span>' : ""}
             ${m.is_message_pinned ? '<span style="font-size:11px;margin-right:2px">📌</span>' : ''}${m.is_starred ? '<span style="font-size:11px;margin-right:2px">⭐</span>' : ''}<span class="msg-date">${this._formatFull(m.date)}</span>
@@ -5335,8 +5339,9 @@ class SmsGammuPanel extends HTMLElement {
       });
       bubble.addEventListener("pointerup", () => { clearTimeout(ltimer); bubble.__longPressTimer = null; });
       bubble.addEventListener("pointercancel", () => { clearTimeout(ltimer); bubble.__longPressTimer = null; });
-      bubble.addEventListener("click", async () => {
+      bubble.addEventListener("click", async (event) => {
         if (longPressed) return;
+        if (event.target.closest("a.msg-link")) return;
         const text = bubble.querySelector(".msg-text")?.textContent || "";
         try {
           if (navigator.clipboard && location.protocol === "https:") {
