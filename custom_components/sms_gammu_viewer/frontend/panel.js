@@ -560,6 +560,7 @@ const CSS = `
     word-break: break-word;
     cursor: pointer;
   }
+  .msg-text:active:not(:has(.msg-link:active)) { opacity: .7; }
   .msg-text .msg-link { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
   .msg-text .msg-link:active { opacity: .7; }
   .msg-bubble.copied {
