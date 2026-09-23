@@ -22,9 +22,17 @@ test("escapes message content and allows no injected markup", () => {
   assert.ok(!html.includes('href="javascript:'));
 });
 
-test("leaves plain text and malformed addresses as text", () => {
-  assert.equal(linkifyMessage("No link: example.com", escapeHtml), "No link: example.com");
+test("links bare domains in arbitrary zones, including Cyrillic domains", () => {
+  const html = linkifyMessage("site.ru/path, store.example.technology and пример.рф", escapeHtml);
+  assert.match(html, /href="https:\/\/site\.ru\/path"/);
+  assert.match(html, /href="https:\/\/store\.example\.technology\/"/);
+  assert.match(html, /href="https:\/\/xn--e1afmkfd\.xn--p1ai\/"/);
+});
+
+test("leaves emails, ordinary dotted text and malformed addresses as text", () => {
+  assert.equal(linkifyMessage("user@site.ru version.1.2", escapeHtml), "user@site.ru version.1.2");
   assert.equal(linkifyMessage("https://", escapeHtml), "https://");
+  assert.equal(linkifyMessage("site.ru@other.com", escapeHtml), "site.ru@other.com");
 });
 
 test("keeps balanced parentheses inside an address", () => {

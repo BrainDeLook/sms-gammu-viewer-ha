@@ -1,11 +1,14 @@
-/** Render explicit web links in SMS text while keeping all other text escaped. */
+/** Render web addresses in SMS text while keeping all other text escaped. */
 export function linkifyMessage(text, escapeHtml) {
   const message = String(text ?? "");
-  const pattern = /\b(?:https?:\/\/|www\.)[^\s<>"']+/gi;
+  // A domain suffix is validated by its shape, so new zones work without a list.
+  const pattern = /(?:https?:\/\/|www\.|(?:[\p{L}\p{N}-]+\.)+(?:[\p{L}]{2,63}|xn--[a-z0-9-]{2,59}))[^\s<>"']*/giu;
   let result = "";
   let start = 0;
 
   for (const match of message.matchAll(pattern)) {
+    // Do not turn the domain part of an email or a longer token into a link.
+    if (match.index > 0 && /[\p{L}\p{N}_@.-]/u.test(message[match.index - 1])) continue;
     const candidate = match[0];
     let link = candidate.replace(/[.,!?;:}\]]+$/, "");
     while (link.endsWith(")") && (link.match(/\)/g) || []).length > (link.match(/\(/g) || []).length) {
@@ -15,8 +18,11 @@ export function linkifyMessage(text, escapeHtml) {
 
     let href = "";
     try {
-      const url = new URL(link.startsWith("www.") ? `https://${link}` : link);
-      if (["http:", "https:"].includes(url.protocol) && url.hostname) href = url.href;
+      const explicitScheme = /^https?:\/\//i.test(link);
+      const url = new URL(explicitScheme ? link : `https://${link}`);
+      const hasDomainZone = /\.(?:[\p{L}]{2,63}|xn--[a-z0-9-]{2,59})$/iu.test(url.hostname);
+      if (["http:", "https:"].includes(url.protocol) && url.hostname &&
+          !url.username && !url.password && (explicitScheme || hasDomainZone)) href = url.href;
     } catch (_) {}
 
     result += href
