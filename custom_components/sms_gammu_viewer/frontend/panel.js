@@ -560,8 +560,8 @@ const CSS = `
     word-break: break-word;
     cursor: pointer;
   }
-  .msg-text:active { opacity: .7; }
   .msg-text .msg-link { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+  .msg-text .msg-link:active { opacity: .7; }
   .msg-bubble.copied {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
@@ -5318,6 +5318,13 @@ class SmsGammuPanel extends HTMLElement {
 
     area.querySelectorAll(".msg-bubble").forEach((bubble) => {
       let ltimer = null, startX = 0, startY = 0, longPressed = false;
+
+      bubble.querySelectorAll("a.msg-link").forEach((link) => {
+        // Link taps must not trigger message copy or the long-press menu.
+        link.addEventListener("pointerdown", (event) => event.stopPropagation());
+        link.addEventListener("click", (event) => event.stopPropagation());
+        link.addEventListener("contextmenu", (event) => event.stopPropagation());
+      });
 
       bubble.addEventListener("pointerdown", (e) => {
         startX = e.clientX; startY = e.clientY; longPressed = false;
