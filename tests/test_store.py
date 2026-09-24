@@ -73,6 +73,22 @@ class StoreContainsTests(unittest.TestCase):
 
 
 class ContactProfileTests(unittest.TestCase):
+    def test_gsm_underscore_displays_without_changing_sender_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = SmsStore(Path(directory) / "sms.db")
+            store.init()
+            sender = "DIT\x11EMIAS"
+            icon = "data:image/png;base64,iVBORw0KGgo="
+            store.add(sender, "hello", "2026-08-16T12:00:00")
+            store.set_brand_custom_icon(sender, icon)
+
+            contact = store.get_contacts()[0]
+            self.assertEqual("DIT_EMIAS", contact["contact_name"])
+            self.assertEqual(sender, contact["number"])
+            self.assertEqual(icon, contact["brand_icon_data"])
+            self.assertEqual("hello", store.get_by_number(sender)[0]["text"])
+            self.assertEqual("VK_ID", store._display_sender_name("VK\x11ID"))
+
     def test_brand_logo_override_is_persistent_and_clearable(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             store = SmsStore(Path(directory) / "sms.db")

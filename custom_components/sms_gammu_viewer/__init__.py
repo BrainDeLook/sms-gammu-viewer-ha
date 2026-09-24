@@ -758,7 +758,7 @@ class SmsCoordinator:
     def _brand_match_text(value: str) -> str:
         return re.sub(
             r"\s+", " ", re.sub(
-                r"[«»\"'’.,()\[\]{}_/\\-]+", " ", re.sub(
+                r"[«»\"'’.,()\[\]{}_\x11/\\-]+", " ", re.sub(
                     r"\b(?:ru|рф|com|net|org|io|su|me|tv|online)\b", " ",
                     str(value or "").lower(), flags=re.IGNORECASE,
                 )
@@ -1424,6 +1424,7 @@ class SmsCoordinator:
             display_name = contact["name"] if contact else number
         except Exception:
             display_name = number
+        display_name = self.store._display_sender_name(display_name)
 
         notification_image = await self._notification_brand_image(number, contact)
 

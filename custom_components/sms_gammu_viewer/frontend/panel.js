@@ -393,7 +393,6 @@ const CSS = `
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    padding-bottom: 3px;
   }
 
   .contact-date {

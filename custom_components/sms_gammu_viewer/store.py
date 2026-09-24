@@ -188,6 +188,11 @@ class SmsStore:
         cleaned = " ".join(cleaned.split())
         return cleaned
 
+    @staticmethod
+    def _display_sender_name(name: str) -> str:
+        """Show a leaked GSM 7-bit underscore without changing the stored sender key."""
+        return name.replace("\x11", "_")
+
     def add(self, number: str, text: str, date: str) -> int | None:
         """Добавляет входящее SMS. Возвращает id только если реально новый, None если дубликат."""
         number = self._sanitize_number(number)
@@ -363,6 +368,10 @@ class SmsStore:
         for r in result:
             r["is_muted"] = bool(r["is_muted"])
             r["is_pinned"] = bool(r["is_pinned"])
+            if "\x11" in (r["contact_name"] or r["number"]):
+                r["contact_name"] = self._display_sender_name(
+                    r["contact_name"] or r["number"]
+                )
         return result
 
     def clear_all(self) -> None:
