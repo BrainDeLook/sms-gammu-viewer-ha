@@ -563,6 +563,12 @@ const CSS = `
   .msg-text:active:not(:has(.msg-link:active)) { opacity: .7; }
   .msg-text .msg-link { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
   .msg-text .msg-link:active { opacity: .7; }
+  @media (hover: hover) and (pointer: fine) {
+    .msg-bubble { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
+    .msg-meta, .msg-meta * { -webkit-user-select: none; user-select: none; }
+    .msg-text { cursor: text; }
+    .msg-text:active:not(:has(.msg-link:active)) { opacity: 1; }
+  }
   .msg-bubble.copied {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
@@ -5333,7 +5339,9 @@ class SmsGammuPanel extends HTMLElement {
       });
 
       bubble.addEventListener("pointerdown", (e) => {
-        startX = e.clientX; startY = e.clientY; longPressed = false;
+        longPressed = false;
+        if (e.pointerType === "mouse" || e.button !== 0) return;
+        startX = e.clientX; startY = e.clientY;
         const gestureToken = this._chatGestureToken;
         ltimer = setTimeout(() => {
           if (gestureToken !== this._chatGestureToken || this._chatGestureMoved || !this._activeNumber || !bubble.isConnected) return;
@@ -5355,6 +5363,9 @@ class SmsGammuPanel extends HTMLElement {
       bubble.addEventListener("click", async (event) => {
         if (longPressed) return;
         if (event.target.closest("a.msg-link")) return;
+        // Mouse clicks are for selecting text; touch taps still copy the
+        // complete message as before.
+        if (event.pointerType === "mouse" || (event.pointerType !== "touch" && window.matchMedia?.("(hover: hover) and (pointer: fine)")?.matches)) return;
         const text = bubble.querySelector(".msg-text")?.textContent || "";
         try {
           if (navigator.clipboard && location.protocol === "https:") {
@@ -5370,7 +5381,10 @@ class SmsGammuPanel extends HTMLElement {
           this._showToast(this._t("copied"));
         } catch { this._showToast(this._t("copy_failed")); }
       });
-      bubble.addEventListener("contextmenu", (e) => { e.preventDefault(); this._showMsgCtxMenu(e, bubble); });
+      bubble.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+        if (e.button === 2 && e.pointerType !== "touch") this._showMsgCtxMenu(e, bubble);
+      });
     });
 
 
