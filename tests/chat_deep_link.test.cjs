@@ -13,7 +13,8 @@ function fixture(number = '+70001234567') {
     location.href = String(url);
   } } };
   const methods = source.slice(source.indexOf('  set route(value)'), source.indexOf('  _token()'));
-  const Panel = vm.runInNewContext(`(class { ${methods} })`, {
+  const resolveMethod = source.slice(source.indexOf('  async _resolveChatNumber(number)'), source.indexOf('  async _selectContact(number)'));
+  const Panel = vm.runInNewContext(`(class { ${methods} ${resolveMethod} })`, {
     URL, window, localStorage: { getItem: () => 'old-chat' },
   });
   const panel = new Panel();
@@ -55,4 +56,19 @@ test('same chat opens again on a fresh notification, but not on other HA pages',
   location.href = 'https://ha.test/lovelace?chat=unrelated';
   panel._openChatLink();
   assert.equal(opened.length, 2);
+});
+
+test('notification sender case resolves to the existing alphanumeric chat', async () => {
+  const { panel } = fixture('Beeline');
+  panel._contacts = [{ number: 'beeline' }];
+  panel._phonebook = [];
+  panel._contactsLoaded = true;
+  panel._phonebookLoaded = true;
+  let selected;
+  panel._selectContact = number => { selected = panel._resolveChatNumber(number); };
+  panel._chatLinkReady = true;
+  panel._openChatLink();
+  assert.equal(await selected, 'beeline');
+  panel._contacts.push({ number: 'Beeline' });
+  assert.equal(await panel._resolveChatNumber('Beeline'), 'Beeline');
 });

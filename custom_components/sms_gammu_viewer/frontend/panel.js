@@ -1724,7 +1724,12 @@ class SmsGammuPanel extends HTMLElement {
       const all = [...this._contacts, ...this._phonebook];
       const exact = all.find((item) => String(item?.number || "").trim() === raw);
       if (exact) return String(exact.number).trim();
-      if (!/^\+?[\d\s().-]+$/.test(raw)) return raw;
+      if (!/^\+?[\d\s().-]+$/.test(raw)) {
+        // Alphanumeric senders can arrive with a different letter case in
+        // another SMS. Open the existing conversation instead of an empty one.
+        const match = all.find((item) => String(item?.number || "").trim().toLowerCase() === raw.toLowerCase());
+        return match ? String(match.number).trim() : raw;
+      }
       const digits = raw.replace(/\D/g, "");
       if (!digits) return raw;
       const suffix = digits.slice(-10);
