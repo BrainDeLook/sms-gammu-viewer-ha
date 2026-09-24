@@ -1311,7 +1311,9 @@ class SmsCoordinator:
 
     async def _save_logical_sms(self, message: LogicalSms) -> bool:
         """Persist one already-linked gateway message without heuristically appending."""
-        number = message.number
+        # Use the exact sender key that SmsStore persists when building
+        # notification links; modem-provided alpha names may contain whitespace.
+        number = self.store._sanitize_number(message.number)
         text = message.text
         if _looks_like_wap_push(text):
             text = "📎 Входящий MMS (не поддерживается)"
