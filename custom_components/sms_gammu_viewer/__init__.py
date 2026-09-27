@@ -632,6 +632,7 @@ class SmsCoordinator:
         self._last_reset_at: float = 0.0
         self._modem_ok: bool = True
         self._sensor_listeners: list = []
+        self._status_listeners: list = []
         # Многие модемы делят один процессор между голосовым и SMS-каналом —
         # во время активного звонка опрос /sms может временно не отвечать.
         # call/cover/button сущности выставляют этот флаг перед дозвоном и
@@ -944,6 +945,13 @@ class SmsCoordinator:
     def register_sensor_listener(self, callback_fn) -> None:
         self._sensor_listeners.append(callback_fn)
 
+    def register_status_listener(self, callback_fn) -> None:
+        self._status_listeners.append(callback_fn)
+
+    def unregister_status_listener(self, callback_fn) -> None:
+        if callback_fn in self._status_listeners:
+            self._status_listeners.remove(callback_fn)
+
     def unregister_sensor_listener(self, callback_fn) -> None:
         if callback_fn in self._sensor_listeners:
             self._sensor_listeners.remove(callback_fn)
@@ -1017,6 +1025,11 @@ class SmsCoordinator:
                     CONF_USE_BRAND_LOGOS, DEFAULT_USE_BRAND_LOGOS
                 ),
             }
+            for listener in list(self._status_listeners):
+                try:
+                    listener()
+                except Exception as error:
+                    _LOGGER.debug("Status listener error: %s", error)
             _LOGGER.debug("Status cache refreshed")
         except Exception as e:
             _LOGGER.debug("Status cache refresh failed: %s", e)

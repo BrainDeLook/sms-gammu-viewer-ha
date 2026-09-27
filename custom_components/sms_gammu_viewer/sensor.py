@@ -364,6 +364,12 @@ class SmsNetworkSensor(_BaseSmsSensor):
         self._unsub = None
 
     async def async_added_to_hass(self) -> None:
+        coord = self._coord()
+        if coord:
+            coord.register_status_listener(self._read_status)
+            self.async_on_remove(
+                lambda: coord.unregister_status_listener(self._read_status)
+            )
         self._unsub = async_track_time_interval(
             self.hass, self._update, SCAN_INTERVAL
         )
@@ -374,12 +380,16 @@ class SmsNetworkSensor(_BaseSmsSensor):
             self._unsub()
 
     async def _update(self, _now=None) -> None:
+        self._read_status()
+
+    @callback
+    def _read_status(self) -> None:
         coord = self._coord()
         if not coord:
             return
         # Из кеша координатора — см. комментарий в SmsSignalSensor
         cache = coord.status_cache
-        if cache is not None:
+        if cache is not None and cache.get("network") is not None:
             n = cache.get("network")
             self._operator = _status_value(
                 n, ("NetworkName", "network_name", "Operator", "operator", "name")
