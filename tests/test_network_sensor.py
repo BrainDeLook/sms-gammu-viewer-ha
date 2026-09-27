@@ -31,7 +31,11 @@ class NetworkSensorTests(unittest.IsolatedAsyncioTestCase):
             "callback": lambda fn: fn, "SCAN_INTERVAL": None,
             "async_track_time_interval": lambda *args: lambda: None,
         }
-        load_nodes("sensor.py", {"_status_value", "_BaseSmsSensor", "SmsNetworkSensor"}, self.namespace)
+        self.namespace["_NETWORK_KEYS"] = (
+            "NetworkName", "network_name", "Operator", "operator",
+            "Carrier", "carrier", "Provider", "provider",
+        )
+        load_nodes("sensor.py", {"_status_value", "_network_value", "_BaseSmsSensor", "SmsNetworkSensor"}, self.namespace)
         tree = ast.parse((ROOT / "__init__.py").read_text(encoding="utf-8"))
         cls = next(node for node in tree.body if getattr(node, "name", None) == "SmsCoordinator")
         cls.body = [node for node in cls.body if getattr(node, "name", None) in {
@@ -90,6 +94,21 @@ class NetworkSensorTests(unittest.IsolatedAsyncioTestCase):
         for remove in self.sensor.removers:
             remove()
         self.assertEqual(self.coord._status_listeners, [])
+
+    async def test_nested_network_and_modem_fallback(self):
+        self.network = {"registration": {"carrier": "Beeline"}}
+        await self.coord.refresh_status_cache()
+        self.assertEqual(self.sensor.native_value, "Beeline")
+        self.assertEqual(self.sensor.extra_state_attributes["operator_source"], "network")
+        self.network = None
+
+        async def modem():
+            return {"NetworkName": "MTS", "Model": "Huawei"}
+
+        self.coord.client.get_modem = modem
+        await self.coord.refresh_status_cache()
+        self.assertEqual(self.sensor.native_value, "MTS")
+        self.assertEqual(self.sensor.extra_state_attributes["operator_source"], "modem")
 
 
 if __name__ == "__main__":
