@@ -432,7 +432,7 @@ class SmsNetworkSensor(_BaseSmsSensor):
     def extra_state_attributes(self) -> dict:
         cache = self._coord().status_cache if self._coord() else None
         return {
-            "diagnostic_version": "3.20.6b2",
+            "diagnostic_version": "3.20.6b3",
             "status_updates": self._status_updates,
             "operator_source": self._source,
             "status_cache_present": cache is not None,
