@@ -26,31 +26,6 @@ def _status_value(payload: object, keys: tuple[str, ...]):
         return payload
     return None
 
-
-_NETWORK_KEYS = ("NetworkName", "network_name", "Operator", "operator", "Carrier", "carrier", "Provider", "provider")
-
-
-def _network_value(cache: dict) -> tuple[str | None, str | None]:
-    """Find the operator in gateway status, including nested lean responses."""
-    for source in ("network", "modem"):
-        payload = cache.get(source)
-        if isinstance(payload, str):
-            value = _status_value(payload, ())
-            if value:
-                return str(value), source
-            continue
-        if not isinstance(payload, dict):
-            continue
-        pending = [payload]
-        while pending:
-            item = pending.pop(0)
-            keys = _NETWORK_KEYS + (("name",) if source == "network" else ())
-            value = _status_value(item, keys)
-            if value:
-                return str(value), source
-            pending.extend(child for child in item.values() if isinstance(child, dict))
-    return None, None
-
 SCAN_INTERVAL = timedelta(seconds=10)
 MODEM_INFO_INTERVAL = timedelta(seconds=30)
 LAST_SMS_TEXT_MAXLEN = 255  # ограничение state в HA
@@ -335,8 +310,11 @@ class SmsChatsSensor(_BaseSmsSensor):
             return False
         cache = coord.status_cache
         s = cache.get("signal")
+        n = cache.get("network")
         signal = _status_value(s, ("SignalPercent", "signal_percent", "signal"))
-        network, _ = _network_value(cache)
+        network = _status_value(
+            n, ("NetworkName", "network_name", "Operator", "operator", "name")
+        )
         changed = signal != self._signal_percent or network != self._network_name
         self._signal_percent = signal
         self._network_name = network
@@ -383,17 +361,9 @@ class SmsNetworkSensor(_BaseSmsSensor):
         super().__init__(hass, entry)
         self._attr_unique_id = f"{entry.entry_id}_network"
         self._operator = None
-        self._source = None
-        self._status_updates = 0
         self._unsub = None
 
     async def async_added_to_hass(self) -> None:
-        coord = self._coord()
-        if coord:
-            coord.register_status_listener(self._read_status)
-            self.async_on_remove(
-                lambda: coord.unregister_status_listener(self._read_status)
-            )
         self._unsub = async_track_time_interval(
             self.hass, self._update, SCAN_INTERVAL
         )
@@ -404,38 +374,18 @@ class SmsNetworkSensor(_BaseSmsSensor):
             self._unsub()
 
     async def _update(self, _now=None) -> None:
-        self._read_status()
-
-    @callback
-    def _read_status(self) -> None:
         coord = self._coord()
         if not coord:
             return
         # Из кеша координатора — см. комментарий в SmsSignalSensor
         cache = coord.status_cache
-        self._status_updates += 1
         if cache is not None:
-            operator, source = _network_value(cache)
-            if operator is not None:
-                self._operator = operator
-                self._source = source
-            elif cache.get("network") is not None:
-                self._operator = None
-                self._source = None
+            n = cache.get("network")
+            self._operator = _status_value(
+                n, ("NetworkName", "network_name", "Operator", "operator", "name")
+            )
         self.async_write_ha_state()
 
     @property
     def native_value(self):
         return self._operator
-
-    @property
-    def extra_state_attributes(self) -> dict:
-        cache = self._coord().status_cache if self._coord() else None
-        return {
-            "diagnostic_version": "3.20.6b3",
-            "status_updates": self._status_updates,
-            "operator_source": self._source,
-            "status_cache_present": cache is not None,
-            "network_payload_keys": list(cache["network"]) if cache and isinstance(cache.get("network"), dict) else None,
-            "modem_payload_keys": list(cache["modem"]) if cache and isinstance(cache.get("modem"), dict) else None,
-        }

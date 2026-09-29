@@ -16,26 +16,6 @@ from .const import CONF_HOST, CONF_PASSWORD, CONF_PORT, CONF_USERNAME
 
 _LOGGER = logging.getLogger(__name__)
 
-
-_NETWORK_NAMES_BY_CODE = {"25099": "Beeline"}
-
-
-def _network_with_code_fallback(payload: Any) -> Any:
-    """Fill a missing Gammu network name from a known MCC/MNC code."""
-    if not isinstance(payload, dict):
-        return payload
-    name = payload.get("NetworkName") or payload.get("network_name")
-    if name is not None and str(name).strip().lower() not in (
-        "", "unknown", "unavailable", "none", "null"
-    ):
-        return payload
-    code = payload.get("NetworkCode") or payload.get("network_code")
-    normalized_code = "".join(char for char in str(code or "") if char.isdigit())
-    fallback_name = _NETWORK_NAMES_BY_CODE.get(normalized_code)
-    if fallback_name:
-        return {**payload, "NetworkName": fallback_name}
-    return payload
-
 # Gammu-gateway иногда зависает на команде при занятом модеме.
 # 30 секунд — разумный максимум для отправки SMS.
 SEND_TIMEOUT = 30
@@ -237,10 +217,8 @@ class GatewayClient:
         try:
             lean = await self._get_lean_status()
             if lean is not None:
-                return _network_with_code_fallback(lean.get("network"))
-            return _network_with_code_fallback(
-                await self._request("GET", "/status/network")
-            )
+                return lean.get("network")
+            return await self._request("GET", "/status/network")
         except Exception:
             return None
 
