@@ -1,0 +1,37 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { installSidebarResize } from '../custom_components/sms_gammu_viewer/frontend/sidebar_resize.mjs';
+
+test('mouse resize persists, clamps, resets and ignores touch', () => {
+  const events = {};
+  let saved = null;
+  let actual;
+  let captured;
+  let observe;
+  globalThis.window = { innerWidth: 1200 };
+  globalThis.localStorage = { getItem: () => saved, setItem: (_, value) => { saved = value; } };
+  globalThis.ResizeObserver = class { constructor(fn) { observe = fn; } observe() {} disconnect() {} };
+  const root = { clientWidth: 1200, style: { setProperty: (_, v) => { actual = v; } }, classList: { add() {}, remove() {} } };
+  const handle = { addEventListener: (key, fn) => { events[key] = fn; }, setAttribute() {}, setPointerCapture: id => { captured = id; }, hasPointerCapture: id => captured === id, releasePointerCapture: () => { captured = null; } };
+  let cleanup = installSidebarResize(root, handle);
+  assert.equal(actual, '320px');
+  const down = { pointerType: 'mouse', button: 0, pointerId: 1, clientX: 320, preventDefault() {} };
+  events.pointerdown(down);
+  events.pointermove({ pointerId: 1, clientX: 480 });
+  events.pointerup();
+  assert.equal(saved, '480');
+  cleanup();
+  cleanup = installSidebarResize(root, handle);
+  assert.equal(actual, '480px');
+  root.clientWidth = 600;
+  observe();
+  assert.equal(actual, '300px');
+  root.clientWidth = 1200;
+  observe();
+  events.dblclick();
+  assert.equal(saved, '320');
+  events.pointerdown({ ...down, pointerType: 'touch' });
+  events.pointermove({ pointerId: 1, clientX: 700 });
+  assert.equal(actual, '320px');
+  cleanup();
+});
