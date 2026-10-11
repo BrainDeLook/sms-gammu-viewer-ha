@@ -4,6 +4,7 @@
  */
 
 import { linkifyMessage } from "./message_links.mjs";
+import { installSidebarResize } from "./sidebar_resize.mjs";
 
 const AVAILABLE_LOCALES = ["ru", "en"];
 const LOCALE_NAMES = { ru: "Русский", en: "English" };
@@ -76,7 +77,8 @@ const CSS = `
 
   /* ─── Contacts sidebar ─── */
   .contacts {
-    width: 300px;
+    width: var(--contacts-width, 320px);
+    flex-shrink: 0;
     min-width: 240px;
     display: flex;
     flex-direction: column;
@@ -86,6 +88,11 @@ const CSS = `
     min-height: 0;
     overflow: hidden;
   }
+
+  .sidebar-resizer { flex: 0 0 6px; cursor: col-resize; background: var(--card); touch-action: none; }
+  .sidebar-resizer:hover, .sidebar-resizer:focus-visible { background: var(--accent); }
+  .root.resizing-sidebar, .root.resizing-sidebar * { cursor: col-resize !important; user-select: none !important; }
+  @media (max-width: 580px), (pointer: coarse) { .sidebar-resizer { display: none; } }
 
   .contacts-header {
     padding: 14px 16px 10px;
@@ -1462,6 +1469,7 @@ class SmsGammuPanel extends HTMLElement {
   }
 
   disconnectedCallback() {
+    this._resizeCleanup?.();
     if (this._onLocationChanged) window.removeEventListener("location-changed", this._onLocationChanged);
     window.removeEventListener("popstate", this._onLocationChanged);
     window.removeEventListener("pageshow", this._onLocationChanged);
@@ -3435,6 +3443,7 @@ class SmsGammuPanel extends HTMLElement {
   // ─── Render ───
 
   _render() {
+    this._resizeCleanup?.();
     this.shadowRoot.innerHTML = `
       <style>${CSS}</style>
       <div class="root" id="root">
@@ -3535,6 +3544,7 @@ class SmsGammuPanel extends HTMLElement {
 
         </div>
 
+        <div class="sidebar-resizer" id="sidebar-resizer" role="separator" aria-orientation="vertical" aria-label="Chat list width" aria-valuemin="240" tabindex="0"></div>
         <div class="chat" id="chat">
           <div class="chat-header" id="chat-header">
             <button class="icon-btn back-btn" id="back-btn" title="Назад">
@@ -3757,6 +3767,7 @@ class SmsGammuPanel extends HTMLElement {
     });
     this.shadowRoot.getElementById("send-btn").addEventListener("click", () => this._sendSms());
 
+    this._resizeCleanup = installSidebarResize(this.shadowRoot.getElementById("root"), this.shadowRoot.getElementById("sidebar-resizer"));
     this.shadowRoot.getElementById("search").addEventListener("input", (e) => {
       this._search = e.target.value;
       this._renderContacts();
