@@ -5,6 +5,7 @@
 
 import { linkifyMessage } from "./message_links.mjs";
 import { installSidebarResize } from "./sidebar_resize.mjs";
+import { signalPercent } from "./signal_percent.mjs";
 
 const AVAILABLE_LOCALES = ["ru", "en"];
 const LOCALE_NAMES = { ru: "Русский", en: "English" };
@@ -3229,7 +3230,7 @@ class SmsGammuPanel extends HTMLElement {
       return;
     }
 
-    const pct = s.signal?.SignalPercent ?? 0;
+    const pct = signalPercent(s.signal?.SignalPercent);
     const barColor = pct >= 50 ? "#4caf50" : pct >= 20 ? "#ff9800" : "#f44336";
 
     const row = (label, val) => val != null
@@ -3886,7 +3887,7 @@ class SmsGammuPanel extends HTMLElement {
       bar.innerHTML = `<span class="signal-dot bad"></span><span>${this._t("no_modem")}</span>${_sp}`;
       return;
     }
-    const pct = s.signal?.SignalPercent ?? "?";
+    const pct = signalPercent(s.signal?.SignalPercent, "?");
     const net = s.network?.NetworkName ?? "";
     const interval = this._pollInterval;
     const dotClass = pct >= 50 ? "" : pct >= 20 ? "mid" : "bad";
