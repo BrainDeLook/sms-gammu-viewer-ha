@@ -1,6 +1,6 @@
 # SMS Gammu Viewer for Home Assistant
 
-[![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg?style=for-the-badge)](https://github.com/hacs/integration)
+[![hacs_badge](https://img.shields.io/badge/HACS-Default-41BDF5.svg?style=for-the-badge)](https://github.com/hacs/default)
 [![GitHub Release](https://img.shields.io/github/v/release/BrainDeLook/sms-gammu-viewer-ha?style=for-the-badge)](https://github.com/BrainDeLook/sms-gammu-viewer-ha/releases)
 [![License](https://img.shields.io/github/license/BrainDeLook/sms-gammu-viewer-ha.svg?style=for-the-badge)](LICENSE)
 
@@ -43,7 +43,7 @@ After installation, an **SMS** tab appears in the sidebar. Messages are stored i
 
 ## Requirements
 
-- Home Assistant 2024.3+
+- Home Assistant 2024.7+
 - [SMS Modem Gateway](https://github.com/BrainDeLook/sms-modem-gateway-ha) add-on
 - USB GSM modem supported by Gammu (e.g. Huawei E1550, E3372, ZTE MF823)
 - For push notifications: [Home Assistant Companion](https://companion.home-assistant.io/) app
@@ -62,15 +62,16 @@ Do not run another SMS gateway against the same modem port at the same time.
 
 ### 2. Install SMS Gammu Viewer via HACS (recommended)
 
+**SMS Gammu Viewer is available in the default HACS catalog.** No custom repository is needed.
+
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=BrainDeLook&repository=sms-gammu-viewer-ha&category=integration)
 
-Or manually:
+To install using HACS search:
 
 1. Open **HACS** in Home Assistant
-2. Click ⋮ → **Custom repositories**
-3. Paste: `https://github.com/BrainDeLook/sms-gammu-viewer-ha` — Category: **Integration**
-4. Find **SMS Gammu Viewer** → **Download**
-5. Restart Home Assistant
+2. Search for **SMS Gammu Viewer**
+3. Open the integration and select **Download**
+4. Restart Home Assistant
 
 ### Manual integration installation
 

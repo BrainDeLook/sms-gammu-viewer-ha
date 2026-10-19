@@ -1,6 +1,6 @@
 # SMS Gammu Viewer для Home Assistant
 
-[![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg?style=for-the-badge)](https://github.com/hacs/integration)
+[![hacs_badge](https://img.shields.io/badge/HACS-Default-41BDF5.svg?style=for-the-badge)](https://github.com/hacs/default)
 [![GitHub Release](https://img.shields.io/github/v/release/BrainDeLook/sms-gammu-viewer-ha?style=for-the-badge)](https://github.com/BrainDeLook/sms-gammu-viewer-ha/releases)
 [![License](https://img.shields.io/github/license/BrainDeLook/sms-gammu-viewer-ha.svg?style=for-the-badge)](LICENSE)
 
@@ -43,7 +43,7 @@
 
 ## Требования
 
-- Home Assistant 2024.3+
+- Home Assistant 2024.7+
 - Аддон [SMS Modem Gateway](https://github.com/BrainDeLook/sms-modem-gateway-ha)
 - USB GSM модем, поддерживаемый Gammu (например Huawei E1550, E3372, ZTE MF823)
 - Для push-уведомлений: приложение [Home Assistant Companion](https://companion.home-assistant.io/)
@@ -62,15 +62,16 @@
 
 ### 2. Установи SMS Gammu Viewer через HACS (рекомендуется)
 
+**SMS Gammu Viewer доступен в стандартном каталоге HACS.** Добавлять пользовательский репозиторий не нужно.
+
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=BrainDeLook&repository=sms-gammu-viewer-ha&category=integration)
 
-Или вручную:
+Для установки через поиск HACS:
 
 1. Открой **HACS** в Home Assistant
-2. Нажми ⋮ → **Пользовательские репозитории**
-3. Вставь: `https://github.com/BrainDeLook/sms-gammu-viewer-ha` — Категория: **Интеграция**
-4. Найди **SMS Gammu Viewer** → **Скачать**
-5. Перезапусти Home Assistant
+2. Найди **SMS Gammu Viewer** через поиск
+3. Открой интеграцию и нажми **Скачать**
+4. Перезапусти Home Assistant
 
 ### Ручная установка интеграции
 
