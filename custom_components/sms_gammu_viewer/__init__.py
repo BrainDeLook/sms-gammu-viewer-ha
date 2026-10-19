@@ -403,11 +403,11 @@ def _signed_brand_asset_url(hass: HomeAssistant, path: str) -> str:
 
 
 def _signed_brand_catalog(hass: HomeAssistant, catalog: dict) -> dict:
-    """Sign response URLs afresh, leaving the shared catalog cache unsigned."""
+    """Sign protected assets only; preserve cacheable public catalog URLs."""
     logos = []
     for item in catalog.get("logos", []):
         item = dict(item)
-        if path := item.get("localUrl"):
+        if (path := item.get("localUrl")) and path.startswith("/api/sms_gammu_viewer_brand/"):
             item["localUrl"] = _signed_brand_asset_url(hass, path)
         logos.append(item)
     return {**catalog, "logos": logos}

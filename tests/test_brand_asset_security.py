@@ -53,13 +53,23 @@ class BrandAssetsTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_catalog_signatures_are_temporary_and_do_not_modify_cache(self):
         ns, signer, hass = load_helpers("unused")
-        catalog = {"logos": [{"localUrl": "/api/sms_gammu_viewer_brand/" + "a" * 64}, {"localFile": "svg/public.svg"}]}
+        catalog = {"logos": [{"localUrl": "/api/sms_gammu_viewer_brand/" + "a" * 64}, {"localUrl": "/sms-viewer/frontend/brand_assets/svg/public.svg"}]}
         response = ns["_signed_brand_catalog"](hass, catalog)
         self.assertIn("?authSig=", response["logos"][0]["localUrl"])
         self.assertNotIn("?authSig=", catalog["logos"][0]["localUrl"])
         self.assertEqual(response["logos"][1], catalog["logos"][1])
         self.assertEqual(signer.call_args.args[2], timedelta(days=7))
         self.assertTrue(signer.call_args.kwargs["use_content_user"])
+        signer.assert_called_once()
+
+    async def test_bundled_catalog_mints_no_signatures(self):
+        ns, signer, hass = load_helpers("unused")
+        catalog_path = SOURCE.parent / "frontend/brand_assets/catalog.json"
+        import json
+        catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+        self.assertTrue(any(item.get("localUrl") for item in catalog["logos"]))
+        self.assertEqual(ns["_signed_brand_catalog"](hass, catalog), catalog)
+        signer.assert_not_called()
 
     async def test_catalog_discovers_only_existing_assets_in_executor(self):
         with tempfile.TemporaryDirectory() as directory:
