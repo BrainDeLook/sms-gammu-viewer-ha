@@ -824,6 +824,13 @@ class SmsCoordinator:
         """
         if not self._notify_images_enabled() and not prewarm:
             return None
+        # A number becomes a brand only through explicit folder membership.
+        # Load separate overrides even when it has no phonebook entry. Keep
+        # the phonebook avatar first, including after removal from Brands.
+        brand_allowed = True
+        if re.match(r"^[+\d\s\-()]+$", number.strip()):
+            options = await self.hass.async_add_executor_job(self.store.get_chat_folder_options)
+            brand_allowed = number in options["brands_manual"] and number not in options["brands_excluded"]
         avatar = str((contact or {}).get("avatar") or "").strip()
         avatar_match = re.fullmatch(
             r"data:(image/(?:jpeg|png|webp|gif));base64,([A-Za-z0-9+/=]+)",
@@ -847,6 +854,10 @@ class SmsCoordinator:
             except Exception as error:
                 _LOGGER.debug("Contact avatar unavailable for notification: %s", error)
         custom_icon = str((contact or {}).get("brand_icon_data") or "").strip()
+        if brand_allowed and not custom_icon:
+            custom_icon = await self.hass.async_add_executor_job(self.store.get_brand_custom_icon, number)
+        if not brand_allowed:
+            custom_icon = ""
         custom_match = re.fullmatch(
             r"data:(image/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)",
             custom_icon,
@@ -868,6 +879,8 @@ class SmsCoordinator:
                     return {"url": f"/api/sms_gammu_viewer_brand/{asset_id}.{suffix}", "content_type": content_type}
             except Exception as error:
                 _LOGGER.debug("Custom brand icon unavailable for notification: %s", error)
+        if not brand_allowed:
+            return None
         source = str((contact or {}).get("brand_logo_url") or "").strip()
         if not source:
             try:

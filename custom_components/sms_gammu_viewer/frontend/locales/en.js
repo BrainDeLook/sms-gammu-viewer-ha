@@ -179,6 +179,7 @@ export default {
   close: "Close",
   back: "Back",
   modem_btn: "Modem status",
+  brand_saved_contact_confirm: "This sender is in your phonebook. The brand icon is stored separately: their name, photo and other contact details will stay unchanged. The contact photo takes priority over the brand icon. Continue?",
   draft: "Draft",
   call_waiting_sms: "Receiving SMS, please wait…",
 };

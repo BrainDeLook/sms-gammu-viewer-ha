@@ -292,6 +292,10 @@ const CSS = `
   .contact-list.brand-loading { visibility: hidden; }
   .folder-tabs { display: flex; align-items: center; gap: 6px; padding: 7px 12px 5px; overflow: visible; }
   .folder-tab-shell { display: flex; align-items: center; gap: 6px; min-width: 0; width: auto; box-sizing: border-box; }
+  @media (min-width: 581px) {
+    .status-bar { padding-bottom: 3px; }
+    .folder-tabs { padding-top: 3px; }
+  }
   .folder-tab-scroll { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1 1 auto; overflow-x: auto; scrollbar-width: none; touch-action: pan-x; background: transparent; }
   .folder-tab-scroll::-webkit-scrollbar { display: none; }
   .folder-tab-scroll { cursor: grab; }
@@ -2046,7 +2050,10 @@ class SmsGammuPanel extends HTMLElement {
   _brandLogoFor(contact) {
     if (!this._status?.use_brand_logos || !contact) return "";
     const value = String(contact.contact_name || contact.number || "").trim().toLowerCase();
-    if (!value || !this._isAlphaTag(contact.number)) return "";
+    const alpha = this._isAlphaTag(contact.number);
+    const manualBrand = this._folderOptions.brands_manual.includes(contact.number)
+      && !this._folderOptions.brands_excluded.includes(contact.number);
+    if (!value || (!alpha && !manualBrand)) return "";
     const custom = String(contact.brand_icon_data || "").trim();
     if (custom) return custom;
     const override = String(contact.brand_logo_url || "").trim();
@@ -2054,6 +2061,8 @@ class SmsGammuPanel extends HTMLElement {
       const selected = (this._brandCatalog || []).find((logo) => this._brandSourceUrl(logo) === override);
       return selected?.localUrl || override;
     }
+    // Numbered senders use explicit choices only, never name-based matching.
+    if (!alpha) return "";
     const cached = String(this._brandAssignments[contact.number] || "").trim();
     if (cached) {
       const cachedLogo = (this._brandCatalog || []).find((logo) => this._brandSourceUrl(logo) === cached);
@@ -2197,7 +2206,7 @@ class SmsGammuPanel extends HTMLElement {
   }
 
   _isBrandChat(contact) {
-    return Boolean(contact?.brand_logo_url || contact?.brand_icon_data || this._brandLogoFor(contact));
+    return this._isAlphaTag(contact.number) && Boolean(contact.brand_logo_url || contact.brand_icon_data || this._brandLogoFor(contact));
   }
 
   _isInBrandsFolder(contact) {
@@ -2899,7 +2908,7 @@ class SmsGammuPanel extends HTMLElement {
         <button class="profile-action" id="profile-edit">
           <span class="profile-action-icon">✎</span><span>${c._saved ? this._t("edit") : this._t("add_to_contacts")}</span>
         </button>
-        ${this._status?.use_brand_logos && this._isAlphaTag(c.number) ? `<button class="profile-action" id="profile-brand">
+        ${this._status?.use_brand_logos && (this._isAlphaTag(c.number) || this._isInBrandsFolder(c)) ? `<button class="profile-action" id="profile-brand">
           <span class="profile-action-icon">▣</span><span>${this._t("change_brand_logo")}</span>
         </button>` : ""}
       </div>
@@ -2932,6 +2941,7 @@ class SmsGammuPanel extends HTMLElement {
 
   async _openBrandLogoPicker(contact) {
     if (!contact?.number) return;
+    if (contact._saved && !confirm(this._t("brand_saved_contact_confirm"))) return;
     await this._ensureBrandCatalog();
     this._brandPickerContact = contact;
     this._renderBrandLogoPicker(String(contact.contact_name || contact.name || contact.number));

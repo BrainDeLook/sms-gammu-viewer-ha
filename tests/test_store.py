@@ -23,6 +23,21 @@ SmsStore = MODULE.SmsStore
 
 
 class StoreContainsTests(unittest.TestCase):
+    def test_brand_icon_does_not_create_or_overwrite_phonebook_contact(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = SmsStore(Path(directory) / "sms.db")
+            store.init()
+            number = "+79990000000"
+            store.set_brand_custom_icon(number, "data:brand")
+            self.assertIsNone(store.get_contact(number))
+            store.add_contact(number, "Person", avatar="data:person", notes="Keep me")
+            store.set_brand_logo_override(number, "https://trace-logos.ru/assets/logos/test.svg")
+            store.set_brand_custom_icon(number, "data:newbrand")
+            contact = store.get_contact(number)
+            self.assertEqual(contact["name"], "Person")
+            self.assertEqual(contact["avatar"], "data:person")
+            self.assertEqual(contact["notes"], "Keep me")
+
     def test_contains_confirms_exact_durable_incoming_row(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             store = SmsStore(Path(directory) / "sms.db")

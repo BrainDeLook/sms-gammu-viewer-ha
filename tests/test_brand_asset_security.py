@@ -1,6 +1,7 @@
 """Exercise image delivery helpers without importing Home Assistant."""
 import ast
 import asyncio
+import base64
 from datetime import timedelta
 import hashlib
 import logging
@@ -35,6 +36,27 @@ def load_helpers(config_dir):
 
 
 class BrandAssetsTests(unittest.IsolatedAsyncioTestCase):
+    async def test_numbered_brand_notification_uses_separate_icon_and_preserves_photo(self):
+        with tempfile.TemporaryDirectory() as directory:
+            ns, _, hass = load_helpers(directory)
+            coordinator = next(n for n in TREE.body if isinstance(n, ast.ClassDef) and n.name == "SmsCoordinator")
+            method = next(n for n in coordinator.body if getattr(n, "name", "") == "_notification_brand_image")
+            ns.update(base64=base64, partial=__import__("functools").partial, _LOGGER=logging.getLogger(__name__))
+            exec(compile(ast.Module(body=[method], type_ignores=[]), str(SOURCE), "exec"), ns)
+            number = "+79990000000"
+            options = {"brands_manual": [number], "brands_excluded": []}
+            icon = "data:image/png;base64," + base64.b64encode(b"\x89PNGbrand").decode()
+            coord = SimpleNamespace(hass=hass, _notify_images_enabled=lambda: True,
+                store=SimpleNamespace(get_chat_folder_options=lambda: options,
+                                      get_brand_custom_icon=lambda _: icon))
+            image = await ns["_notification_brand_image"](coord, number, None)
+            self.assertEqual(image["content_type"], "image/png")
+            options["brands_manual"] = []
+            self.assertIsNone(await ns["_notification_brand_image"](coord, number, None))
+            photo = "data:image/png;base64," + base64.b64encode(b"\x89PNGperson").decode()
+            image = await ns["_notification_brand_image"](coord, number, {"avatar": photo})
+            self.assertIn(ns["_brand_asset_id"](photo), image["url"])
+
     async def test_private_view_reads_via_executor_and_rejects_invalid_paths(self):
         with tempfile.TemporaryDirectory() as directory:
             ns, _, hass = load_helpers(directory)
