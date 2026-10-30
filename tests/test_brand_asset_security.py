@@ -11,7 +11,7 @@ import tempfile
 from types import SimpleNamespace
 import unittest
 from unittest.mock import AsyncMock, Mock
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit, parse_qs
 
 SOURCE = Path(__file__).parents[1] / "custom_components/sms_gammu_viewer/__init__.py"
 TREE = ast.parse(SOURCE.read_text(encoding="utf-8"))
@@ -111,6 +111,7 @@ class BrandAssetsTests(unittest.IsolatedAsyncioTestCase):
         coordinator = next(n for n in TREE.body if isinstance(n, ast.ClassDef) and n.name == "SmsCoordinator")
         notify = next(n for n in coordinator.body if getattr(n, "name", "") == "_notify")
         ns.update(quote=quote, CONF_LANGUAGE="language", DEFAULT_LANGUAGE="ru",
+                  get_url=Mock(return_value="https://ha.example/"), NoURLAvailableError=RuntimeError,
                   NOTIFY_ACTION_REPLY_PREFIX="reply_", NOTIFY_ACTION_READ_PREFIX="read_",
                   _LOGGER=logging.getLogger(__name__))
         exec(compile(ast.Module(body=[notify], type_ignores=[]), str(SOURCE), "exec"), ns)
@@ -125,10 +126,19 @@ class BrandAssetsTests(unittest.IsolatedAsyncioTestCase):
         )
         await ns["_notify"](coord, "+79991234567", "Test")
         mobile_data = hass.services.async_call.call_args_list[0].args[2]["data"]
-        self.assertEqual(mobile_data["attachment"], {"url": image["url"] + "?authSig=test", "content-type": "png"})
+        self.assertEqual(mobile_data["attachment"], {"url": "https://ha.example" + image["url"] + "?authSig=test", "content-type": "png"})
+        attachment = urlsplit(mobile_data["attachment"]["url"])
+        self.assertEqual(attachment.scheme, "https")
+        self.assertEqual(attachment.path, image["url"])
+        self.assertEqual(parse_qs(attachment.query), {"authSig": ["test"]})
+        ns["get_url"].assert_called_once_with(hass, prefer_external=True)
         self.assertEqual(mobile_data["url"], "/sms-viewer?chat=%2B79991234567")
         self.assertNotIn("attachment", hass.services.async_call.call_args_list[1].args[2]["data"])
         signer.assert_called_once()
+        hass.services.async_call.reset_mock()
+        ns["get_url"].side_effect = RuntimeError
+        await ns["_notify"](coord, "+79991234567", "Still deliver SMS")
+        self.assertNotIn("attachment", hass.services.async_call.call_args_list[0].args[2]["data"])
 
     async def test_no_direct_file_metadata_calls_in_async_functions(self):
         class Check(ast.NodeVisitor):

@@ -28,6 +28,7 @@ from homeassistant.components.http.auth import async_sign_path
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.network import NoURLAvailableError, get_url
 
 from .const import (
     CONF_CALL_DEVICE,
@@ -1483,6 +1484,19 @@ class SmsCoordinator:
         display_name = self.store._display_sender_name(display_name)
 
         notification_image = await self._notification_brand_image(number, contact)
+        attachment_url = None
+        if notification_image:
+            try:
+                base_url = get_url(self.hass, prefer_external=True)
+            except NoURLAvailableError:
+                _LOGGER.warning("Notification image omitted: no Home Assistant URL is configured")
+            else:
+                # iOS appends relative attachment URLs as path components,
+                # escaping '?' in signed paths and producing a 404. Absolute
+                # URLs retain authSig and need no Companion auth header.
+                attachment_url = base_url.rstrip("/") + _signed_brand_asset_url(
+                    self.hass, notification_image["url"]
+                )
 
         preview = text if len(text) <= 150 else text[:150] + "…"
 
@@ -1531,7 +1545,7 @@ class SmsCoordinator:
             }
             # Attachments are understood by the Home Assistant mobile_app
             # notifier. Keep other notify targets byte-for-byte compatible.
-            if notification_image and parts[0] == "notify" and parts[1].startswith("mobile_app_"):
+            if attachment_url and parts[0] == "notify" and parts[1].startswith("mobile_app_"):
                 attachment_type = {
                     "image/png": "png",
                     "image/jpeg": "jpeg",
@@ -1539,7 +1553,7 @@ class SmsCoordinator:
                     "image/webp": "webp",
                 }.get(notification_image["content_type"])
                 notification_data["attachment"] = {
-                    "url": _signed_brand_asset_url(self.hass, notification_image["url"]),
+                    "url": attachment_url,
                 }
                 # Companion's attachment.content-type is a file extension,
                 # not an HTTP MIME type. Supplying "image/png" makes iOS
